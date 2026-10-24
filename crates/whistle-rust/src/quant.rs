@@ -3,7 +3,8 @@
 //! `(codebook[idx] * norm) @ H`, `H` the orthonormal Walsh–Hadamard matrix of the group size
 //! (Sylvester order); `H` is symmetric, so each group is one fast Walsh–Hadamard transform.
 //! Reads the validated [`Tensor`] records `cact` produces. [`CqRows`] keeps a CQ record packed
-//! and dequantizes single rows on demand (the model's Engram tables).
+//! and dequantizes single rows on demand (the model's Engram tables); [`CqRows::parts`] hands
+//! the packed fields to the packed-weight projection kernel (`model::kernels::packed`).
 
 use crate::cact::{packed_row_bytes, Archive, DType, Tensor, TERNARY_RECORD_BITS};
 use crate::error::Error;
@@ -107,7 +108,7 @@ fn field(row: &[u8], k: usize, width: usize) -> usize {
 
 /// The decoding parameters of one CQ record: its logical shape, padded row, width and
 /// codebook. Shared by the whole-tensor path ([`Tensor::to_f32`]) and [`CqRows`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct CqLayout {
     rows: usize,
     cols: usize,
@@ -193,7 +194,7 @@ impl CqLayout {
 /// 38 MB apiece. Holds the one owned copy of the record's blob (about 2.5 MB per table), so it
 /// outlives the archive. Rows must be whole groups, which lets [`CqRows::row_into`] decode
 /// straight into the caller's buffer without allocating.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CqRows {
     layout: CqLayout,
     blob: Vec<u8>,
@@ -216,6 +217,33 @@ impl CqRows {
         })
     }
 
+    /// The packed rows of any CQ matrix, padded rows included: what the packed projection
+    /// kernel reads (it pads the activations to match). [`CqRows::row_into`] still needs
+    /// whole groups; [`CqRows::to_f32`] drops the padding.
+    pub(crate) fn from_tensor_padded(
+        tensor: &Tensor<'_>,
+        archive: &Archive<'_>,
+    ) -> Result<CqRows, Error> {
+        Ok(CqRows {
+            layout: CqLayout::new(tensor, archive)?,
+            blob: tensor.bytes().to_vec(),
+        })
+    }
+
+    /// The record's packed fields, for the packed projection kernel.
+    pub(crate) fn parts(&self) -> CqParts<'_> {
+        let (packed, norms) = self.blob.split_at(self.layout.norms_at());
+        CqParts {
+            packed,
+            norms,
+            row_bytes: self.layout.row_bytes,
+            bits: self.layout.bits,
+            group: self.layout.group,
+            in_pad: self.layout.in_pad,
+            codebook: &self.layout.codebook,
+        }
+    }
+
     /// The logical row count (`out`).
     pub fn rows(&self) -> usize {
         self.layout.rows
@@ -229,7 +257,10 @@ impl CqRows {
     /// Dequantizes row `r` into `out` (`cols` values), exactly as [`Tensor::to_f32`] would.
     /// Allocation-free.
     pub fn row_into(&self, r: usize, out: &mut [f32]) -> Result<(), Error> {
-        if r >= self.layout.rows || out.len() != self.layout.cols {
+        if r >= self.layout.rows
+            || out.len() != self.layout.cols
+            || self.layout.cols != self.layout.in_pad
+        {
             return Err(Error::Archive(format!(
                 "CQ row {r} of {} rows into {} values (row length {})",
                 self.layout.rows,
@@ -247,14 +278,55 @@ impl CqRows {
         Ok(out)
     }
 
-    /// Every row, row-major: the whole matrix.
+    /// Every row, row-major: the whole matrix (padding dropped).
     pub fn to_f32(&self) -> Result<Vec<f32>, Error> {
         let mut values = vec![0.0f32; self.layout.rows * self.layout.cols];
-        for (r, row) in values.chunks_exact_mut(self.layout.cols).enumerate() {
-            self.layout.decode(&self.blob, r, row)?;
-        }
+        let mut padded = vec![0.0f32; self.layout.in_pad];
+        self.rows_into(0, &mut values, &mut padded)?;
         Ok(values)
     }
+
+    /// Rows `first..first + out.len() / cols` into `out`, row-major, padding dropped, through
+    /// the caller's `padded` scratch (`in_pad` long; unused when rows are whole groups), exactly
+    /// as [`CqRows::to_f32`]'s rows. Rows past the matrix are an error.
+    pub(crate) fn rows_into(
+        &self,
+        first: usize,
+        out: &mut [f32],
+        padded: &mut [f32],
+    ) -> Result<(), Error> {
+        let (cols, in_pad) = (self.layout.cols, self.layout.in_pad);
+        let count = out.len().checked_div(cols).unwrap_or(0);
+        if first + count > self.layout.rows || padded.len() != in_pad {
+            return Err(Error::Archive(format!(
+                "CQ rows {first}..{} of {} rows",
+                first + count,
+                self.layout.rows
+            )));
+        }
+        for (i, row) in out.chunks_exact_mut(cols).enumerate() {
+            if cols == in_pad {
+                self.layout.decode(&self.blob, first + i, row)?;
+            } else {
+                self.layout.decode(&self.blob, first + i, padded)?;
+                row.copy_from_slice(&padded[..cols]);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// A CQ record's packed fields: `rows` packed index rows of `row_bytes` (LSB-first fields of
+/// `bits`, ternary as 2-bit crumbs), then one fp16 norm per row and `group`; rows padded to
+/// `in_pad`; the unit `codebook`.
+pub(crate) struct CqParts<'a> {
+    pub packed: &'a [u8],
+    pub norms: &'a [u8],
+    pub row_bytes: usize,
+    pub bits: u32,
+    pub group: usize,
+    pub in_pad: usize,
+    pub codebook: &'a [f32],
 }
 
 /// A whole CQ record, decoded from the archive's bytes in place (no copy of the blob).

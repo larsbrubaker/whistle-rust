@@ -153,16 +153,8 @@ impl Engram {
         let (k, v) = self.project_rows(tokens, 0)?;
         let conv = self.value_conv(&v, 0)?;
         let n = tokens.len();
-        let keys = Matrix {
-            rows: n,
-            cols: self.key_proj.rows,
-            data: k,
-        };
-        let values = Matrix {
-            rows: n,
-            cols: self.value_proj.rows,
-            data: conv,
-        };
+        let keys = Matrix::dense(n, self.key_proj.rows, k);
+        let values = Matrix::dense(n, self.value_proj.rows, conv);
         Ok((keys, values))
     }
 
@@ -269,11 +261,12 @@ impl Engram {
         let dilation = self.hash.dilation;
         // `sum(taps[j] * shift_right(v, j · dilation) * tap_ok[j])`: Python's `sum` starts at 0
         // and adds the taps in order, which this keeps so the f32 sums round the same way.
+        let tap_values = taps.data();
         let mut conv = vec![0.0f32; (n - first) * d];
         for t in first..n {
             let out = &mut conv[(t - first) * d..(t - first + 1) * d];
             for j in 0..taps.rows {
-                let tap = &taps.data[j * d..(j + 1) * d];
+                let tap = &tap_values[j * d..(j + 1) * d];
                 // `tap_in_sequence` holds exactly when the shift neither overflows nor reaches
                 // before the start.
                 let src = j

@@ -116,6 +116,142 @@ the step in the few-row kernel, spread over cross-attention (about 30%), self-at
 projections and gate/out (about 37%), the head (about 23%) and the Engram projections (5%);
 norms, A8, Hadamard, Sinkhorn and attention itself are each under 2%.
 
+## Packed CQ weights
+
+The archive has 152 CQ records (145 at 2 bits, 7 at 4 bits, groups of 128). The two Engram
+tables were already kept packed (`CqRows`, gathered by row). The other 150, every CQ matrix the
+model projects, are now packed too instead of dequantized: about 36 M weights, about 130 MB
+less per binding (measured below). Each keeps its record: the packed indices
+(10.2 MB for the 150) and the fp16 norms in the blob (0.56 MB), plus an f32 copy of the
+norms (1.12 MB, the kernels' per-group scale). Packed matrices need a power-of-two group of at
+least 16 (the band decode's butterflies rely on it; `cact` admits no other) and 2 or 4 bits;
+any other record would stay dense. The fp16 matrices (stem taps, depthwise kernels, Hadamard
+factors, the mel filterbank) stay dense. `Matrix::data()` returns a `Cow`: borrowed for a dense
+matrix; for a packed one, a new dequantized vector (exactly `Tensor::to_f32`) on every call,
+with nothing kept, so it costs `rows · cols` f32 and about 0.4 ns per weight each time. Only
+tests and inspection call it; the model never does. Two packed matrices compare equal by their
+records, without dequantizing. The embedding is gathered row by row (`Matrix::row_into`,
+padded rows included) and the mHC mixing projects a band of `phi`'s rows
+(`Matrix::project_rows`). `kernels/packed.rs` has two orders:
+
+- **Rotated (the decoder's matrices, the head and the Engram projections).** A group's row
+  dequantizes to `(cb[idx] · norm_g) @ H`, and `H` is symmetric, so `w_g · x_g = norm_g ·
+  (cb[idx] · H x_g)`. Each input row is padded and rotated once per group by the existing
+  FWHT, and each output is `Σ_g norm_g · Σ_k cb[idx] · xr_k`. There are 16 lanes per group
+  (lane `j` takes `k ≡ j mod 16`), mul then add, a fixed reduction tree, and the groups are
+  summed in order. NEON decodes 16 indices per step: a `vqtbl1q_u8` byte spread, a shift and
+  a mask give `4 · code`, then `vqtbl1q_u8` (2-bit) or `vqtbl4q_u8` (4-bit) into the codebook's
+  bytes. AVX2 and simd128 have their own paths (below). The unit tests pin NEON to scalar
+  bit for bit on every archive matrix at 1, 4 and 5 rows and at both widths. The full pass and
+  the cached step use the same kernel, so the KV-cache identity still holds. So does the thread
+  identity: a split never divides a sum.
+- **Dense (the encoder's and the stem's matrices, and the decoder's cross-attention keys and
+  values).** These project many frames (the keys and values only ever project the encoder's
+  frames, once per call, shared by every decode pass) and have no cached step. The rotated order
+  decodes the weights again for every 4 input rows, which made the 30 s encoder 3–4× slower
+  (2.07 s against 0.55 s on 1 thread under the same load). So these matrices run
+  `kernels/band.rs`: workers own contiguous slices of the outputs, and each decodes 64 rows at a
+  time and multiplies them by every input row while they are in cache, storing straight into
+  the output (`linear_band_into`). Results do not depend on the thread count, and no full
+  dequantized copy is made. The decode gives `Tensor::to_f32`'s bits exactly (a test pins it on
+  every archive matrix and path). NEON folds `(cb[c] · norm) · scale` into a per-group lookup
+  table, decodes 16 indices with the same byte shuffles, does the butterfly levels 1–8 in
+  registers and the higher ones as vector add and subtract: 0.37–0.58 ns per weight against
+  1.9–2.0 scalar (`band_decode_timing`, load 10–12). The dense kernel then gives the same bits
+  as before, so no encoder or stem bound moved.
+
+**SIMD by target.** Every path keeps the scalar order's lanes, reduction and butterfly
+order, mul then add with no FMA, and unaligned loads. The lane mappings are worked out in each
+module's header.
+
+| Kernel | aarch64 | x86_64 | wasm32 |
+|---|---|---|---|
+| rotated projection (decoder) | NEON: `vqtbl` index and codebook lookups | AVX2 (`Avx2Detected`): `_mm256_srlv_epi32` index decode, `_mm256_permutevar8x32_ps` codebook lookup (`packed_x86.rs`) | simd128: nibble split with `i8x16_swizzle` and `v128_bitselect`, codebook as byte planes through `i8x16_swizzle` (`packed_wasm.rs`) |
+| band decode (encoder, stem, cross K/V) | NEON | AVX2: the same decode, butterflies by `_mm256_shuffle_ps` / `_mm256_blend_ps` / `_mm256_permute2f128_ps` | simd128: the same decode, butterflies by `i32x4_shuffle` |
+| anything else | scalar order | scalar order (no AVX2) | scalar order (no simd128) |
+
+What has run and what has not:
+- **NEON** runs here: the unit tests pin it to scalar bit for bit.
+- **simd128** ran in wasmtime through a scratch harness outside the repo. A wasm32 build with
+  simd128 and one without hashed the same encoder output and decoder logits bits on a 2 s
+  chirp (`6644388670678719336` both); the simd128 build took 0.62 s against 1.22 s.
+- **AVX2 has not run.** There is no x86_64 machine or Rosetta here. It is checked by
+  construction and by `--emit asm` for x86_64-unknown-linux-gnu:
+  - `rows_into_avx2` and `band_into_avx2` hold their whole loops, with no calls except
+    memcpy and panic paths, so there is no per-group call.
+  - There is no FMA anywhere in the crate.
+  - The expected instructions are present: `vpsrlvd`, `vpermd` (the integer form of the f32
+    permute, the same bits), `vblendvps` and blends 0xAA/0xCC/0xF0. LLVM chose
+    `vmovsldup`/`vmovshdup`/`vmovddup` and `vinsertf128` for the same element moves, and
+    `vhaddps` for the exact pairwise final adds.
+- The wasm asm (`--emit asm`, +simd128) shows both kernels inlined into `rows_into` and
+  `band_into`, with `i8x16.swizzle`, `i8x16.shuffle`, `f32x4.mul` and `f32x4.add`, no calls
+  and no FMA.
+- The same unit tests compare `best_path` against scalar, so they cover AVX2 when run on
+  x86_64 hardware.
+
+**Numerics.** The rotated order rounds differently from dequantize-then-sum. Measured
+2026-10-24 against `main` (e78c65a), same fixtures:
+
+| Stage (worst) | main | packed |
+|---|---|---|
+| decoder layer from previous lanes (`LAYER_BOUND`, was 5e-4, now 2e-3) | 1.39e-4 (de_anna L2) | 1.08e-3 (en_samantha L3) |
+| decoder/out (bound 3e-2) | 1.65e-2 (pl_zosia); silence 6.0e-7 | 1.76e-2 (pl_zosia); silence 1.30e-2 |
+| decoder/logits (bound 1.5e-2) | 7.17e-3 | 5.40e-3 |
+| decoder block layers 0, 3 (bound 7e-3) | 3.49e-3 | 3.49e-3 |
+| decoder self/cross projections, norms, outputs (≤1e-6) | 4.7e-7 / 6.3e-7 | 6.6e-7 / 7.4e-7 |
+| Engram keys / values (5e-4) | 2.04e-4 / 2.31e-4 | unchanged |
+| encoder layer, encoder end to end, stem | 2.28e-3, 2.74e-2, 1.32e-4 | unchanged (dense order) |
+
+The per-layer decoder measurement moved past its bound, from one flipped A8 step on
+en_samantha layer 3. 1.08e-3 is under the reference's own 2.6–2.8e-3 for one block between
+execution modes (`oracle.md`), so the bound was re-set to 2e-3 with the measurement beside it.
+That move was pre-approved for a contract that holds. The exact-stage projection tests stay
+≤ 1e-6 on the packed path. **Token contract:** identical tokens, text and language on all 8
+speech clips with the VAD off and with the default gate and trim. Silence and empty audio give
+an empty transcript. The cached steps score exactly as the full recompute, and 1 and 4 threads
+are bit-identical.
+
+**Why silence's `decoder/out` moved** (6.0e-7 to 1.30e-2). It is one flipped A8 step, not a
+zero-row asymmetry. Run layer by layer, the rotated order against the dense bits on the silence
+clip's own lanes (7 positions, "Thank you."), the difference is f32 rounding at every position
+in layer 0 (3–6e-7). Then a single jump appears at layer 1, position 0 (the start token, 4.8e-7
+to 1.2e-4), and self-attention spreads it to every later position from layer 2 on (1.4e-3 to
+1.5e-2 by layer 6). Silence's zero features never reach the decoder as zero rows: its memory
+matches the reference to 4.5e-8, and no layer-0 row matches exactly. On `main` this clip
+happened to have no flip; the speech clips already carried flips at the same 1e-2 level.
+
+**Memory and time.** Apple M5, release, 2026-10-24, the machine shared with other builds. Main
+(e78c65a) and packed were run back to back, alternating. Peak resident set of the `transcribe`
+timing process (`/usr/bin/time -l`; it binds the model twice, as a `Whistle` and as bare
+`Weights`): 399.5–402.9 MB on main, 163.3–179.4 MB packed. The resident set right after
+binding (`from_cact`, measured in review) is 171 MB on main against 40.8 MB packed: about 130 MB
+less per binding. The quietest set (load average 2.9, three rounds each; before the strided store and the
+folded lookup table, which only made the band path cheaper):
+
+| | main | packed |
+|---|---|---|
+| decoder, per token, 1 thread | 2.46–2.50 ms | 2.09–2.31 ms |
+| decoder, per token, 4 threads | 2.54–2.56 ms | 2.15–2.16 ms |
+| 3 s encoder, 1 thread | 36.9–37.4 ms | 41.6–41.8 ms |
+| 3 s encoder, 4 threads | 29.8–30.1 ms | 32.0–32.2 ms |
+| 3 s decoder setup (cross keys and values then rotated), 1 / 4 threads | 5.1 / 3.5 ms | 6.2–6.5 / 3.9 ms |
+| 30 s features to encoder output, 1 thread | 385–392 ms | 397–406 ms |
+| 30 s features to encoder output, 4 threads | 257–263 ms | 274–300 ms |
+| 3 s whole default call, 4 threads | 78.1–78.8 ms | 73.4–74.5 ms |
+
+The final code, 30 s only, four alternating rounds at load average 9.6–10: 1 thread 462–640
+ms on main (median about 540) against 483–573 ms packed (about 523); 4 threads 394–518 ms (about
+439) against 410–502 ms (about 471): within the noise. The 3 s clip in the same conditions:
+whole call 126–174 ms on main against 114–150 ms packed (4 threads); encoder 56–60 ms against
+61–83 ms on 4 threads and 58–69 against 61–69 ms on 1.
+
+So a binding holds about 130 MB less and the decoder step is faster: 2 bits per weight to
+stream instead of 32. The whole call is no slower. The encoder pays one decode of its matrices
+per call (about 19M weights at 0.4–0.6 ns): within the noise on 30 s, but a few ms (5–12%) on a
+3 s clip, which has only about 39 frames to amortize it over. That is the one stage still
+measurably behind `main` on a quiet machine.
+
 ## What is left
 
 - **The decoder step** (about 2.7 ms per token) runs on one thread and is now bound by how the
@@ -130,5 +266,7 @@ norms, A8, Hadamard, Sinkhorn and attention itself are each under 2%.
   cost decides whether it lands well under 2 s.
 - **Spawn cost:** threads are spawned per projection (`std::thread::scope`); a persistent pool
   would cut the overhead that keeps small and single-row projections on one thread.
-- **Packed CQ weights** and the fast Walsh–Hadamard rotation (PORTING_PLAN item 6) are the
-  next step; these kernels work on the dense f32 weights.
+- **Packed encoder on short clips:** the per-call band decode costs a few ms on a 3 s clip
+  (above).
+- **Run the AVX2 packed paths** (and the dense AVX2 kernels) on an x86_64 machine: the unit
+  tests pin them to scalar, but they have only been checked by construction and asm.

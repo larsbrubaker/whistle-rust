@@ -156,7 +156,10 @@ fn decoder_cross_attention_reproduces_layers_0_and_3() {
         let p = format!("decoder/layer{l:02}/block");
         let layer = &weights().decoder[l];
         let (_, x) = f.f32(&format!("{p}/cross_norm/0"));
-        let proj = layer.cross_attn.projections(&x, mem.memory.data()).unwrap();
+        let proj = layer
+            .cross_attn
+            .projections(&x, &mem.memory.data())
+            .unwrap();
         for (name, got) in [
             ("q_proj", &proj.q),
             ("k_proj", &proj.k),

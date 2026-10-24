@@ -114,6 +114,7 @@ impl EncoderLayer {
         let k = self.dw.rows;
         let left = k.saturating_sub(1) / 2;
         let frames = ctx.frames;
+        let dw = self.dw.data();
         let mut out = vec![0.0f32; h.len()];
         for t in 0..frames {
             let o = &mut out[t * d..(t + 1) * d];
@@ -121,7 +122,7 @@ impl EncoderLayer {
                 let Some(src) = (t + tap).checked_sub(left).filter(|&s| s < frames) else {
                     continue;
                 };
-                let w = &self.dw.data[tap * d..(tap + 1) * d];
+                let w = &dw[tap * d..(tap + 1) * d];
                 let hs = &h[src * d..(src + 1) * d];
                 for ((o, &w), &v) in o.iter_mut().zip(w).zip(hs) {
                     *o += v * w;

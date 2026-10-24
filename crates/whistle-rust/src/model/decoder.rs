@@ -47,8 +47,8 @@ impl<'w> DecoderContext<'w> {
         let (mut engram_k, mut engram_v) = (Vec::new(), Vec::new());
         for e in &weights.engrams {
             let (k, v) = e.keys_values(tokens)?;
-            engram_k.extend_from_slice(&k.data);
-            engram_v.extend_from_slice(&v.data);
+            engram_k.extend_from_slice(&k.data());
+            engram_v.extend_from_slice(&v.data());
         }
         Ok(DecoderContext {
             weights,
@@ -132,8 +132,9 @@ pub(crate) fn site_flags(weights: &Weights, layer: usize) -> Vec<f32> {
 pub(crate) fn input_lanes(weights: &Weights, tokens: &[u32]) -> Result<Lanes, Error> {
     let x = weights.embed(tokens)?;
     let n = weights.decoder_mhc.lanes;
-    let mut data = Vec::with_capacity(x.data.len() * n);
-    for row in x.data.chunks_exact(x.cols) {
+    let values = x.data();
+    let mut data = Vec::with_capacity(values.len() * n);
+    for row in values.chunks_exact(x.cols) {
         for _ in 0..n {
             data.extend_from_slice(row);
         }
@@ -340,27 +341,27 @@ impl<'w> Decoder<'w> {
                 lanes.width
             )));
         }
-        Ok(Matrix {
-            rows: lanes.frames,
-            cols: width,
-            data: lane_mean_norm(lanes, &self.weights.final_norm),
-        })
+        Ok(Matrix::dense(
+            lanes.frames,
+            width,
+            lane_mean_norm(lanes, &self.weights.final_norm),
+        ))
     }
 
     /// The tied output head on the decoder's output: `A8(hidden) · embeddingᵀ` in f32 over the
     /// whole vocabulary. A hidden width other than `d_model` is [`Error::Input`].
     pub fn logits(&self, hidden: &Matrix) -> Result<Logits, Error> {
         let e = &self.weights.embedding;
-        if hidden.cols != e.cols || hidden.rows.checked_mul(e.cols) != Some(hidden.data.len()) {
+        if hidden.cols != e.cols || hidden.rows.checked_mul(e.cols) != Some(hidden.data().len()) {
             return Err(Error::Input(format!(
                 "decoder output [{}, {}] of {} values for a {}-wide embedding",
                 hidden.rows,
                 hidden.cols,
-                hidden.data.len(),
+                hidden.data().len(),
                 e.cols
             )));
         }
-        let mut x = hidden.data.clone();
+        let mut x = hidden.data().into_owned();
         a8(&mut x, e.cols);
         Ok(Logits {
             data: e.project(&x),

@@ -10,6 +10,8 @@ use crate::cact::{Archive, DType, Geometry, Tensor};
 use crate::error::Error;
 use crate::quant::CqRows;
 
+use super::kernels::{Order, PackedMatrix};
+
 use super::weights::{
     AudioManifest, CrossAttention, DecoderLayer, EncoderLayer, Engram, HadaPerms, HadamardMlp,
     Matrix, Mhc, Norm, QkvTaps, SelfAttention, Stem, StemStage, Weights,
@@ -27,6 +29,9 @@ const AUDIO_MANIFEST_VERSION: u32 = 1;
 struct Reader<'r, 'a> {
     archive: &'r Archive<'a>,
     names: Vec<String>,
+    /// How the CQ matrices bound next project (`kernels::packed`): rotated for the decoder,
+    /// dense for its cross-attention keys and values, the encoder and the stem.
+    order: Order,
 }
 
 impl<'r, 'a> Reader<'r, 'a> {
@@ -75,15 +80,18 @@ impl<'r, 'a> Reader<'r, 'a> {
 
     fn fp16_matrix(&mut self, name: String, rows: usize, cols: usize) -> Result<Matrix, Error> {
         let data = self.fp16(name, &[rows, cols])?;
-        Ok(Matrix { rows, cols, data })
+        Ok(Matrix::dense(rows, cols, data))
     }
 
-    /// A CQ matrix, dequantized.
+    /// A CQ matrix: kept packed when the packed kernel takes its width and group (every CQ
+    /// matrix of Whistle's archive), otherwise dequantized.
     fn matrix(&mut self, name: String, rows: usize, cols: usize) -> Result<Matrix, Error> {
-        let data = self
-            .take(name, DType::Cq, &[rows, cols])?
-            .to_f32(self.archive)?;
-        Ok(Matrix { rows, cols, data })
+        let tensor = self.take(name, DType::Cq, &[rows, cols])?;
+        let cq = CqRows::from_tensor_padded(tensor, self.archive)?;
+        match PackedMatrix::new(cq, self.order) {
+            Some(packed) => Ok(Matrix::packed(packed)),
+            None => Ok(Matrix::dense(rows, cols, tensor.to_f32(self.archive)?)),
+        }
     }
 
     /// A CQ matrix, kept packed.
@@ -208,6 +216,7 @@ pub(crate) fn bind(archive: &Archive<'_>) -> Result<Weights, Error> {
     let mut r = Reader {
         archive,
         names: Vec::with_capacity(archive.tensors().len()),
+        order: Order::Rotated,
     };
 
     let embedding = r.matrix("embedding".into(), g.vocab as usize, d)?;
@@ -245,6 +254,7 @@ pub(crate) fn bind(archive: &Archive<'_>) -> Result<Weights, Error> {
         decoder.push(decoder_cross(&mut r, &dims, &format!("layer{i:02}"), core)?);
     }
     let pe_gate = r.scalar("pe_gate".into())?;
+    r.order = Order::Dense;
     let mut encoder = Vec::new();
     for i in 0..audio.enc_layers {
         let kernel = audio.conv_kernel as usize;
@@ -266,11 +276,7 @@ pub(crate) fn bind(archive: &Archive<'_>) -> Result<Weights, Error> {
     let stem = stem(&mut r, &audio, d)?;
     let mel_rows = audio.fft as usize / 2 + 1;
     let mel_data = r.fp32("mel".into(), &[mel_rows, audio.mels as usize])?;
-    let mel = Matrix {
-        rows: mel_rows,
-        cols: audio.mels as usize,
-        data: mel_data,
-    };
+    let mel = Matrix::dense(mel_rows, audio.mels as usize, mel_data);
     r.take("tokenizer".into(), DType::Raw, &[])?;
     if r.names.len() != archive.tensors().len() {
         return Err(Error::Archive(format!(
@@ -459,8 +465,12 @@ fn decoder_cross(
 ) -> Result<DecoderLayer, Error> {
     let cross_norm = r.norm(format!("{p}.cross_norm"), k.d)?;
     let q_proj = r.matrix(format!("{p}.cross.q_proj"), k.q_width, k.d)?;
+    // The keys and values project only the encoder's frames, once per call, and every decode
+    // pass shares them, so they take the dense order: the decode is amortized over the frames.
+    r.order = Order::Dense;
     let k_proj = r.matrix(format!("{p}.cross.k_proj"), k.q_width, k.d)?;
     let v_proj = r.matrix(format!("{p}.cross.v_proj"), k.v_width, k.d)?;
+    r.order = Order::Rotated;
     let gate_proj = r.matrix(format!("{p}.cross.gate_proj"), k.v_width, k.d)?;
     let out_proj = r.matrix(format!("{p}.cross.out_proj"), k.d, k.v_width)?;
     let cross_attn = CrossAttention {

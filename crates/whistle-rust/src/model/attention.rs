@@ -86,11 +86,12 @@ pub(crate) fn causal_conv(z: &[f32], taps: &Matrix, history: usize) -> Result<Ve
     if history > rows {
         return Err(Error::Input(format!("{history} history rows of {rows}")));
     }
+    let tap_values = taps.data();
     let mut out = vec![0.0f32; (rows - history) * width];
     for (i, o) in out.chunks_exact_mut(width).enumerate() {
         let r = history + i;
         for j in 0..taps.rows {
-            let tap = &taps.data[j * width..(j + 1) * width];
+            let tap = &tap_values[j * width..(j + 1) * width];
             // Before row 0 the shifted row is padding times tap_ok: 0, which adds nothing.
             let Some(src) = r.checked_sub(j) else {
                 continue;

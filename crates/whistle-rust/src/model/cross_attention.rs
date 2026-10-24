@@ -80,8 +80,8 @@ impl CrossAttention {
     /// `k_norm`, and the KV path at `kv_bits` (8: per-head A8 over each head vector, 0: none).
     /// A memory with no frames, or more valid frames than frames, is [`Error::Input`].
     pub fn memory_kv(&self, memory: &DecoderMemory, kv_bits: u32) -> Result<CrossMemory, Error> {
-        let m = &memory.memory;
-        let frames = self.check_width(&m.data, "the decoder memory")?;
+        let m = memory.memory.data();
+        let frames = self.check_width(&m, "the decoder memory")?;
         if frames == 0 {
             return Err(Error::Input(
                 "the decoder memory has no frames (no encoded audio to attend to)".into(),
@@ -94,8 +94,8 @@ impl CrossAttention {
             )));
         }
         let h = self.heads();
-        let mut k = self.key_heads(&self.k_proj.project(&m.data));
-        let mut v = split_heads(&self.v_proj.project(&m.data), h.kv_heads, h.v_dim);
+        let mut k = self.key_heads(&self.k_proj.project(&m));
+        let mut v = split_heads(&self.v_proj.project(&m), h.kv_heads, h.v_dim);
         if kv_bits > 0 {
             fake_quant_rows(&mut k, h.qk_dim, kv_bits);
             fake_quant_rows(&mut v, h.v_dim, kv_bits);

@@ -28,7 +28,12 @@ fn lanes(f: &Fixture, name: &str) -> Lanes {
 /// Measured (2026-10-24): worst 1.39e-4 (de_anna layer 2); de_anna layer 4 2.5e-5; every other
 /// layer of both clips 7.5e-8 to 3.5e-7 (f32 rounding, no flipped step). The flips are A8
 /// steps moved by f32 noise, as in the encoder; the bound leaves room for a few more.
-const LAYER_BOUND: f64 = 5e-4;
+/// Re-set when the CQ matrices became packed (`kernels::packed`: the FWHT moves to the
+/// activations and the sum is grouped, so the rounding differs). Measured (2026-10-24): worst
+/// 1.08e-3 (en_samantha layer 3), de_anna layer 0 3.9e-4, de_anna layers 6 and 7 7.5e-5 and
+/// 7.3e-5, every other layer 8.3e-8 to 4.6e-7; tokens unchanged on every clip. The bound stays
+/// under the reference's own 2.6–2.8e-3 between execution modes for one block (`oracle.md`).
+const LAYER_BOUND: f64 = 2e-3;
 
 #[test]
 fn every_decoder_layer_matches_from_the_previous_layers_lanes() {
@@ -75,7 +80,7 @@ fn decoder_output_reproduces_the_reference_on_every_clip() {
         let out = decoder.hidden(&f.tokens(), &memory(&f)).unwrap();
         let (shape, want) = f.f32("decoder/out");
         assert_eq!(vec![out.rows(), out.cols()], shape, "{clip}");
-        let err = relative_l2(out.data(), &want);
+        let err = relative_l2(&out.data(), &want);
         println!("{clip}: decoder/out relative L2 {err:.3e}");
         if err > worst.0 {
             worst = (err, clip.clone());

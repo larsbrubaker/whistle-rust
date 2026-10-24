@@ -8,17 +8,12 @@ use crate::error::Error;
 
 use super::ops::{a8, rms_unit, sigmoid, sinkhorn, zc_rms_norm};
 use super::stem::Lanes;
-use super::weights::{Mhc, Norm};
+use super::weights::{Matrix, Mhc, Norm};
 
 /// `nx · phi[row]ᵀ` for each of `count` rows starting at `first`, per token: a projection by
 /// that band of `phi`'s rows.
-fn mix_logits(nx: &[f32], phi: &[f32], width: usize, first: usize, count: usize) -> Vec<f32> {
-    super::ops::linear(
-        nx,
-        &phi[first * width..(first + count) * width],
-        width,
-        count,
-    )
+fn mix_logits(nx: &[f32], phi: &Matrix, first: usize, count: usize) -> Vec<f32> {
+    phi.project_rows(nx, first, count)
 }
 
 impl Mhc {
@@ -70,7 +65,7 @@ impl Mhc {
         let b_post = &self.b_post[layer * n..(layer + 1) * n];
         let b_res = &self.b_res[layer * n * n..(layer + 1) * n * n];
 
-        let pre = mix_logits(&nx, &self.phi_pre.data, nc, layer * n, n);
+        let pre = mix_logits(&nx, &self.phi_pre, layer * n, n);
         let mut u = vec![0.0f32; frames * c];
         for t in 0..frames {
             let ut = &mut u[t * c..(t + 1) * c];
@@ -94,8 +89,8 @@ impl Mhc {
         }
         let y: Vec<f32> = out.iter().zip(&u).map(|(o, u)| o - u).collect();
 
-        let post = mix_logits(&nx, &self.phi_post.data, nc, layer * n, n);
-        let mut res = mix_logits(&nx, &self.phi_res.data, nc, layer * n * n, n * n);
+        let post = mix_logits(&nx, &self.phi_post, layer * n, n);
+        let mut res = mix_logits(&nx, &self.phi_res, layer * n * n, n * n);
         for m in res.chunks_exact_mut(n * n) {
             for (v, &b) in m.iter_mut().zip(b_res) {
                 *v = a_res * *v + b;

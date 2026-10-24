@@ -7,17 +7,15 @@ verification bar for every stage: CLAUDE.md "Tolerance policy".
 
 ## 6. Performance
 
-Transcription is fast enough for push-to-talk on every target. Dense SIMD kernels (NEON, AVX2,
-simd128) with a few-row path for decoder steps and native threads are in, bit-identical to the
-scalar order (`docs/design/performance.md`: a 3 s clip in ~85 ms, 30 s from features to encoder
-output in ~0.35 s, ~2.7 ms per decoder token on an M5); what is left:
+Transcription is fast enough for push-to-talk on every target, and the weights stay packed
+(`docs/design/performance.md`: ~41 MB resident after binding, a 3 s clip in ~75-85 ms on an M5
+at one beam, ~2.2 ms per decoder token); what is left:
 
-- The decoder step now streams ~72 MB of f32 weights per token and is memory-bound. Keep CQ
-  weights packed in memory (17 MB instead of ~160 MB, 2 bits per weight to stream) and rotate
-  activations by a fast Walsh–Hadamard transform per group instead of dequantizing; this
-  changes rounding, so the token contract decides whether it can land.
-- Run the AVX2 and simd128 paths' bit-identity tests on x86 and in a wasm runtime; bench
-  against the engine CLI on the same clips and record the numbers.
+- Run the AVX2 paths' bit-identity tests on x86_64 hardware (dense, few-row and packed kernels
+  are checked by construction and asm only); simd128 ran under wasmtime.
+- The 3 s encoder alone is 5-12% slower than the dense build (it decodes ~19M packed weights per
+  call); cut that if the encoder dominates a real workload.
+- Bench against the engine CLI on the same clips and record the numbers.
 
 ## 7. Designed decode features
 

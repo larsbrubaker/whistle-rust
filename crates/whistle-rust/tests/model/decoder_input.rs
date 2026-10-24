@@ -19,7 +19,7 @@ fn embedding_reproduces_the_reference_on_every_clip() {
         let (shape, want) = f.f32("decoder/embedded");
         let got = weights().embed(&tokens).unwrap();
         assert_eq!(vec![got.rows(), got.cols()], shape, "{clip}");
-        let err = relative_l2(got.data(), &want);
+        let err = relative_l2(&got.data(), &want);
         println!("{clip}: embedding relative L2 {err:.3e}");
         assert!(err <= EXACT, "{clip}: relative L2 {err:.3e}");
     }
@@ -57,7 +57,7 @@ fn decoder_memory_reproduces_the_reference_on_every_clip() {
             "{clip}"
         );
         assert_eq!(mem.valid_frames, valid, "{clip}");
-        let err = relative_l2(mem.memory.data(), &want);
+        let err = relative_l2(&mem.memory.data(), &want);
         println!("{clip}: decoder memory relative L2 {err:.3e}");
         if err > worst.0 {
             worst = (err, clip.clone());

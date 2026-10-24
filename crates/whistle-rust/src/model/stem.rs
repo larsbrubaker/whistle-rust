@@ -63,6 +63,7 @@ fn conv3x3(
     input: ConvInput<'_>,
 ) -> Plane {
     let (t_out, m_out) = (halved(time), halved(mel));
+    let taps = w.data();
     let mut data = vec![0.0f32; t_out * m_out * channels];
     for t in 0..valid.min(t_out) {
         for m in 0..m_out {
@@ -76,7 +77,7 @@ fn conv3x3(
                     let Some(mj) = (2 * m + j).checked_sub(1).filter(|&mj| mj < mel) else {
                         continue;
                     };
-                    let tap = &w.data[(3 * i + j) * channels..(3 * i + j + 1) * channels];
+                    let tap = &taps[(3 * i + j) * channels..(3 * i + j + 1) * channels];
                     match input {
                         ConvInput::Mono(x) => {
                             let v = x[ti * mel + mj];

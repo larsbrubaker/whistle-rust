@@ -46,7 +46,7 @@ impl<'w> Shapes<'w> {
         );
     }
     fn m(&mut self, name: String, m: &'w Matrix) {
-        self.raw(name, vec![m.rows(), m.cols()], Cow::Borrowed(m.data()));
+        self.raw(name, vec![m.rows(), m.cols()], m.data());
     }
     fn v(&mut self, name: String, v: &'w [f32]) {
         self.raw(name, vec![v.len()], Cow::Borrowed(v));

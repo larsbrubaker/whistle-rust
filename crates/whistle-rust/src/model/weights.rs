@@ -2,22 +2,47 @@
 //! their mHC lane stacks, the Engram sites and the shared tensors, built from a parsed archive by
 //! [`Weights::from_archive`]. The archive's tensors carry no names, so `bind` derives each
 //! index's role from the geometry and the audio manifest, in the order upstream's
-//! `export._tensors` and `_audio_tensors` write them. Matrices are dequantized to row-major
-//! `[out, in]` f32 ([`Matrix`]); the Engram tables stay packed ([`CqRows`]).
+//! `export._tensors` and `_audio_tensors` write them. The 2- and 4-bit CQ matrices stay packed
+//! ([`Matrix`] over `kernels::packed`, projected without dequantizing); fp16 matrices are
+//! row-major `[out, in]` f32; the Engram tables stay packed ([`CqRows`]).
+
+use std::borrow::Cow;
+use std::sync::Arc;
 
 use crate::cact::{Archive, Geometry};
 use crate::error::Error;
 use crate::quant::CqRows;
 
 use super::bind;
+#[cfg(test)]
+use super::kernels::Order;
+use super::kernels::PackedMatrix;
 
-/// A row-major f32 matrix, `[rows, cols]` as the archive stores it (`[out, in]` for a Dense
-/// kernel, so a projection is [`Matrix::project`]).
-#[derive(Debug, Clone, PartialEq)]
+/// A matrix, `[rows, cols]` as the archive stores it (`[out, in]` for a Dense kernel, so a
+/// projection is [`Matrix::project`]): row-major f32, or a CQ record kept packed, whose
+/// [`Matrix::data`] dequantizes on every call and keeps nothing.
+#[derive(Debug, Clone)]
 pub struct Matrix {
     pub(crate) rows: usize,
     pub(crate) cols: usize,
-    pub(crate) data: Vec<f32>,
+    /// The values of a dense matrix; empty for a packed one.
+    data: Vec<f32>,
+    packed: Option<Arc<PackedMatrix>>,
+}
+
+/// Equal shapes and values. Two packed matrices compare by their records (packed indices,
+/// norms, codebook, layout), so a comparison never dequantizes; a packed and a dense matrix
+/// compare by values, dequantizing the packed one transiently.
+impl PartialEq for Matrix {
+    fn eq(&self, other: &Matrix) -> bool {
+        if (self.rows, self.cols) != (other.rows, other.cols) {
+            return false;
+        }
+        match (&self.packed, &other.packed) {
+            (Some(a), Some(b)) => a.same_record(b),
+            _ => self.data() == other.data(),
+        }
+    }
 }
 
 impl Matrix {
@@ -31,7 +56,32 @@ impl Matrix {
                 data.len()
             )));
         }
-        Ok(Matrix { rows, cols, data })
+        Ok(Matrix::dense(rows, cols, data))
+    }
+
+    /// A dense matrix; the caller guarantees `data.len() == rows · cols`.
+    pub(crate) fn dense(rows: usize, cols: usize, data: Vec<f32>) -> Matrix {
+        Matrix {
+            rows,
+            cols,
+            data,
+            packed: None,
+        }
+    }
+
+    /// A packed CQ matrix.
+    pub(crate) fn packed(packed: PackedMatrix) -> Matrix {
+        Matrix {
+            rows: packed.rows(),
+            cols: packed.cols(),
+            data: Vec::new(),
+            packed: Some(Arc::new(packed)),
+        }
+    }
+
+    /// Whether the matrix is kept packed (projected from its CQ indices).
+    pub fn is_packed(&self) -> bool {
+        self.packed.is_some()
     }
 
     pub fn rows(&self) -> usize {
@@ -42,13 +92,69 @@ impl Matrix {
         self.cols
     }
 
-    pub fn data(&self) -> &[f32] {
-        &self.data
+    /// The row-major values: borrowed for a dense matrix. A packed matrix is dequantized
+    /// exactly as the archive's `Tensor::to_f32`, into a new `rows · cols` f32 vector on
+    /// **every call** (the embedding is 16.8 MB, a 512×512 projection 1 MB, at about 0.4 ns
+    /// per weight on NEON) and nothing is kept, so a packed matrix stays packed in memory. The
+    /// model never calls this on a packed matrix; it is for tests, inspection and callers that
+    /// want the values.
+    pub fn data(&self) -> Cow<'_, [f32]> {
+        match &self.packed {
+            Some(p) => Cow::Owned(p.dense()),
+            None => Cow::Borrowed(&self.data),
+        }
+    }
+
+    /// Which projection order a packed matrix was bound with (`None` for a dense one).
+    #[cfg(test)]
+    pub(crate) fn packed_order(&self) -> Option<Order> {
+        self.packed.as_ref().map(|p| p.order())
     }
 
     /// `x [T, cols] -> [T, rows]`: the Dense layer this `[out, in]` kernel stores.
     pub(crate) fn project(&self, x: &[f32]) -> Vec<f32> {
-        super::ops::linear(x, &self.data, self.cols, self.rows)
+        self.project_rows(x, 0, self.rows)
+    }
+
+    /// `x [T, cols] -> [T, count]` against rows `first..first + count` only.
+    pub(crate) fn project_rows(&self, x: &[f32], first: usize, count: usize) -> Vec<f32> {
+        match &self.packed {
+            Some(p) => p.project(
+                super::kernels::best_path(),
+                super::kernels::threads(),
+                x,
+                first,
+                count,
+            ),
+            None => super::ops::linear(
+                x,
+                &self.data[first * self.cols..(first + count) * self.cols],
+                self.cols,
+                count,
+            ),
+        }
+    }
+
+    /// Row `r` into `out` (`cols` values), as [`Matrix::data`]'s row `r`.
+    pub(crate) fn row_into(&self, r: usize, out: &mut [f32]) -> Result<(), Error> {
+        match &self.packed {
+            Some(p) => p.row_into(r, out),
+            None => {
+                let row = self.data.get(r * self.cols..(r + 1) * self.cols);
+                match row {
+                    Some(row) if out.len() == self.cols => {
+                        out.copy_from_slice(row);
+                        Ok(())
+                    }
+                    _ => Err(Error::Input(format!(
+                        "row {r} of a [{}, {}] matrix into {} values",
+                        self.rows,
+                        self.cols,
+                        out.len()
+                    ))),
+                }
+            }
+        }
     }
 }
 

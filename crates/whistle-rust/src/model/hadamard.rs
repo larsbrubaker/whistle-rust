@@ -19,13 +19,14 @@ impl Norm {
 /// Σ_ij z[i, j] · a[i, k] · b[j, l]`, contracted over `j` first.
 fn kron_apply(z: &[f32], a: &Matrix, b: &Matrix, out: &mut [f32]) {
     let (na, nb) = (a.rows, b.rows);
+    let (ad, bd) = (a.data(), b.data());
     // zb[i, l] = Σ_j z[i, j] · b[j, l]
     let mut zb = vec![0.0f32; na * nb];
     for i in 0..na {
         let zi = &z[i * nb..(i + 1) * nb];
         let row = &mut zb[i * nb..(i + 1) * nb];
         for (j, &zij) in zi.iter().enumerate() {
-            let bj = &b.data[j * nb..(j + 1) * nb];
+            let bj = &bd[j * nb..(j + 1) * nb];
             for (o, &bjl) in row.iter_mut().zip(bj) {
                 *o += zij * bjl;
             }
@@ -33,7 +34,7 @@ fn kron_apply(z: &[f32], a: &Matrix, b: &Matrix, out: &mut [f32]) {
     }
     out.fill(0.0);
     for i in 0..na {
-        let ai = &a.data[i * na..(i + 1) * na];
+        let ai = &ad[i * na..(i + 1) * na];
         let zbi = &zb[i * nb..(i + 1) * nb];
         for (k, &aik) in ai.iter().enumerate() {
             let row = &mut out[k * nb..(k + 1) * nb];
@@ -50,6 +51,7 @@ impl HadamardMlp {
         let d = self.cond_v.rows;
         let rank = self.cond_v.cols;
         let n = self.d1.len();
+        let (cond_v, cond_u) = (self.cond_v.data(), self.cond_u.data());
         let mut out = Vec::with_capacity(x.len());
         let (mut z, mut k) = (vec![0.0f32; n], vec![0.0f32; n]);
         let mut gain = vec![0.0f32; rank];
@@ -59,7 +61,7 @@ impl HadamardMlp {
                 *g = row
                     .iter()
                     .enumerate()
-                    .map(|(i, &v)| v * self.cond_v.data[i * rank + r])
+                    .map(|(i, &v)| v * cond_v[i * rank + r])
                     .sum();
             }
             softmax(&mut gain, rank);
@@ -68,7 +70,7 @@ impl HadamardMlp {
                     let s: f32 = gain
                         .iter()
                         .enumerate()
-                        .map(|(r, &p)| p * self.cond_u.data[r * n + j])
+                        .map(|(r, &p)| p * cond_u[r * n + j])
                         .sum();
                     1.0 + s
                 })

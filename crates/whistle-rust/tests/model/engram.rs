@@ -114,8 +114,8 @@ fn engram_keys_and_values_reproduce_the_reference_on_every_clip() {
             let (k, v) = engram.keys_values(&tokens).unwrap();
             assert_eq!((k.rows(), k.cols()), (tokens.len(), 512), "{clip}");
             let site = s * per_site..(s + 1) * per_site;
-            let ek = relative_l2(k.data(), &want_k[site.clone()]);
-            let ev = relative_l2(v.data(), &want_v[site]);
+            let ek = relative_l2(&k.data(), &want_k[site.clone()]);
+            let ev = relative_l2(&v.data(), &want_v[site]);
             println!("{clip} site {s}: keys {ek:.3e}, values {ev:.3e}");
             let name = format!("{clip} site {s}");
             if ek > worst_k.0 {

@@ -11,7 +11,8 @@
 //! of weights in registers instead (`small`), in the same order. The portable scalar
 //! path, NEON (aarch64), AVX2 (x86_64, detected at run time) and wasm `simd128` therefore agree
 //! bit for bit, and threads only choose which outputs a worker owns, never how one is summed,
-//! so results do not depend on the thread count either.
+//! so results do not depend on the thread count either. Packed CQ matrices project through
+//! `packed` instead, straight from their indices.
 
 use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -268,12 +269,37 @@ pub(crate) fn linear_into(path: Path, x: &[f32], w: &[f32], n: usize, out: &mut 
         // Too few rows to amortize the scratch transpose: transpose in registers instead.
         small::linear_rows_into(path, x, w, n, out);
     } else {
-        linear_panels_into(path, x, w, n, out);
+        linear_panels_into(path, x, w, n, out, w.len() / n, 0);
     }
 }
 
-/// [`linear_into`] by transposed panels, for any row count; `n > 0`.
-fn linear_panels_into(path: Path, x: &[f32], w: &[f32], n: usize, out: &mut [f32]) {
+/// [`linear_into`] for at least [`ROWS`] input rows, storing output `c` of row `r` at
+/// `out[r · stride + col0 + c]`: a band of a wider output written in place (the packed dense
+/// order). The same sums, so the same bits. `n > 0`.
+pub(crate) fn linear_band_into(
+    path: Path,
+    x: &[f32],
+    w: &[f32],
+    n: usize,
+    out: &mut [f32],
+    stride: usize,
+    col0: usize,
+) {
+    debug_assert!(x.len() / n >= ROWS && col0 + w.len() / n <= stride);
+    linear_panels_into(path, x, w, n, out, stride, col0);
+}
+
+/// [`linear_into`] by transposed panels, for any row count, row `r`'s outputs stored from
+/// `out[r · stride + col0]`; `n > 0`.
+fn linear_panels_into(
+    path: Path,
+    x: &[f32],
+    w: &[f32],
+    n: usize,
+    out: &mut [f32],
+    stride: usize,
+    col0: usize,
+) {
     let (rows, outputs) = (x.len() / n, w.len() / n);
     let xr = |r: usize| &x[r * n..(r + 1) * n];
     let mut wt = vec![0.0f32; n * PANEL];
@@ -291,7 +317,8 @@ fn linear_panels_into(path: Path, x: &[f32], w: &[f32], n: usize, out: &mut [f32
             }
         }
         let mut store = |r: usize, o: &[f32; PANEL]| {
-            out[r * outputs + c0..r * outputs + c0 + width].copy_from_slice(&o[..width]);
+            let at = r * stride + col0 + c0;
+            out[at..at + width].copy_from_slice(&o[..width]);
         };
         let mut r = 0;
         while r + ROWS <= rows {
@@ -342,7 +369,10 @@ pub(crate) fn linear_with(
     out
 }
 
+mod packed;
 mod small;
+
+pub(crate) use packed::{Order, PackedMatrix};
 
 #[cfg(test)]
 mod tests;

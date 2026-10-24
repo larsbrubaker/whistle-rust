@@ -51,17 +51,14 @@ impl Weights {
                         self.embedding.rows
                     ))
                 })?;
-            data.extend(
-                self.embedding.data[row * d..(row + 1) * d]
-                    .iter()
-                    .map(|v| v * scale),
-            );
+            let at = data.len();
+            data.resize(at + d, 0.0);
+            self.embedding.row_into(row, &mut data[at..])?;
+            for v in &mut data[at..] {
+                *v *= scale;
+            }
         }
-        Ok(Matrix {
-            rows: tokens.len(),
-            cols: d,
-            data,
-        })
+        Ok(Matrix::dense(tokens.len(), d, data))
     }
 
     /// The decoder's memory from the encoder output (`encoder_out`, `[frames, d_model]`
@@ -100,11 +97,7 @@ impl Weights {
             .collect();
         a8(&mut data, d);
         Ok(DecoderMemory {
-            memory: Matrix {
-                rows: frames,
-                cols: d,
-                data,
-            },
+            memory: Matrix::dense(frames, d, data),
             valid_frames: valid,
         })
     }

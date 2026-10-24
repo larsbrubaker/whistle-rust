@@ -203,7 +203,7 @@ fn few_row_timing() {
                 })
                 .fold(f64::INFINITY, f64::min)
         };
-        let panels = best(&mut |o| linear_panels_into(best_path(), &x, &w, n, o));
+        let panels = best(&mut |o| linear_panels_into(best_path(), &x, &w, n, o, w.len() / n, 0));
         let small = best(&mut |o| small::linear_rows_into(best_path(), &x, &w, n, o));
         println!("1x{n}x{outputs}: panels {panels:.0} us, in-register {small:.0} us");
     }
@@ -223,7 +223,7 @@ fn few_row_timing() {
             })
             .fold(f64::INFINITY, f64::min)
     };
-    let panels = best(&mut |m, o| linear_panels_into(best_path(), &x, m, n, o));
+    let panels = best(&mut |m, o| linear_panels_into(best_path(), &x, m, n, o, m.len() / n, 0));
     let small = best(&mut |m, o| small::linear_rows_into(best_path(), &x, m, n, o));
     println!("{count} x 1x{n}x{outputs} (64 MB): panels {panels:.0} us, in-register {small:.0} us");
 }
