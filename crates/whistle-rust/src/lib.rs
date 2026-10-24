@@ -11,8 +11,8 @@
 //! [`cact::Tensor::to_f32`] dequantizes any tensor, [`tokenizer::Tokenizer`] encodes and decodes
 //! text, [`audio`] turns a WAV file or 16 kHz mono samples into the model's input features, and
 //! [`vad`] finds the parts of the audio that contain speech. [`model::Weights::from_archive`]
-//! binds the archive's tensors by role, and the [`model`] stages ported so far (the stem,
-//! ZC-RMSNorm, the Hadamard MLP) run on them.
+//! binds the archive's tensors by role, and [`model::Encoder::forward`] turns features into the
+//! speech embedding (the stem, eight encoder blocks in their mHC lane stack, the final norm).
 
 pub mod audio;
 pub mod cact;

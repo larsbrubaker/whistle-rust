@@ -4,10 +4,6 @@
 //! arithmetic, same order within an element), so the stages built on them (`stem`, `hadamard`,
 //! and the encoder and decoder blocks) reproduce the reference to f32 rounding.
 
-// `rms_unit`, `glu`, `sinkhorn` and `Rope` serve the attention, conv module and mHC lane stack,
-// which land in the next step; until then only their unit tests (`ops/tests.rs`) call them.
-#![allow(dead_code)]
-
 /// `ZCRMSNorm`'s epsilon, and `_rms_unit`'s.
 pub(crate) const NORM_EPS: f32 = 1e-6;
 

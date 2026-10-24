@@ -49,15 +49,27 @@ layer from 1280 to 512: one frame per 80 ms.
 
 The frame count is padded to even. Each block: `x + 0.5 · HadamardMLP(norm(x))`; gated
 self-attention `x + σ(attn_gate) · norm(attn(norm(x)))` (bidirectional over valid frames, RoPE);
-a conv module `x + pw2(silu(norm(depthwise_k9(glu(pw1(norm(x))) · valid))))`; then another
-half-step Hadamard MLP. All norms are ZC-RMSNorm: `(1 + scale) · x / sqrt(mean(x²) + 1e-6)`.
+a conv module `x + pw2(A8(silu(norm(depthwise_k9(glu(pw1(A8(norm(x)))) · valid)))))`; then
+another half-step Hadamard MLP. All norms are ZC-RMSNorm: `(1 + scale) · x / sqrt(mean(x²) +
+1e-6)`. The GLU keeps the first 512 channels of `pw1`'s output gated by the sigmoid of the last
+512; frames past the valid length are zeroed after it; the depthwise conv is a cross-correlation
+over time with "SAME" padding, 4 zero frames each side, so output frame `t` reads frames
+`t − 4 … t + 4` with tap `k` on frame `t + k − 4`. The encoder output (the speech embedding) is
+`[frames, 512]` over the even-padded frames, with the stem's valid length.
 
 ## Attention (`MultiHeadAttention`, `CrossAttention`)
 
 Input A8; Q, K, V projections; in the decoder a causal 3-tap depthwise conv on each of Q, K, V;
 ZC-RMSNorm on q and k per head; RoPE on q and k (self-attention only); A8 on q, and the KV path
 at `kv_bits` (8: per-head symmetric A8). The fused kernel pads qk (48) and v (64) to 64 and
-scales q by `sqrt(64/48)` so the softmax scale is `1/sqrt(48)`. Output times
+scales q by `sqrt(64/48)` so the softmax scale is `1/sqrt(48)`. The KV heads are shared in
+contiguous groups: with 8 query heads and 2 KV heads, query head `h` reads KV head `h / 4`
+(`jax.nn.dot_product_attention` reshapes the query heads to `[kv_heads, group]`). q is quantized
+after its norm and RoPE, per head and position over the 48-wide head vector; k likewise, v over
+its 64. The encoder's mask is over keys only (`seen[:, None, None, :]`): every query row,
+padded ones included, attends to the valid frames, and masked logits take a large finite
+negative, so the softmax runs in f32 over all keys. RoPE positions are `0..T` over all frames,
+padding included. Output times
 `σ(gate_proj(x))`, A8, then `out_proj`. Cross-attention keys and values come from the decoder
 memory (encoder output plus `σ(pe_gate)` × sinusoidal positions, A8), masked to valid frames.
 

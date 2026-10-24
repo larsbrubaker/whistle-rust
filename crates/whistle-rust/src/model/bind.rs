@@ -174,8 +174,24 @@ fn hada_blocks(n: usize) -> (usize, usize) {
     (a, n / a)
 }
 
+/// The KV-path widths the port runs: 0 (no KV quantization) and 8 (per-head A8). Upstream's
+/// `maybe_quant_kv` treats any width of 8 or more as A8 and anything from 1 to 7 as its
+/// codebook KV quantization (`cq_fake_quant_kv`), which is not ported; this narrows to the two
+/// widths an exported archive uses (Whistle ships 8), so a wider one is rejected rather than
+/// silently run as A8.
+pub(crate) fn check_kv_bits(kv_bits: u32) -> Result<(), Error> {
+    if kv_bits == 0 || kv_bits == 8 {
+        Ok(())
+    } else {
+        Err(Error::Archive(format!(
+            "kv_bits {kv_bits} is not supported (only 0 and 8)"
+        )))
+    }
+}
+
 pub(crate) fn bind(archive: &Archive<'_>) -> Result<Weights, Error> {
     let g = archive.geometry().clone();
+    check_kv_bits(g.kv_bits)?;
     let dims = Dims::new(&g)?;
     let d = dims.d;
     let mut r = Reader {

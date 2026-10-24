@@ -387,3 +387,17 @@ fn huge_header_geometry_is_an_error_not_a_panic() {
         assert!(matches!(err, Error::Archive(_)), "{fields:?}: {err}");
     }
 }
+
+#[test]
+fn an_archive_with_an_unported_kv_width_is_rejected() {
+    // Header field 4 is kv_bits; Whistle ships 8. Width 4 is upstream's codebook KV path.
+    for kv_bits in [4u32, 16] {
+        let bytes = patched_header(&[(4, kv_bits)]);
+        let archive = Archive::parse(&bytes).unwrap();
+        let err = Weights::from_archive(&archive).unwrap_err();
+        assert!(
+            matches!(&err, Error::Archive(m) if m.contains("kv_bits")),
+            "{kv_bits}: {err}"
+        );
+    }
+}

@@ -78,7 +78,9 @@ A8 fake quantization rounds activations to int8 steps of a row's absmax, which i
 Float noise from a different operation order flips a few activations to the neighbouring step,
 and those flips spread through later layers. Measured on upstream alone (2026-10-24, jax
 0.12.0.1): the encoder output differs by 1.5–2.3% (relative L2) between eager and `jax.jit`,
-and between `scan_unroll` 1 and 8. Decoding from the jitted encoder output (either unroll)
+and between `scan_unroll` 1 and 8, and by 1.9–2.8% under 3e-7 input noise (pl_zosia 2.40–2.76%),
+so the reference spans about 1.5–2.8% across execution modes and input noise. Its layer-0
+encoder block alone moves 2.6–2.8e-3 the same way. Decoding from the jitted encoder output (either unroll)
 gives greedy tokens identical to the fixtures on all nine clips. So the stage
 tests compare one layer at a time from the previous fixture, and the token stream is the
 end-to-end contract (CLAUDE.md "Tolerance policy").

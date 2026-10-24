@@ -66,8 +66,8 @@ Plus the gates that run with net 1:
 The model runs in deployment numerics: weights dequantized from the archive, activations
 fake-quantized to A8, the KV path at the archive's `kv_bits`. A8 rounding is discontinuous, so
 float noise flips a few activations to the neighbouring int8 step and the flips spread:
-upstream's own encoder output moves 1.5–2.3% (relative L2) between equivalent JAX execution
-modes (`docs/design/oracle.md`). So:
+upstream's own encoder output moves 1.5–2.8% (relative L2) between equivalent JAX execution
+modes and under 3e-7 input noise (`docs/design/oracle.md`). So:
 
 - Compare by **relative L2**, `support::relative_l2`, never by max-abs.
 - **Exact stages** (archive parsing and dequantization, tokenizer, mel features, anything

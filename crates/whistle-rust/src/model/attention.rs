@@ -1,0 +1,194 @@
+//! Gated multi-head self-attention (`architecture.MultiHeadAttention` with `flash=True`, quant on)
+//! as the encoder runs it: A8 on the input, the Q, K, V and gate projections, ZC-RMSNorm on q and
+//! k per head, RoPE, A8 on q and on the KV path, grouped-query attention, the sigmoid gate, A8,
+//! and `out_proj`. The pieces are separate so the decoder's tapped, causal variant can reuse
+//! them; the weights are the [`SelfAttention`] bound in `weights`, the arithmetic is `ops`.
+
+use super::ops::{a8, fake_quant_rows, sigmoid, softmax, zc_rms_norm, Rope};
+use super::weights::SelfAttention;
+
+/// The four projections of one sequence from its A8 input, each `[T, width]` row-major.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Projections {
+    /// `[T, heads · qk_dim]`.
+    pub q: Vec<f32>,
+    /// `[T, kv_heads · qk_dim]`.
+    pub k: Vec<f32>,
+    /// `[T, kv_heads · v_dim]`.
+    pub v: Vec<f32>,
+    /// `[T, heads · v_dim]`, before the sigmoid.
+    pub gate: Vec<f32>,
+}
+
+/// The attention's head geometry, derived from the bound weights.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Heads {
+    pub(crate) heads: usize,
+    pub(crate) kv_heads: usize,
+    pub(crate) qk_dim: usize,
+    pub(crate) v_dim: usize,
+}
+
+/// `jax.nn.dot_product_attention`'s stand-in for a masked logit (`_get_large_negative`):
+/// finite, so a row with no allowed key still softmaxes to a uniform average as it does there.
+const MASKED: f32 = -0.7 * f32::MAX;
+
+/// `[T, heads · dim]` to `[heads, T, dim]` (the reference's `reshape` then `transpose(0, 2, 1, 3)`).
+fn split_heads(x: &[f32], heads: usize, dim: usize) -> Vec<f32> {
+    let frames = x.len() / (heads * dim).max(1);
+    let mut out = vec![0.0f32; x.len()];
+    for t in 0..frames {
+        for h in 0..heads {
+            let src = &x[(t * heads + h) * dim..(t * heads + h + 1) * dim];
+            out[(h * frames + t) * dim..(h * frames + t + 1) * dim].copy_from_slice(src);
+        }
+    }
+    out
+}
+
+impl SelfAttention {
+    pub(crate) fn heads(&self) -> Heads {
+        let qk_dim = self.q_norm.scale.len().max(1);
+        let kv_heads = (self.k_proj.rows / qk_dim).max(1);
+        Heads {
+            heads: self.q_proj.rows / qk_dim,
+            kv_heads,
+            qk_dim,
+            v_dim: self.v_proj.rows / kv_heads,
+        }
+    }
+
+    /// A8 on `x` (`[T, d_model]`), then the Q, K, V and gate projections of that A8 input.
+    pub fn projections(&self, x: &[f32]) -> Projections {
+        let mut xq = x.to_vec();
+        a8(&mut xq, self.q_proj.cols);
+        Projections {
+            q: self.q_proj.project(&xq),
+            k: self.k_proj.project(&xq),
+            v: self.v_proj.project(&xq),
+            gate: self.gate_proj.project(&xq),
+        }
+    }
+
+    /// The query projection split into heads, `[heads, T, qk_dim]`, and ZC-RMSNorm'd per head
+    /// (`q_norm`, before RoPE).
+    pub fn query_heads(&self, q: &[f32]) -> Vec<f32> {
+        let h = self.heads();
+        zc_rms_norm(&split_heads(q, h.heads, h.qk_dim), &self.q_norm.scale)
+    }
+
+    /// The key projection split into heads, `[kv_heads, T, qk_dim]`, and normed (`k_norm`).
+    pub fn key_heads(&self, k: &[f32]) -> Vec<f32> {
+        let h = self.heads();
+        zc_rms_norm(&split_heads(k, h.kv_heads, h.qk_dim), &self.k_norm.scale)
+    }
+
+    /// The encoder's attention (no Q/K/V taps; the decoder's own forward applies its taps
+    /// between [`SelfAttention::projections`] and the head split) over `x` (`[T, d_model]`,
+    /// already normed): bidirectional, every query row attending to the keys at frames below
+    /// `valid_frames`, RoPE at positions `0..T`. `kv_bits` is the archive's KV width: 8 is
+    /// per-head A8, 0 none. Returns `out_proj`'s output, `[T, d_model]`.
+    pub(crate) fn forward_bidirectional(
+        &self,
+        x: &[f32],
+        rope: &Rope,
+        valid_frames: usize,
+        kv_bits: u32,
+    ) -> Vec<f32> {
+        let h = self.heads();
+        let p = self.projections(x);
+        let mut q = self.query_heads(&p.q);
+        let mut k = self.key_heads(&p.k);
+        let mut v = split_heads(&p.v, h.kv_heads, h.v_dim);
+        let frames = x.len() / self.q_proj.cols.max(1);
+        rotate(&mut q, rope, h.qk_dim, frames, 0);
+        rotate(&mut k, rope, h.qk_dim, frames, 0);
+        // maybe_quant_query and maybe_quant_kv: per head and position, over the head dim.
+        a8(&mut q, h.qk_dim);
+        if kv_bits > 0 {
+            fake_quant_rows(&mut k, h.qk_dim, kv_bits);
+            fake_quant_rows(&mut v, h.v_dim, kv_bits);
+        }
+        let out = attend(&q, &k, &v, h, |_, s| s < valid_frames);
+        self.gate_out(out, &p.gate)
+    }
+
+    /// `out · sigmoid(gate)`, A8, then `out_proj`.
+    pub(crate) fn gate_out(&self, mut out: Vec<f32>, gate: &[f32]) -> Vec<f32> {
+        for (o, &g) in out.iter_mut().zip(gate) {
+            *o *= sigmoid(g);
+        }
+        a8(&mut out, self.out_proj.cols);
+        self.out_proj.project(&out)
+    }
+}
+
+/// RoPE on every head vector of `[heads, frames, dim]`: row `t` of each head at position
+/// `start + t`, so a decoder step can rotate one cached position, or a sequence can use a table
+/// longer than itself. The caller keeps `start + frames` within the table (`Rope::new`'s
+/// `seq_len`); `Rope::apply` indexes it.
+pub(crate) fn rotate(x: &mut [f32], rope: &Rope, dim: usize, frames: usize, start: usize) {
+    debug_assert!(start + frames <= rope.cos.len() / rope.half.max(1));
+    for (i, row) in x.chunks_exact_mut(dim).enumerate() {
+        rope.apply(row, start + i % frames.max(1));
+    }
+}
+
+/// Grouped-query attention as `jax.nn.dot_product_attention` computes the fused kernel's call:
+/// q `[heads, Tq, qk_dim]`, k `[kv_heads, Tk, qk_dim]`, v `[kv_heads, Tk, v_dim]`. Query head
+/// `h` reads KV head `h / (heads / kv_heads)` (JAX reshapes the query heads to
+/// `[kv_heads, group]`). q is scaled by `sqrt(fused / qk_dim)` with `fused = max(qk_dim,
+/// v_dim)`, the logits by `1 / sqrt(fused)` (the zero padding to `fused` adds nothing to a dot
+/// product), keys where `allowed(t, s)` is false take [`MASKED`], and each row softmaxes in f32.
+/// Returns `[Tq, heads · v_dim]`.
+pub(crate) fn attend(
+    q: &[f32],
+    k: &[f32],
+    v: &[f32],
+    h: Heads,
+    allowed: impl Fn(usize, usize) -> bool,
+) -> Vec<f32> {
+    let fused = h.qk_dim.max(h.v_dim);
+    let q_scale = (fused as f64 / h.qk_dim as f64).sqrt() as f32;
+    let scale = (1.0 / (fused as f64).sqrt()) as f32;
+    let tq = q.len() / (h.heads * h.qk_dim).max(1);
+    let tk = k.len() / (h.kv_heads * h.qk_dim).max(1);
+    let group = (h.heads / h.kv_heads.max(1)).max(1);
+    let width = h.heads * h.v_dim;
+    let mut out = vec![0.0f32; tq * width];
+    let mut logits = vec![0.0f32; tk];
+    let mut qs = vec![0.0f32; h.qk_dim];
+    for head in 0..h.heads {
+        let g = head / group;
+        let keys = &k[g * tk * h.qk_dim..(g + 1) * tk * h.qk_dim];
+        let values = &v[g * tk * h.v_dim..(g + 1) * tk * h.v_dim];
+        for t in 0..tq {
+            let qrow = &q[(head * tq + t) * h.qk_dim..(head * tq + t + 1) * h.qk_dim];
+            for (s, &x) in qs.iter_mut().zip(qrow) {
+                *s = x * q_scale;
+            }
+            for (s, (l, kr)) in logits
+                .iter_mut()
+                .zip(keys.chunks_exact(h.qk_dim))
+                .enumerate()
+            {
+                *l = if allowed(t, s) {
+                    qs.iter().zip(kr).map(|(a, b)| a * b).sum::<f32>() * scale
+                } else {
+                    MASKED
+                };
+            }
+            softmax(&mut logits, tk);
+            let o = &mut out[t * width + head * h.v_dim..t * width + (head + 1) * h.v_dim];
+            for (&p, vr) in logits.iter().zip(values.chunks_exact(h.v_dim)) {
+                for (o, &x) in o.iter_mut().zip(vr) {
+                    *o += p * x;
+                }
+            }
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests;
