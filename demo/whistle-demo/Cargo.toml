@@ -1,0 +1,20 @@
+# whistle-demo: the browser demo's UI, built with agg-gui (record/stop, the live transcript,
+# the options row, the status line, transcribe-a-file and the model's license note). It holds
+# the demo's state and talks to its shell through the `DemoHost` trait, so it builds and tests
+# natively; demo/whistle-demo-web runs it in the browser.
+[package]
+name = "whistle-demo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+description = "agg-gui UI of the whistle-rust browser demo (live speech-to-text)."
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+agg-gui = { workspace = true }

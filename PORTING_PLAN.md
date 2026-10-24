@@ -25,7 +25,7 @@ and measured for one thread on wasm first; native threads are a bonus.
   the byte codes and mel spans): the encoder's dense panel kernel is now the largest single
   function (~26-32% of a 3 s clip at one beam), the decoder's rotated kernel 28% at one beam and
   42% at three, the Hadamard MLP ~9%, decoder setup ~8%. Rerun the full `scripts/wasm-bench.sh`
-  table on a quiet machine; then the browser itself (item 8's demo).
+  table on a quiet machine, and measure in the browser through the demo (item 8).
 - The 3 s encoder alone is 5-12% slower than the dense build (it decodes ~19M packed weights per
   call); cut that if the encoder dominates a real workload.
 - Close the gap to the engine (`scripts/bench.sh`, `docs/design/performance.md` "Against the
@@ -53,12 +53,14 @@ Beam search (default 3 beams), keyword biasing, word timestamps, windowing and s
 
 ## 8. Integration
 
-- wasm32: the library builds and runs in a Web Worker; the host downloads and caches
-  `whistle.cact` from a pinned, self-hosted URL.
-- MatterCAD Rust: a local Whistle transcription provider beside OpenAI
-  (`mattercad-ai` `AiTranscriptionProvider`; MatterCAD's recorders already record 16 kHz mono
-  PCM16). The step lands in mattercad-rust, following its CLAUDE.md.
-- An agg-gui demo (microphone → live transcript), native and web.
+- The browser demo (`demo/`, agg-gui: live microphone transcript, a WAV file path, the model
+  downloaded, checksummed and cached, transcription in a Web Worker) is in; to publish it,
+  enable GitHub Pages (Source: GitHub Actions), run `deploy-demo.yml`, then switch it to run on
+  every push. Still unverified by hand: live microphone streaming (per-update time and real-time
+  factor in the browser), the word-timestamps display, the Hugging Face fallback, the file
+  picker. A native demo shell (microphone through the platform recorders) is not built.
+- MatterCAD Rust: the desktop Whistle provider lands in mattercad-rust (its roadmap, `ai.md`);
+  the browser provider needs a Web Worker host like the demo's.
 
 ## 9. Release on crates.io
 

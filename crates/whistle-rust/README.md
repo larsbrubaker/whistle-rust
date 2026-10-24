@@ -9,7 +9,8 @@ Transcription of up to 10 minutes of audio works, in one pass up to 30 s and in 
 that, cut inside the voice-activity detector's pauses. Greedy (`beams: 1`) reproduces the
 reference decode on every test clip, the default 3-beam search reproduces the engine's
 transcripts, keyword biasing favours the names and jargon you list, and word timestamps give
-each word's start, end and probability. Streaming is still to come.
+each word's start, end and probability. Live audio streams through `Whistle::stream` with the
+live preset `Options::streaming()`, committing each word once two passes agree on it.
 
 ## Install
 

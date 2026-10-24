@@ -10,8 +10,8 @@
 // `file-size-refactoring` skill), never squeezed. Skipped trees are build output, VCS data
 // and third-party material that is not ours: every Cargo target directory (any directory
 // holding the `CACHEDIR.TAG` Cargo writes into each one, wherever CARGO_TARGET_DIR pointed),
-// target/ next to a Cargo.toml or anywhere under .claude/, .git/, node_modules/, web/pkg/,
-// web/dist/, .claude/worktrees/, and the downloaded or generated trees: needle-reference/
+// target/ next to a Cargo.toml or anywhere under .claude/, .git/, node_modules/, demo/web/pkg/,
+// demo/web/dist/, .claude/worktrees/, and the downloaded or generated trees: needle-reference/
 // (upstream's code), models/ (weights), oracle/.venv/ and oracle/.engine/ (the oracle's Python
 // and the engine binary) and test-data/fixtures-local/ (regenerated tensors). A `target`
 // directory elsewhere is source and is checked, as are real sources under .claude/.
@@ -46,8 +46,8 @@ fn is_skipped_dir(relative: &str, beside_cargo_toml: bool) -> bool {
         || matches!(name, ".git" | "node_modules")
         || matches!(
             relative,
-            "web/pkg"
-                | "web/dist"
+            "demo/web/pkg"
+                | "demo/web/dist"
                 | ".claude/worktrees"
                 | "needle-reference"
                 | "models"
@@ -264,8 +264,12 @@ fn compliance_rules_classify_examples() {
     assert!(!is_skipped_dir("test-data/fixtures", false));
     assert!(is_skipped_dir("target", true));
     assert!(is_skipped_dir("web/node_modules", false));
-    assert!(is_skipped_dir("web/pkg", false));
-    assert!(is_skipped_dir("web/dist", false));
+    assert!(is_skipped_dir("demo/web/pkg", false));
+    assert!(is_skipped_dir("demo/web/dist", false));
+    // The demo is its own Cargo workspace; its build output is skipped, its sources checked.
+    assert!(is_skipped_dir("demo/target", true));
+    assert!(!is_skipped_dir("demo/web/src", false));
+    assert!(!is_skipped_dir("demo/whistle-demo/src", true));
     assert!(is_skipped_dir(".claude/worktrees", false));
     assert!(is_skipped_dir(".claude/target", false));
     assert!(is_skipped_dir(".claude/x/target", false));

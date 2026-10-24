@@ -1,0 +1,23 @@
+# whistle-demo-web: the browser demo's UI module (wasm cdylib): `start_ui` runs the whistle-demo
+# UI in agg-gui-web-shell on the page's main thread; the model runs in the worker module
+# (demo/whistle-demo-worker). Natively it compiles to an empty rlib so `cargo build
+# --workspace` stays green. Built by demo/web/build-wasm.sh (wasm-pack).
+[package]
+name = "whistle-demo-web"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+description = "WebAssembly shell of the whistle-rust browser demo."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+whistle-demo = { path = "../whistle-demo" }
+agg-gui-web-shell = { workspace = true }
+wasm-bindgen = "0.2"
+js-sys = "0.3"

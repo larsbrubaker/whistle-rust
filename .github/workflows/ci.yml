@@ -11,6 +11,10 @@
 # The `wasm` job builds the library for wasm32-unknown-unknown with and without simd128, and
 # the bench example for wasm32-wasip1 (what the wasm benchmark runs).
 #
+# The `demo` job checks the browser demo (demo/, its own Cargo workspace) with
+# scripts/demo-gates.sh. Only it clones the sibling checkouts the demo's GUI toolkit needs
+# (agg-gui, agg-rust, tess2-rust); the library's jobs never build the demo.
+#
 # The toolchain is the one pinned in rust-toolchain.toml, read from that file. Checkouts are LF
 # on every OS (.gitattributes), so Windows needs no core.autocrlf override.
 name: ci
@@ -91,3 +95,30 @@ jobs:
         env:
           RUSTFLAGS: -C target-feature=+simd128
         run: cargo build -p whistle-rust --release --example bench --target wasm32-wasip1
+
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Clone the demo's sibling checkouts (agg-gui, agg-rust, tess2-rust)
+        run: |
+          for repo in agg-gui agg-rust tess2-rust; do
+            git clone --depth 1 "https://github.com/larsbrubaker/$repo.git" "../$repo"
+          done
+      - name: Read the pinned toolchain
+        id: pins
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.pins.outputs.channel }}
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: demo
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: oven-sh/setup-bun@v2
+      - name: Demo gates (fmt, clippy native and wasm32, tests, wasm builds, tsc, bundle)
+        run: scripts/demo-gates.sh

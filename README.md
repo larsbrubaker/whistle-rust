@@ -11,13 +11,33 @@ pauses, with a hard cut and a 1 s overlap only in speech with no pause, and at f
 with the detector off. Greedy (`beams: 1`) reproduces the reference decode on every test
 clip, the default 3-beam search reproduces the engine's transcripts, keyword biasing favours
 the names and jargon you list, and word timestamps give each word's start, end and
-probability. Streaming is still to come
-(`PORTING_PLAN.md`).
+probability. Live audio streams through `Whistle::stream` with the live preset
+`Options::streaming()` (`docs/design/streaming.md`), and the [live demo](#live-demo) runs all of
+it in a web page. Open work is in `PORTING_PLAN.md`.
 
 The crate's own README, [`crates/whistle-rust/README.md`](crates/whistle-rust/README.md), is
 its crates.io page and its docs.rs front page (the crate docs include it, so its examples
 compile as doctests). The full usage guide and options are there; this file covers the
 repository.
+
+## Live demo
+
+**[larsbrubaker.github.io/whistle-rust](https://larsbrubaker.github.io/whistle-rust/)**:
+live speech-to-text from your microphone, or transcribe a WAV file (pick it, or drop it on the
+page), entirely in the browser. The UI is [agg-gui](https://github.com/larsbrubaker/agg-gui);
+the model runs in a single-threaded Web Worker built with simd128 (every current browser:
+Chrome 91+, Firefox 89+, Safari 16.4+), so the page never blocks. The page fetches
+`whistle.cact` from beside itself (Hugging Face if that copy is missing; `?model=URL` picks
+another), checks its size and SHA-256, and keeps it in the Cache API, so a second visit
+downloads nothing.
+
+![The demo after transcribing en_daniel.wav](docs/demo.png)
+
+The demo is its own Cargo workspace in [`demo/`](demo/README.md), so the library and its CI
+never depend on the GUI toolkit; how to build and run it is there.
+`.github/workflows/deploy-demo.yml` deploys it, with `whistle.cact`, to GitHub Pages on every
+push to `main`. Pages must be enabled in the repository settings (Pages, Source: GitHub
+Actions).
 
 ## Install
 

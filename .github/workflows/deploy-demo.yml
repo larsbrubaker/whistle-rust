@@ -1,0 +1,90 @@
+# Builds the browser demo (demo/: whistle-demo-web, whistle-demo-worker and web/) and
+# publishes it to GitHub Pages at https://larsbrubaker.github.io/whistle-rust/. It runs by hand
+# (workflow_dispatch) until Pages is enabled; then add `push: branches: [main]` back so every push
+# redeploys. whistle.cact (Apache-2.0, Cactus Compute) is fetched and checksummed by
+# scripts/fetch-weights.sh and deployed next to the page, so the demo downloads it from Pages
+# (Hugging Face is its fallback). Pages must be enabled in the repository settings with
+# Source: GitHub Actions.
+name: Deploy demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      # agg-gui is a path dependency on a sibling checkout (demo/Cargo.toml), as are the agg-rust
+      # and tess2-rust checkouts agg-gui depends on.
+      - name: Clone the demo's sibling checkouts (agg-gui, agg-rust, tess2-rust)
+        run: |
+          for repo in agg-gui agg-rust tess2-rust; do
+            git clone --depth 1 "https://github.com/larsbrubaker/$repo.git" "../$repo"
+          done
+
+      - name: Read the pinned toolchain and model checksum
+        id: pins
+        run: |
+          echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+          echo "model=$(awk '$2 == "models/whistle.cact" { print $1 }' scripts/weights.sha256)" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.pins.outputs.channel }}
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: demo
+
+      - name: Cache the model
+        uses: actions/cache@v6
+        with:
+          path: models
+          key: whistle-cact-${{ runner.os }}-${{ steps.pins.outputs.model }}
+
+      - name: Fetch the model (checksummed)
+        run: scripts/fetch-weights.sh
+
+      - name: Build wasm (UI, and the worker with simd128)
+        run: demo/web/build-wasm.sh
+
+      - name: Build demo bundle
+        working-directory: demo/web
+        run: |
+          bun install
+          bun run build
+
+      - name: Put whistle.cact next to the page
+        run: cp models/whistle.cact demo/web/dist/whistle.cact
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: demo/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

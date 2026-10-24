@@ -1,0 +1,22 @@
+# whistle-demo-worker: the browser demo's transcription worker (wasm cdylib). `Engine` wraps the
+# library (from_cact, stream, push, finish, transcribe_wav) for demo/web/src/worker.ts, one thread,
+# built with simd128 (demo/web/build-wasm.sh). A separate module from the UI's (whistle-demo-web):
+# the worker loads only the model code, not the GUI, and the UI builds without simd128 (rustc
+# 1.99's LLVM fails to select a simd128 instruction in agg-gui). Natively an empty rlib.
+[package]
+name = "whistle-demo-worker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+description = "Transcription Web Worker module of the whistle-rust browser demo."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+whistle-rust = { workspace = true }
+wasm-bindgen = "0.2"

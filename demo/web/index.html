@@ -1,0 +1,42 @@
+<!-- The whistle-rust browser demo's page: only places the canvas; every visible control is
+     painted by agg-gui (demo/whistle-demo) and wired up by src/main.ts. data-model names the
+     whistle.cact URL (default: a copy next to the page; ?model=URL overrides it). -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#ebebf2" />
+    <meta
+      name="description"
+      content="Whistle speech-to-text running in your browser: a pure-Rust, single-threaded WebAssembly port of Cactus Compute's on-device model."
+    />
+    <title>Whistle: live speech-to-text in your browser</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #ebebf2;
+        overflow: hidden;
+        height: 100%;
+        height: 100dvh;
+        width: 100%;
+        overscroll-behavior: none;
+        touch-action: none;
+      }
+      #whistle-canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        touch-action: none;
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="whistle-canvas" tabindex="0" data-model="./whistle.cact"></canvas>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

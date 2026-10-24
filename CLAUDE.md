@@ -115,6 +115,13 @@ crates/
   whistle-rust/        the library (`whistle`): .cact reader, CQ dequant, tokenizer, mel front
                        end, stem, encoder, decoder, decoding; tests/ holds the stage tests
   workspace-gates/     file_compliance (tests only)
+demo/                  the browser demo, its own Cargo workspace (demo/README.md), so the
+                       library never depends on agg-gui:
+  whistle-demo/        the agg-gui UI and its state (rlib, tested natively)
+  whistle-demo-web/    the UI's wasm (agg-gui-web-shell); empty natively
+  whistle-demo-worker/ the transcription Web Worker's wasm (`Engine`, simd128); empty natively
+  web/                 the page (bun + vite): main.ts, worker.ts, model download and cache,
+                       microphone capture; build-wasm.sh fills web/pkg/
 oracle/                Python (needle-reference + JAX): fixtures, clip synthesis, engine
                        transcripts; never used by the Rust build
 scripts/               fetch-reference.sh, fetch-weights.sh, gates.sh
@@ -159,6 +166,9 @@ cargo build -p whistle-rust --target wasm32-unknown-unknown
 cargo clippy --workspace --all-targets -- -D warnings
 scripts/fetch-weights.sh [--checkpoint] [--engine]   # models/whistle.cact (+ fp32 checkpoint, engine CLI)
 scripts/fetch-reference.sh                    # needle-reference/ at the pinned commit
+scripts/demo-gates.sh                         # the demo's gate: fmt, clippy (native, wasm32), tests, wasm builds, tsc, bundle
+demo/web/build-wasm.sh                        # the demo's wasm (needs wasm-pack and ../agg-gui, ../agg-rust, ../tess2-rust)
+(cd demo/web && bun install && bun run dev)   # serve the demo (link models/whistle.cact into demo/web/public/ first)
 oracle/setup.sh                               # oracle/.venv (Python 3.12, JAX)
 oracle/.venv/bin/python -I oracle/cact_params.py      # check the archive rebuild against the checkpoint
 oracle/.venv/bin/python -I oracle/dump.py             # stage fixtures (regenerate only when REFERENCE changes)

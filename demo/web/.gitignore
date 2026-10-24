@@ -1,0 +1,6 @@
+# Generated: web/build-wasm.sh (pkg/), vite build (dist/), bun install (node_modules/), and the
+# model copied in for local serving (public/whistle.cact; deploy-demo.yml copies it into dist/).
+/pkg
+/dist
+/node_modules
+/public/whistle.cact
