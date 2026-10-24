@@ -10,10 +10,13 @@
 //! [`cact::Archive::parse`] reads the archive's geometry and tensor directory,
 //! [`cact::Tensor::to_f32`] dequantizes any tensor, [`tokenizer::Tokenizer`] encodes and decodes
 //! text, and [`audio`] turns a WAV file or 16 kHz mono samples into the model's input features.
+//! [`model::Weights::from_archive`] binds the archive's tensors by role, and the [`model`] stages
+//! ported so far (the stem, ZC-RMSNorm, the Hadamard MLP) run on them.
 
 pub mod audio;
 pub mod cact;
 pub mod error;
+pub mod model;
 pub mod quant;
 pub mod tokenizer;
 

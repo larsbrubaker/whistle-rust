@@ -73,7 +73,7 @@ mean and ZC-RMSNorm.
 ## Hadamard MLP
 
 On a width padded to the next power of two (512): `d4 · K3(d3 · P2(K2(silu(d2 · cond · P1(K1(d1 ·
-x))) + b2)))`, where each `K` is a Kronecker product of two learned square factors (`w1a ⊗ w1b`,
+x)) + b2))))`, where each `K` is a Kronecker product of two learned square factors (`w1a ⊗ w1b`,
 …), `P1`, `P2` are fixed permutations (stored in the archive as `hada_p1`, `hada_p2`), and
 `cond = 1 + softmax(x · cond_v) · cond_u` is a rank-8 per-token gain.
 

@@ -2,7 +2,8 @@
 //! following upstream's `export._cq_unpack`. A CQ group dequantizes to
 //! `(codebook[idx] * norm) @ H`, `H` the orthonormal Walsh–Hadamard matrix of the group size
 //! (Sylvester order); `H` is symmetric, so each group is one fast Walsh–Hadamard transform.
-//! Reads the validated [`Tensor`] records `cact` produces.
+//! Reads the validated [`Tensor`] records `cact` produces. [`CqRows`] keeps a CQ record packed
+//! and dequantizes single rows on demand (the model's Engram tables).
 
 use crate::cact::{packed_row_bytes, Archive, DType, Tensor, TERNARY_RECORD_BITS};
 use crate::error::Error;
@@ -104,28 +105,61 @@ fn field(row: &[u8], k: usize, width: usize) -> usize {
     (word >> shift) & ((1 << width) - 1)
 }
 
-fn dequantize_cq(tensor: &Tensor<'_>, archive: &Archive<'_>) -> Result<Vec<f32>, Error> {
-    // Shape, width, group and the blob size were validated by `Archive::parse`.
-    let (out, in_dim) = (tensor.shape()[0], tensor.shape()[1]);
-    let bits = tensor.bits();
-    let group = tensor.group() as usize;
-    let in_pad = in_dim.next_multiple_of(group);
-    let groups = in_pad / group;
-    let row_bytes = packed_row_bytes(in_pad, bits);
-    let (packed, norms) = tensor.bytes().split_at(out * row_bytes);
-    let cb = codebook(archive, bits, group)?;
-    let width = if bits == TERNARY_RECORD_BITS {
-        2
-    } else {
-        bits as usize
-    };
-    let mut values = Vec::with_capacity(out * in_dim);
-    let mut padded = vec![0.0f32; in_pad];
-    for r in 0..out {
-        let row = &packed[r * row_bytes..(r + 1) * row_bytes];
+/// The decoding parameters of one CQ record: its logical shape, padded row, width and
+/// codebook. Shared by the whole-tensor path ([`Tensor::to_f32`]) and [`CqRows`].
+#[derive(Debug, Clone)]
+struct CqLayout {
+    rows: usize,
+    cols: usize,
+    in_pad: usize,
+    row_bytes: usize,
+    bits: u32,
+    group: usize,
+    codebook: Vec<f32>,
+}
+
+impl CqLayout {
+    fn new(tensor: &Tensor<'_>, archive: &Archive<'_>) -> Result<CqLayout, Error> {
+        if tensor.dtype() != DType::Cq {
+            return Err(Error::Archive(format!(
+                "expected a CQ matrix, found {:?}",
+                tensor.dtype()
+            )));
+        }
+        // Shape, width, group and the blob size were validated by `Archive::parse`.
+        let (rows, cols) = (tensor.shape()[0], tensor.shape()[1]);
+        let group = tensor.group() as usize;
+        let in_pad = cols.next_multiple_of(group);
+        Ok(CqLayout {
+            rows,
+            cols,
+            in_pad,
+            row_bytes: packed_row_bytes(in_pad, tensor.bits()),
+            bits: tensor.bits(),
+            group,
+            codebook: codebook(archive, tensor.bits(), group)?,
+        })
+    }
+
+    /// Where the per-group norms start in the blob (after every packed row).
+    fn norms_at(&self) -> usize {
+        self.rows * self.row_bytes
+    }
+
+    /// Row `r` padded to the group size (`padded.len() == in_pad`) from the record's `blob`:
+    /// codebook values, times each group's norm, then the group's Walsh–Hadamard transform.
+    fn decode(&self, blob: &[u8], r: usize, padded: &mut [f32]) -> Result<(), Error> {
+        let (packed, norms) = blob.split_at(self.norms_at());
+        let groups = self.in_pad / self.group;
+        let row = &packed[r * self.row_bytes..(r + 1) * self.row_bytes];
+        let width = if self.bits == TERNARY_RECORD_BITS {
+            2
+        } else {
+            self.bits as usize
+        };
         for (k, slot) in padded.iter_mut().enumerate() {
             let code = field(row, k, width);
-            let idx = if bits == TERNARY_RECORD_BITS {
+            let idx = if self.bits == TERNARY_RECORD_BITS {
                 // Crumb codes 3, 0, 1 are trits 0, 1, 2 (sign-extended -1, 0, +1).
                 match code {
                     3 => 0,
@@ -140,9 +174,9 @@ fn dequantize_cq(tensor: &Tensor<'_>, archive: &Archive<'_>) -> Result<Vec<f32>,
             } else {
                 code
             };
-            *slot = cb[idx];
+            *slot = self.codebook[idx];
         }
-        for (g, chunk) in padded.chunks_exact_mut(group).enumerate() {
+        for (g, chunk) in padded.chunks_exact_mut(self.group).enumerate() {
             let at = (r * groups + g) * 2;
             let norm = fp16_to_f32(u16::from_le_bytes([norms[at], norms[at + 1]]));
             for v in chunk.iter_mut() {
@@ -150,7 +184,87 @@ fn dequantize_cq(tensor: &Tensor<'_>, archive: &Archive<'_>) -> Result<Vec<f32>,
             }
             walsh_hadamard(chunk);
         }
-        values.extend_from_slice(&padded[..in_dim]);
+        Ok(())
+    }
+}
+
+/// One CQ record kept packed, so a caller can dequantize a single row on demand: the Engram
+/// tables (73,728 rows each) are only ever gathered by row, and as f32 they would cost about
+/// 38 MB apiece. Holds the one owned copy of the record's blob (about 2.5 MB per table), so it
+/// outlives the archive. Rows must be whole groups, which lets [`CqRows::row_into`] decode
+/// straight into the caller's buffer without allocating.
+#[derive(Debug, Clone)]
+pub struct CqRows {
+    layout: CqLayout,
+    blob: Vec<u8>,
+}
+
+impl CqRows {
+    /// The packed rows of a CQ tensor whose row length is a multiple of its group; any other
+    /// dtype or a padded row is an error.
+    pub fn from_tensor(tensor: &Tensor<'_>, archive: &Archive<'_>) -> Result<CqRows, Error> {
+        let layout = CqLayout::new(tensor, archive)?;
+        if layout.cols != layout.in_pad {
+            return Err(Error::Archive(format!(
+                "a row-addressed CQ matrix needs whole groups; rows of {} at group {}",
+                layout.cols, layout.group
+            )));
+        }
+        Ok(CqRows {
+            layout,
+            blob: tensor.bytes().to_vec(),
+        })
+    }
+
+    /// The logical row count (`out`).
+    pub fn rows(&self) -> usize {
+        self.layout.rows
+    }
+
+    /// The row length (`in`).
+    pub fn cols(&self) -> usize {
+        self.layout.cols
+    }
+
+    /// Dequantizes row `r` into `out` (`cols` values), exactly as [`Tensor::to_f32`] would.
+    /// Allocation-free.
+    pub fn row_into(&self, r: usize, out: &mut [f32]) -> Result<(), Error> {
+        if r >= self.layout.rows || out.len() != self.layout.cols {
+            return Err(Error::Archive(format!(
+                "CQ row {r} of {} rows into {} values (row length {})",
+                self.layout.rows,
+                out.len(),
+                self.layout.cols
+            )));
+        }
+        self.layout.decode(&self.blob, r, out)
+    }
+
+    /// Dequantizes row `r` as a new vector.
+    pub fn row(&self, r: usize) -> Result<Vec<f32>, Error> {
+        let mut out = vec![0.0f32; self.layout.cols];
+        self.row_into(r, &mut out)?;
+        Ok(out)
+    }
+
+    /// Every row, row-major: the whole matrix.
+    pub fn to_f32(&self) -> Result<Vec<f32>, Error> {
+        let mut values = vec![0.0f32; self.layout.rows * self.layout.cols];
+        for (r, row) in values.chunks_exact_mut(self.layout.cols).enumerate() {
+            self.layout.decode(&self.blob, r, row)?;
+        }
+        Ok(values)
+    }
+}
+
+/// A whole CQ record, decoded from the archive's bytes in place (no copy of the blob).
+fn dequantize_cq(tensor: &Tensor<'_>, archive: &Archive<'_>) -> Result<Vec<f32>, Error> {
+    let layout = CqLayout::new(tensor, archive)?;
+    let mut values = Vec::with_capacity(layout.rows * layout.cols);
+    let mut padded = vec![0.0f32; layout.in_pad];
+    for r in 0..layout.rows {
+        layout.decode(tensor.bytes(), r, &mut padded)?;
+        values.extend_from_slice(&padded[..layout.cols]);
     }
     Ok(values)
 }

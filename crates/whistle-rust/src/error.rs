@@ -1,7 +1,7 @@
 // The library's error type: every fallible call in `whistle` returns `Result<_, Error>`, and each
 // variant carries a message a caller can show (CLAUDE.md "Numbers": a malformed archive is an
 // error, never a panic). Used by `cact` (archive parsing), `quant` (dequantization) and
-// `tokenizer`.
+// `tokenizer`, and `Input` by the model stages for inconsistent caller input.
 
 use std::fmt;
 
@@ -13,6 +13,9 @@ pub enum Error {
     Archive(String),
     /// The tokenizer attachment is malformed.
     Tokenizer(String),
+    /// An input the caller passed is inconsistent (for example features whose data does not
+    /// match their frame count).
+    Input(String),
 }
 
 impl fmt::Display for Error {
@@ -20,6 +23,7 @@ impl fmt::Display for Error {
         match self {
             Error::Archive(message) => write!(f, "invalid model archive: {message}"),
             Error::Tokenizer(message) => write!(f, "invalid tokenizer: {message}"),
+            Error::Input(message) => write!(f, "invalid input: {message}"),
         }
     }
 }

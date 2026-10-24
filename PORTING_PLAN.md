@@ -7,13 +7,16 @@ verification bar for every stage: CLAUDE.md "Tolerance policy".
 
 ## 3. Encoder
 
-A caller can compute the speech embedding (one 512-vector per 80 ms frame).
+A caller can compute the speech embedding (one 512-vector per 80 ms frame). The weights are
+bound (`model::Weights`), and the stem, ZC-RMSNorm, A8 and the Hadamard MLP match the reference;
+what is left:
 
-- Stem, ZC-RMSNorm, A8 fake quant (round half to even), Hadamard MLP, encoder self-attention
-  (GQA, RoPE, q/k norm, fused-head scaling, sigmoid gate, KV A8), conv module, mHC lane stack
-  with Sinkhorn, final norm.
-- Tests: `stem/out`; each encoder layer from the previous layer's `lanes` (en_samantha,
-  de_anna); `encoder/out` on every clip end to end, bound set by measurement.
+- Encoder self-attention (GQA, RoPE, q/k norm, fused-head scaling, sigmoid gate, A8 query and
+  KV path), the conv module (GLU, depthwise k9, masking), the encoder block, the mHC lane stack
+  with Sinkhorn, and the final norm.
+- Tests: the block's sub-modules from en_samantha's committed layer 0 and 7 internals; each
+  encoder layer from the previous layer's `lanes` (en_samantha, de_anna); `encoder/out` on every
+  clip end to end, bound set by measurement.
 
 ## 4. Decoder
 
