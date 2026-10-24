@@ -1,0 +1,24 @@
+{
+ "reference": [
+  "needle b4fc11b04f1852888d375c8c6dfbaca44572d014",
+  "whistle-weights 741118687e1f008f06d1351a402a731274789790",
+  "needle3-engine d6c7d6a2e9655505e0f8e23339356dd1705900eb"
+ ],
+ "deploy": {
+  "act_bits": 8,
+  "kv_bits": 8,
+  "kv_group": 64
+ },
+ "jax": "0.12.0.1",
+ "clips": [
+  "de_anna",
+  "en_daniel",
+  "en_samantha",
+  "es_monica",
+  "fr_thomas",
+  "it_alice",
+  "nl_xander",
+  "pl_zosia",
+  "silence"
+ ]
+}

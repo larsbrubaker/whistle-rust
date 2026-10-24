@@ -1,0 +1,342 @@
+{
+ "clip": "fr_thomas",
+ "samples": 48257,
+ "feature_frames": 301,
+ "encoder_frames": 38,
+ "language": "fr",
+ "tokens": [
+  2,
+  8194,
+  8131,
+  8123,
+  329,
+  449,
+  579,
+  286,
+  1984,
+  340,
+  942,
+  1496,
+  325,
+  8188,
+  8094,
+  687,
+  6947,
+  1803,
+  294,
+  340,
+  1167,
+  539,
+  8096,
+  4307,
+  8116,
+  1
+ ],
+ "text": "Ajoute un trop de 5000 mètres au centre de la plaque.",
+ "replay_max_abs_error": {
+  "encoder": 0.022158777341246605,
+  "decoder": 0.009873571805655956
+ },
+ "internals": false,
+ "arrays": {
+  "samples": {
+   "file": "samples.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    48257
+   ]
+  },
+  "features": {
+   "file": "features.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    302,
+    80
+   ]
+  },
+  "stem/out": {
+   "file": "stem.out.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    38,
+    512
+   ]
+  },
+  "stem/pw_1": {
+   "file": "stem.pw_1.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    76,
+    20,
+    128
+   ]
+  },
+  "stem/pw_2": {
+   "file": "stem.pw_2.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    10,
+    128
+   ]
+  },
+  "encoder/out": {
+   "file": "encoder.out.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    38,
+    512
+   ]
+  },
+  "encoder/lanes_in": {
+   "file": "encoder.lanes_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    4,
+    512
+   ]
+  },
+  "encoder/layer00/lanes": {
+   "file": "encoder.layer00.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    4,
+    512
+   ]
+  },
+  "encoder/layer01/lanes": {
+   "file": "encoder.layer01.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    4,
+    512
+   ]
+  },
+  "encoder/layer02/lanes": {
+   "file": "encoder.layer02.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    4,
+    512
+   ]
+  },
+  "encoder/layer03/lanes": {
+   "file": "encoder.layer03.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    4,
+    512
+   ]
+  },
+  "encoder/layer04/lanes": {
+   "file": "encoder.layer04.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    4,
+    512
+   ]
+  },
+  "encoder/layer05/lanes": {
+   "file": "encoder.layer05.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    4,
+    512
+   ]
+  },
+  "encoder/layer06/lanes": {
+   "file": "encoder.layer06.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    4,
+    512
+   ]
+  },
+  "encoder/layer07/lanes": {
+   "file": "encoder.layer07.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    38,
+    4,
+    512
+   ]
+  },
+  "tokens": {
+   "file": "tokens.npy",
+   "tier": "core",
+   "dtype": "int32",
+   "shape": [
+    26
+   ]
+  },
+  "decoder/logits": {
+   "file": "decoder.logits.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    8199
+   ]
+  },
+  "decoder/embedded": {
+   "file": "decoder.embedded.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    26,
+    512
+   ]
+  },
+  "decoder/memory": {
+   "file": "decoder.memory.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    38,
+    512
+   ]
+  },
+  "decoder/engram_k": {
+   "file": "decoder.engram_k.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    2,
+    26,
+    512
+   ]
+  },
+  "decoder/engram_v": {
+   "file": "decoder.engram_v.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    2,
+    26,
+    512
+   ]
+  },
+  "decoder/out": {
+   "file": "decoder.out.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    26,
+    512
+   ]
+  },
+  "decoder/lanes_in": {
+   "file": "decoder.lanes_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    4,
+    512
+   ]
+  },
+  "decoder/layer00/lanes": {
+   "file": "decoder.layer00.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    4,
+    512
+   ]
+  },
+  "decoder/layer01/lanes": {
+   "file": "decoder.layer01.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    4,
+    512
+   ]
+  },
+  "decoder/layer02/lanes": {
+   "file": "decoder.layer02.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    4,
+    512
+   ]
+  },
+  "decoder/layer03/lanes": {
+   "file": "decoder.layer03.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    4,
+    512
+   ]
+  },
+  "decoder/layer04/lanes": {
+   "file": "decoder.layer04.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    4,
+    512
+   ]
+  },
+  "decoder/layer05/lanes": {
+   "file": "decoder.layer05.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    4,
+    512
+   ]
+  },
+  "decoder/layer06/lanes": {
+   "file": "decoder.layer06.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    4,
+    512
+   ]
+  },
+  "decoder/layer07/lanes": {
+   "file": "decoder.layer07.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    26,
+    4,
+    512
+   ]
+  }
+ }
+}

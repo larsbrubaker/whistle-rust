@@ -1,0 +1,6 @@
+# Pins the toolchain so local checks and CI run the same clippy and rustfmt (the same release
+# mattercad-rust pins, so the two share one installed toolchain). Bump deliberately.
+[toolchain]
+channel = "1.99.0"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]

@@ -1,0 +1,8 @@
+# Oracle-only (fixture generation). Exact pins are recorded in requirements.lock by setup.sh.
+numpy
+jax
+jaxlib
+flax>=0.10.2
+safetensors
+sentencepiece
+huggingface_hub

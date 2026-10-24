@@ -1,0 +1,54 @@
+{
+ "text": "Unisce le due parti e salva il progetto.",
+ "language": "it",
+ "words": [
+  {
+   "word": "Unisce",
+   "start": 0.08,
+   "end": 0.48,
+   "probability": 0.637
+  },
+  {
+   "word": "le",
+   "start": 0.48,
+   "end": 0.64,
+   "probability": 0.995
+  },
+  {
+   "word": "due",
+   "start": 0.64,
+   "end": 0.72,
+   "probability": 0.999
+  },
+  {
+   "word": "parti",
+   "start": 0.72,
+   "end": 1.12,
+   "probability": 0.999
+  },
+  {
+   "word": "e",
+   "start": 1.12,
+   "end": 1.2,
+   "probability": 0.997
+  },
+  {
+   "word": "salva",
+   "start": 1.2,
+   "end": 1.52,
+   "probability": 0.996
+  },
+  {
+   "word": "il",
+   "start": 1.52,
+   "end": 1.68,
+   "probability": 0.999
+  },
+  {
+   "word": "progetto.",
+   "start": 1.68,
+   "end": 2.24,
+   "probability": 1.0
+  }
+ ]
+}

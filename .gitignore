@@ -1,0 +1,13 @@
+/target
+**/target
+# Downloaded or generated: scripts/fetch-reference.sh, scripts/fetch-weights.sh, oracle/setup.sh,
+# oracle/dump.py (its committed tier is test-data/fixtures/).
+needle-reference/
+models/
+oracle/.venv/
+oracle/.engine/
+test-data/fixtures-local/
+__pycache__/
+.DS_Store
+.claude/worktrees/
+.claude/settings.local.json

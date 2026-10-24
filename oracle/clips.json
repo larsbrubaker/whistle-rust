@@ -1,0 +1,10 @@
+[
+  {"name": "en_samantha", "language": "en", "voice": "Samantha", "text": "Make the cube twenty millimeters wide and round the top edges."},
+  {"name": "en_daniel", "language": "en", "voice": "Daniel", "text": "Please export the bracket as an STL file for printing."},
+  {"name": "de_anna", "language": "de", "voice": "Anna", "text": "Bitte mach den Würfel zwei Zentimeter höher."},
+  {"name": "fr_thomas", "language": "fr", "voice": "Thomas", "text": "Ajoute un trou de cinq millimètres au centre de la plaque."},
+  {"name": "es_monica", "language": "es", "voice": "Mónica", "text": "Gira el cilindro noventa grados sobre el eje vertical."},
+  {"name": "it_alice", "language": "it", "voice": "Alice", "text": "Unisci le due parti e salva il progetto."},
+  {"name": "nl_xander", "language": "nl", "voice": "Xander", "text": "Maak de muur van de doos drie millimeter dik."},
+  {"name": "pl_zosia", "language": "pl", "voice": "Zosia", "text": "Przesuń ten element dziesięć milimetrów w lewo."}
+]

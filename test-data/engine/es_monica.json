@@ -1,0 +1,60 @@
+{
+ "text": "Gira el cilindro 90 grados sobre el eje vertical.",
+ "language": "es",
+ "words": [
+  {
+   "word": "Gira",
+   "start": 0.08,
+   "end": 0.4,
+   "probability": 0.674
+  },
+  {
+   "word": "el",
+   "start": 0.4,
+   "end": 0.48,
+   "probability": 0.642
+  },
+  {
+   "word": "cilindro",
+   "start": 0.48,
+   "end": 0.88,
+   "probability": 0.869
+  },
+  {
+   "word": "90",
+   "start": 0.88,
+   "end": 1.12,
+   "probability": 0.96
+  },
+  {
+   "word": "grados",
+   "start": 1.12,
+   "end": 1.52,
+   "probability": 0.995
+  },
+  {
+   "word": "sobre",
+   "start": 1.52,
+   "end": 1.84,
+   "probability": 1.0
+  },
+  {
+   "word": "el",
+   "start": 1.84,
+   "end": 1.92,
+   "probability": 0.943
+  },
+  {
+   "word": "eje",
+   "start": 1.92,
+   "end": 2.08,
+   "probability": 0.894
+  },
+  {
+   "word": "vertical.",
+   "start": 2.08,
+   "end": 2.48,
+   "probability": 0.999
+  }
+ ]
+}

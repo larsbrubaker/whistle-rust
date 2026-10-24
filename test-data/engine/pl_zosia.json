@@ -1,0 +1,54 @@
+{
+ "text": "Przez im ten element do 10 milimetrów lewo.",
+ "language": "pl",
+ "words": [
+  {
+   "word": "Przez",
+   "start": 0.0,
+   "end": 0.32,
+   "probability": 0.836
+  },
+  {
+   "word": "im",
+   "start": 0.32,
+   "end": 0.48,
+   "probability": 0.24
+  },
+  {
+   "word": "ten",
+   "start": 0.48,
+   "end": 0.64,
+   "probability": 0.992
+  },
+  {
+   "word": "element",
+   "start": 0.64,
+   "end": 0.96,
+   "probability": 0.969
+  },
+  {
+   "word": "do",
+   "start": 0.96,
+   "end": 1.2,
+   "probability": 0.737
+  },
+  {
+   "word": "10",
+   "start": 1.2,
+   "end": 1.52,
+   "probability": 0.882
+  },
+  {
+   "word": "milimetrów",
+   "start": 1.52,
+   "end": 2.16,
+   "probability": 0.67
+  },
+  {
+   "word": "lewo.",
+   "start": 2.16,
+   "end": 2.48,
+   "probability": 0.919
+  }
+ ]
+}

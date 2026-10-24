@@ -1,0 +1,332 @@
+{
+ "clip": "nl_xander",
+ "samples": 34205,
+ "feature_frames": 213,
+ "encoder_frames": 27,
+ "language": "nl",
+ "tokens": [
+  2,
+  8197,
+  8140,
+  768,
+  340,
+  325,
+  872,
+  367,
+  340,
+  7385,
+  796,
+  325,
+  8107,
+  1606,
+  8116,
+  1
+ ],
+ "text": "Maat de muur van de dos 3 mm dit.",
+ "replay_max_abs_error": {
+  "encoder": 0.02117372490465641,
+  "decoder": 0.00011783847003243864
+ },
+ "internals": false,
+ "arrays": {
+  "samples": {
+   "file": "samples.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34205
+   ]
+  },
+  "features": {
+   "file": "features.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    214,
+    80
+   ]
+  },
+  "stem/out": {
+   "file": "stem.out.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    27,
+    512
+   ]
+  },
+  "stem/pw_1": {
+   "file": "stem.pw_1.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    54,
+    20,
+    128
+   ]
+  },
+  "stem/pw_2": {
+   "file": "stem.pw_2.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    27,
+    10,
+    128
+   ]
+  },
+  "encoder/out": {
+   "file": "encoder.out.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    28,
+    512
+   ]
+  },
+  "encoder/lanes_in": {
+   "file": "encoder.lanes_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    28,
+    4,
+    512
+   ]
+  },
+  "encoder/layer00/lanes": {
+   "file": "encoder.layer00.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    28,
+    4,
+    512
+   ]
+  },
+  "encoder/layer01/lanes": {
+   "file": "encoder.layer01.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    28,
+    4,
+    512
+   ]
+  },
+  "encoder/layer02/lanes": {
+   "file": "encoder.layer02.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    28,
+    4,
+    512
+   ]
+  },
+  "encoder/layer03/lanes": {
+   "file": "encoder.layer03.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    28,
+    4,
+    512
+   ]
+  },
+  "encoder/layer04/lanes": {
+   "file": "encoder.layer04.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    28,
+    4,
+    512
+   ]
+  },
+  "encoder/layer05/lanes": {
+   "file": "encoder.layer05.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    28,
+    4,
+    512
+   ]
+  },
+  "encoder/layer06/lanes": {
+   "file": "encoder.layer06.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    28,
+    4,
+    512
+   ]
+  },
+  "encoder/layer07/lanes": {
+   "file": "encoder.layer07.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    28,
+    4,
+    512
+   ]
+  },
+  "tokens": {
+   "file": "tokens.npy",
+   "tier": "core",
+   "dtype": "int32",
+   "shape": [
+    16
+   ]
+  },
+  "decoder/logits": {
+   "file": "decoder.logits.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    8199
+   ]
+  },
+  "decoder/embedded": {
+   "file": "decoder.embedded.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    16,
+    512
+   ]
+  },
+  "decoder/memory": {
+   "file": "decoder.memory.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    28,
+    512
+   ]
+  },
+  "decoder/engram_k": {
+   "file": "decoder.engram_k.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    2,
+    16,
+    512
+   ]
+  },
+  "decoder/engram_v": {
+   "file": "decoder.engram_v.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    2,
+    16,
+    512
+   ]
+  },
+  "decoder/out": {
+   "file": "decoder.out.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    16,
+    512
+   ]
+  },
+  "decoder/lanes_in": {
+   "file": "decoder.lanes_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    4,
+    512
+   ]
+  },
+  "decoder/layer00/lanes": {
+   "file": "decoder.layer00.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    4,
+    512
+   ]
+  },
+  "decoder/layer01/lanes": {
+   "file": "decoder.layer01.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    4,
+    512
+   ]
+  },
+  "decoder/layer02/lanes": {
+   "file": "decoder.layer02.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    4,
+    512
+   ]
+  },
+  "decoder/layer03/lanes": {
+   "file": "decoder.layer03.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    4,
+    512
+   ]
+  },
+  "decoder/layer04/lanes": {
+   "file": "decoder.layer04.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    4,
+    512
+   ]
+  },
+  "decoder/layer05/lanes": {
+   "file": "decoder.layer05.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    4,
+    512
+   ]
+  },
+  "decoder/layer06/lanes": {
+   "file": "decoder.layer06.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    4,
+    512
+   ]
+  },
+  "decoder/layer07/lanes": {
+   "file": "decoder.layer07.lanes.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    16,
+    4,
+    512
+   ]
+  }
+ }
+}

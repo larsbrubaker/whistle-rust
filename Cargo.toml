@@ -1,0 +1,25 @@
+# whistle-rust workspace: a pure-Rust port of Whistle, Cactus Compute's on-device speech-to-text
+# model (see CLAUDE.md for the contract and PORTING_PLAN.md for open work).
+#
+# Members live under crates/: the library (whistle-rust, imported as `whistle`) and the
+# repo-wide gates (workspace-gates, tests only).
+[workspace]
+resolver = "2"
+members = ["crates/whistle-rust", "crates/workspace-gates"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+license = "Apache-2.0"
+authors = ["Lars Brubaker <larsbrubaker@matterhackers.com>"]
+repository = "https://github.com/larsbrubaker/whistle-rust"
+
+# Inference is arithmetic-heavy: unoptimized test builds would make every fixture test crawl.
+# opt-level 2 for our members and dependencies keeps `cargo test` fast while debug assertions
+# and debuginfo stay on.
+[profile.dev]
+opt-level = 2
+
+[profile.dev.package."*"]
+opt-level = 2

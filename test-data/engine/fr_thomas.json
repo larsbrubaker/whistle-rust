@@ -1,0 +1,72 @@
+{
+ "text": "Ajoute un trop de 5000 mètres au centre de la plaque.",
+ "language": "fr",
+ "words": [
+  {
+   "word": "Ajoute",
+   "start": 0.08,
+   "end": 0.48,
+   "probability": 0.962
+  },
+  {
+   "word": "un",
+   "start": 0.48,
+   "end": 0.64,
+   "probability": 0.998
+  },
+  {
+   "word": "trop",
+   "start": 0.64,
+   "end": 0.8,
+   "probability": 0.933
+  },
+  {
+   "word": "de",
+   "start": 0.8,
+   "end": 0.96,
+   "probability": 1.0
+  },
+  {
+   "word": "5000",
+   "start": 0.96,
+   "end": 1.44,
+   "probability": 0.811
+  },
+  {
+   "word": "mètres",
+   "start": 1.44,
+   "end": 1.84,
+   "probability": 0.795
+  },
+  {
+   "word": "au",
+   "start": 1.84,
+   "end": 2.0,
+   "probability": 0.998
+  },
+  {
+   "word": "centre",
+   "start": 2.0,
+   "end": 2.32,
+   "probability": 0.999
+  },
+  {
+   "word": "de",
+   "start": 2.32,
+   "end": 2.48,
+   "probability": 1.0
+  },
+  {
+   "word": "la",
+   "start": 2.48,
+   "end": 2.56,
+   "probability": 0.994
+  },
+  {
+   "word": "plaque.",
+   "start": 2.56,
+   "end": 2.96,
+   "probability": 0.984
+  }
+ ]
+}

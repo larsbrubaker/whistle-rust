@@ -1,0 +1,72 @@
+{
+ "text": "Make the cube 20 mm wide and round the top edges.",
+ "language": "en",
+ "words": [
+  {
+   "word": "Make",
+   "start": 0.08,
+   "end": 0.32,
+   "probability": 0.831
+  },
+  {
+   "word": "the",
+   "start": 0.32,
+   "end": 0.48,
+   "probability": 1.0
+  },
+  {
+   "word": "cube",
+   "start": 0.48,
+   "end": 0.72,
+   "probability": 0.762
+  },
+  {
+   "word": "20",
+   "start": 0.72,
+   "end": 1.04,
+   "probability": 0.977
+  },
+  {
+   "word": "mm",
+   "start": 1.04,
+   "end": 1.68,
+   "probability": 0.879
+  },
+  {
+   "word": "wide",
+   "start": 1.68,
+   "end": 1.84,
+   "probability": 0.92
+  },
+  {
+   "word": "and",
+   "start": 1.84,
+   "end": 2.0,
+   "probability": 0.993
+  },
+  {
+   "word": "round",
+   "start": 2.0,
+   "end": 2.24,
+   "probability": 0.999
+  },
+  {
+   "word": "the",
+   "start": 2.24,
+   "end": 2.4,
+   "probability": 0.924
+  },
+  {
+   "word": "top",
+   "start": 2.4,
+   "end": 2.64,
+   "probability": 0.956
+  },
+  {
+   "word": "edges.",
+   "start": 2.64,
+   "end": 2.96,
+   "probability": 0.984
+  }
+ ]
+}

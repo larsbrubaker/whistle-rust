@@ -1,0 +1,3570 @@
+{
+ "clip": "de_anna",
+ "samples": 41579,
+ "feature_frames": 259,
+ "encoder_frames": 33,
+ "language": "de",
+ "tokens": [
+  2,
+  8193,
+  8146,
+  4661,
+  325,
+  1637,
+  2209,
+  590,
+  223,
+  216,
+  8098,
+  8112,
+  318,
+  512,
+  315,
+  8107,
+  347,
+  223,
+  210,
+  714,
+  8116,
+  1
+ ],
+ "text": "Bitte macht den Würfel 2 cm höher.",
+ "replay_max_abs_error": {
+  "encoder": 0.022772716358304024,
+  "decoder": 0.013286507688462734
+ },
+ "internals": true,
+ "arrays": {
+  "samples": {
+   "file": "samples.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    41579
+   ]
+  },
+  "features": {
+   "file": "features.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    260,
+    80
+   ]
+  },
+  "stem/out": {
+   "file": "stem.out.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    33,
+    512
+   ]
+  },
+  "stem/pw_1": {
+   "file": "stem.pw_1.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    65,
+    20,
+    128
+   ]
+  },
+  "stem/pw_2": {
+   "file": "stem.pw_2.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    33,
+    10,
+    128
+   ]
+  },
+  "encoder/out": {
+   "file": "encoder.out.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/lanes_in": {
+   "file": "encoder.lanes_in.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer00/lanes": {
+   "file": "encoder.layer00.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer00/0/0": {
+   "file": "encoder.layer00.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer00/block/ZCRMSNorm_0/0": {
+   "file": "encoder.layer00.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/0": {
+   "file": "encoder.layer00.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/conv_norm/0": {
+   "file": "encoder.layer00.block.conv_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/conv_out_norm/0": {
+   "file": "encoder.layer00.block.conv_out_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/hadamard_mlp/0": {
+   "file": "encoder.layer00.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/hadamard_mlp_0/0": {
+   "file": "encoder.layer00.block.hadamard_mlp_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/post_attn_norm/0": {
+   "file": "encoder.layer00.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/pre_hada_norm/0": {
+   "file": "encoder.layer00.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/pre_hada_norm_0/0": {
+   "file": "encoder.layer00.block.pre_hada_norm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/pw1/0": {
+   "file": "encoder.layer00.block.pw1.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    1024
+   ]
+  },
+  "encoder/layer00/block/pw2/0": {
+   "file": "encoder.layer00.block.pw2.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/self_attn/0": {
+   "file": "encoder.layer00.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/self_attn/gate_proj/0": {
+   "file": "encoder.layer00.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/self_attn/k_norm/0": {
+   "file": "encoder.layer00.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    34,
+    48
+   ]
+  },
+  "encoder/layer00/block/self_attn/k_proj/0": {
+   "file": "encoder.layer00.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    96
+   ]
+  },
+  "encoder/layer00/block/self_attn/out_proj/0": {
+   "file": "encoder.layer00.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer00/block/self_attn/q_norm/0": {
+   "file": "encoder.layer00.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "encoder/layer00/block/self_attn/q_proj/0": {
+   "file": "encoder.layer00.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "encoder/layer00/block/self_attn/v_proj/0": {
+   "file": "encoder.layer00.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    128
+   ]
+  },
+  "encoder/layer01/lanes": {
+   "file": "encoder.layer01.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer01/0/0": {
+   "file": "encoder.layer01.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer01/block/ZCRMSNorm_0/0": {
+   "file": "encoder.layer01.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/0": {
+   "file": "encoder.layer01.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/conv_norm/0": {
+   "file": "encoder.layer01.block.conv_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/conv_out_norm/0": {
+   "file": "encoder.layer01.block.conv_out_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/hadamard_mlp/0": {
+   "file": "encoder.layer01.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/hadamard_mlp_0/0": {
+   "file": "encoder.layer01.block.hadamard_mlp_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/post_attn_norm/0": {
+   "file": "encoder.layer01.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/pre_hada_norm/0": {
+   "file": "encoder.layer01.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/pre_hada_norm_0/0": {
+   "file": "encoder.layer01.block.pre_hada_norm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/pw1/0": {
+   "file": "encoder.layer01.block.pw1.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    1024
+   ]
+  },
+  "encoder/layer01/block/pw2/0": {
+   "file": "encoder.layer01.block.pw2.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/self_attn/0": {
+   "file": "encoder.layer01.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/self_attn/gate_proj/0": {
+   "file": "encoder.layer01.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/self_attn/k_norm/0": {
+   "file": "encoder.layer01.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    34,
+    48
+   ]
+  },
+  "encoder/layer01/block/self_attn/k_proj/0": {
+   "file": "encoder.layer01.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    96
+   ]
+  },
+  "encoder/layer01/block/self_attn/out_proj/0": {
+   "file": "encoder.layer01.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer01/block/self_attn/q_norm/0": {
+   "file": "encoder.layer01.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "encoder/layer01/block/self_attn/q_proj/0": {
+   "file": "encoder.layer01.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "encoder/layer01/block/self_attn/v_proj/0": {
+   "file": "encoder.layer01.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    128
+   ]
+  },
+  "encoder/layer02/lanes": {
+   "file": "encoder.layer02.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer02/0/0": {
+   "file": "encoder.layer02.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer02/block/ZCRMSNorm_0/0": {
+   "file": "encoder.layer02.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/0": {
+   "file": "encoder.layer02.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/conv_norm/0": {
+   "file": "encoder.layer02.block.conv_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/conv_out_norm/0": {
+   "file": "encoder.layer02.block.conv_out_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/hadamard_mlp/0": {
+   "file": "encoder.layer02.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/hadamard_mlp_0/0": {
+   "file": "encoder.layer02.block.hadamard_mlp_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/post_attn_norm/0": {
+   "file": "encoder.layer02.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/pre_hada_norm/0": {
+   "file": "encoder.layer02.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/pre_hada_norm_0/0": {
+   "file": "encoder.layer02.block.pre_hada_norm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/pw1/0": {
+   "file": "encoder.layer02.block.pw1.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    1024
+   ]
+  },
+  "encoder/layer02/block/pw2/0": {
+   "file": "encoder.layer02.block.pw2.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/self_attn/0": {
+   "file": "encoder.layer02.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/self_attn/gate_proj/0": {
+   "file": "encoder.layer02.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/self_attn/k_norm/0": {
+   "file": "encoder.layer02.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    34,
+    48
+   ]
+  },
+  "encoder/layer02/block/self_attn/k_proj/0": {
+   "file": "encoder.layer02.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    96
+   ]
+  },
+  "encoder/layer02/block/self_attn/out_proj/0": {
+   "file": "encoder.layer02.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer02/block/self_attn/q_norm/0": {
+   "file": "encoder.layer02.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "encoder/layer02/block/self_attn/q_proj/0": {
+   "file": "encoder.layer02.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "encoder/layer02/block/self_attn/v_proj/0": {
+   "file": "encoder.layer02.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    128
+   ]
+  },
+  "encoder/layer03/lanes": {
+   "file": "encoder.layer03.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer03/0/0": {
+   "file": "encoder.layer03.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer03/block/ZCRMSNorm_0/0": {
+   "file": "encoder.layer03.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/0": {
+   "file": "encoder.layer03.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/conv_norm/0": {
+   "file": "encoder.layer03.block.conv_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/conv_out_norm/0": {
+   "file": "encoder.layer03.block.conv_out_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/hadamard_mlp/0": {
+   "file": "encoder.layer03.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/hadamard_mlp_0/0": {
+   "file": "encoder.layer03.block.hadamard_mlp_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/post_attn_norm/0": {
+   "file": "encoder.layer03.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/pre_hada_norm/0": {
+   "file": "encoder.layer03.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/pre_hada_norm_0/0": {
+   "file": "encoder.layer03.block.pre_hada_norm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/pw1/0": {
+   "file": "encoder.layer03.block.pw1.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    1024
+   ]
+  },
+  "encoder/layer03/block/pw2/0": {
+   "file": "encoder.layer03.block.pw2.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/self_attn/0": {
+   "file": "encoder.layer03.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/self_attn/gate_proj/0": {
+   "file": "encoder.layer03.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/self_attn/k_norm/0": {
+   "file": "encoder.layer03.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    34,
+    48
+   ]
+  },
+  "encoder/layer03/block/self_attn/k_proj/0": {
+   "file": "encoder.layer03.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    96
+   ]
+  },
+  "encoder/layer03/block/self_attn/out_proj/0": {
+   "file": "encoder.layer03.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer03/block/self_attn/q_norm/0": {
+   "file": "encoder.layer03.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "encoder/layer03/block/self_attn/q_proj/0": {
+   "file": "encoder.layer03.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "encoder/layer03/block/self_attn/v_proj/0": {
+   "file": "encoder.layer03.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    128
+   ]
+  },
+  "encoder/layer04/lanes": {
+   "file": "encoder.layer04.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer04/0/0": {
+   "file": "encoder.layer04.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer04/block/ZCRMSNorm_0/0": {
+   "file": "encoder.layer04.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/0": {
+   "file": "encoder.layer04.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/conv_norm/0": {
+   "file": "encoder.layer04.block.conv_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/conv_out_norm/0": {
+   "file": "encoder.layer04.block.conv_out_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/hadamard_mlp/0": {
+   "file": "encoder.layer04.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/hadamard_mlp_0/0": {
+   "file": "encoder.layer04.block.hadamard_mlp_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/post_attn_norm/0": {
+   "file": "encoder.layer04.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/pre_hada_norm/0": {
+   "file": "encoder.layer04.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/pre_hada_norm_0/0": {
+   "file": "encoder.layer04.block.pre_hada_norm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/pw1/0": {
+   "file": "encoder.layer04.block.pw1.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    1024
+   ]
+  },
+  "encoder/layer04/block/pw2/0": {
+   "file": "encoder.layer04.block.pw2.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/self_attn/0": {
+   "file": "encoder.layer04.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/self_attn/gate_proj/0": {
+   "file": "encoder.layer04.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/self_attn/k_norm/0": {
+   "file": "encoder.layer04.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    34,
+    48
+   ]
+  },
+  "encoder/layer04/block/self_attn/k_proj/0": {
+   "file": "encoder.layer04.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    96
+   ]
+  },
+  "encoder/layer04/block/self_attn/out_proj/0": {
+   "file": "encoder.layer04.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer04/block/self_attn/q_norm/0": {
+   "file": "encoder.layer04.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "encoder/layer04/block/self_attn/q_proj/0": {
+   "file": "encoder.layer04.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "encoder/layer04/block/self_attn/v_proj/0": {
+   "file": "encoder.layer04.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    128
+   ]
+  },
+  "encoder/layer05/lanes": {
+   "file": "encoder.layer05.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer05/0/0": {
+   "file": "encoder.layer05.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer05/block/ZCRMSNorm_0/0": {
+   "file": "encoder.layer05.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/0": {
+   "file": "encoder.layer05.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/conv_norm/0": {
+   "file": "encoder.layer05.block.conv_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/conv_out_norm/0": {
+   "file": "encoder.layer05.block.conv_out_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/hadamard_mlp/0": {
+   "file": "encoder.layer05.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/hadamard_mlp_0/0": {
+   "file": "encoder.layer05.block.hadamard_mlp_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/post_attn_norm/0": {
+   "file": "encoder.layer05.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/pre_hada_norm/0": {
+   "file": "encoder.layer05.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/pre_hada_norm_0/0": {
+   "file": "encoder.layer05.block.pre_hada_norm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/pw1/0": {
+   "file": "encoder.layer05.block.pw1.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    1024
+   ]
+  },
+  "encoder/layer05/block/pw2/0": {
+   "file": "encoder.layer05.block.pw2.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/self_attn/0": {
+   "file": "encoder.layer05.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/self_attn/gate_proj/0": {
+   "file": "encoder.layer05.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/self_attn/k_norm/0": {
+   "file": "encoder.layer05.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    34,
+    48
+   ]
+  },
+  "encoder/layer05/block/self_attn/k_proj/0": {
+   "file": "encoder.layer05.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    96
+   ]
+  },
+  "encoder/layer05/block/self_attn/out_proj/0": {
+   "file": "encoder.layer05.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer05/block/self_attn/q_norm/0": {
+   "file": "encoder.layer05.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "encoder/layer05/block/self_attn/q_proj/0": {
+   "file": "encoder.layer05.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "encoder/layer05/block/self_attn/v_proj/0": {
+   "file": "encoder.layer05.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    128
+   ]
+  },
+  "encoder/layer06/lanes": {
+   "file": "encoder.layer06.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer06/0/0": {
+   "file": "encoder.layer06.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer06/block/ZCRMSNorm_0/0": {
+   "file": "encoder.layer06.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/0": {
+   "file": "encoder.layer06.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/conv_norm/0": {
+   "file": "encoder.layer06.block.conv_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/conv_out_norm/0": {
+   "file": "encoder.layer06.block.conv_out_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/hadamard_mlp/0": {
+   "file": "encoder.layer06.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/hadamard_mlp_0/0": {
+   "file": "encoder.layer06.block.hadamard_mlp_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/post_attn_norm/0": {
+   "file": "encoder.layer06.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/pre_hada_norm/0": {
+   "file": "encoder.layer06.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/pre_hada_norm_0/0": {
+   "file": "encoder.layer06.block.pre_hada_norm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/pw1/0": {
+   "file": "encoder.layer06.block.pw1.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    1024
+   ]
+  },
+  "encoder/layer06/block/pw2/0": {
+   "file": "encoder.layer06.block.pw2.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/self_attn/0": {
+   "file": "encoder.layer06.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/self_attn/gate_proj/0": {
+   "file": "encoder.layer06.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/self_attn/k_norm/0": {
+   "file": "encoder.layer06.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    34,
+    48
+   ]
+  },
+  "encoder/layer06/block/self_attn/k_proj/0": {
+   "file": "encoder.layer06.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    96
+   ]
+  },
+  "encoder/layer06/block/self_attn/out_proj/0": {
+   "file": "encoder.layer06.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer06/block/self_attn/q_norm/0": {
+   "file": "encoder.layer06.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "encoder/layer06/block/self_attn/q_proj/0": {
+   "file": "encoder.layer06.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "encoder/layer06/block/self_attn/v_proj/0": {
+   "file": "encoder.layer06.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    128
+   ]
+  },
+  "encoder/layer07/lanes": {
+   "file": "encoder.layer07.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer07/0/0": {
+   "file": "encoder.layer07.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    4,
+    512
+   ]
+  },
+  "encoder/layer07/block/ZCRMSNorm_0/0": {
+   "file": "encoder.layer07.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/0": {
+   "file": "encoder.layer07.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/conv_norm/0": {
+   "file": "encoder.layer07.block.conv_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/conv_out_norm/0": {
+   "file": "encoder.layer07.block.conv_out_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/hadamard_mlp/0": {
+   "file": "encoder.layer07.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/hadamard_mlp_0/0": {
+   "file": "encoder.layer07.block.hadamard_mlp_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/post_attn_norm/0": {
+   "file": "encoder.layer07.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/pre_hada_norm/0": {
+   "file": "encoder.layer07.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/pre_hada_norm_0/0": {
+   "file": "encoder.layer07.block.pre_hada_norm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/pw1/0": {
+   "file": "encoder.layer07.block.pw1.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    1024
+   ]
+  },
+  "encoder/layer07/block/pw2/0": {
+   "file": "encoder.layer07.block.pw2.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/self_attn/0": {
+   "file": "encoder.layer07.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/self_attn/gate_proj/0": {
+   "file": "encoder.layer07.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/self_attn/k_norm/0": {
+   "file": "encoder.layer07.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    34,
+    48
+   ]
+  },
+  "encoder/layer07/block/self_attn/k_proj/0": {
+   "file": "encoder.layer07.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    96
+   ]
+  },
+  "encoder/layer07/block/self_attn/out_proj/0": {
+   "file": "encoder.layer07.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "encoder/layer07/block/self_attn/q_norm/0": {
+   "file": "encoder.layer07.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "encoder/layer07/block/self_attn/q_proj/0": {
+   "file": "encoder.layer07.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "encoder/layer07/block/self_attn/v_proj/0": {
+   "file": "encoder.layer07.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    128
+   ]
+  },
+  "tokens": {
+   "file": "tokens.npy",
+   "tier": "core",
+   "dtype": "int32",
+   "shape": [
+    22
+   ]
+  },
+  "decoder/logits": {
+   "file": "decoder.logits.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    8199
+   ]
+  },
+  "decoder/embedded": {
+   "file": "decoder.embedded.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/memory": {
+   "file": "decoder.memory.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "decoder/engram_k": {
+   "file": "decoder.engram_k.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    512
+   ]
+  },
+  "decoder/engram_v": {
+   "file": "decoder.engram_v.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    512
+   ]
+  },
+  "decoder/out": {
+   "file": "decoder.out.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/lanes_in": {
+   "file": "decoder.lanes_in.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer00/lanes": {
+   "file": "decoder.layer00.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer00/0/0": {
+   "file": "decoder.layer00.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer00/block/ZCRMSNorm_0/0": {
+   "file": "decoder.layer00.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/0": {
+   "file": "decoder.layer00.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/cross_attn/0": {
+   "file": "decoder.layer00.block.cross_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/cross_attn/gate_proj/0": {
+   "file": "decoder.layer00.block.cross_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/cross_attn/k_norm/0": {
+   "file": "decoder.layer00.block.cross_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "decoder/layer00/block/cross_attn/k_proj/0": {
+   "file": "decoder.layer00.block.cross_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "decoder/layer00/block/cross_attn/out_proj/0": {
+   "file": "decoder.layer00.block.cross_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/cross_attn/q_norm/0": {
+   "file": "decoder.layer00.block.cross_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer00/block/cross_attn/q_proj/0": {
+   "file": "decoder.layer00.block.cross_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer00/block/cross_attn/v_proj/0": {
+   "file": "decoder.layer00.block.cross_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "decoder/layer00/block/cross_norm/0": {
+   "file": "decoder.layer00.block.cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/hadamard_mlp/0": {
+   "file": "decoder.layer00.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/post_attn_norm/0": {
+   "file": "decoder.layer00.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/post_cross_norm/0": {
+   "file": "decoder.layer00.block.post_cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/pre_hada_norm/0": {
+   "file": "decoder.layer00.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/self_attn/0": {
+   "file": "decoder.layer00.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/self_attn/gate_proj/0": {
+   "file": "decoder.layer00.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/self_attn/k_norm/0": {
+   "file": "decoder.layer00.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    48
+   ]
+  },
+  "decoder/layer00/block/self_attn/k_proj/0": {
+   "file": "decoder.layer00.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    96
+   ]
+  },
+  "decoder/layer00/block/self_attn/out_proj/0": {
+   "file": "decoder.layer00.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer00/block/self_attn/q_norm/0": {
+   "file": "decoder.layer00.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer00/block/self_attn/q_proj/0": {
+   "file": "decoder.layer00.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer00/block/self_attn/v_proj/0": {
+   "file": "decoder.layer00.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    128
+   ]
+  },
+  "decoder/layer01/lanes": {
+   "file": "decoder.layer01.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer01/0/0": {
+   "file": "decoder.layer01.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer01/block/ZCRMSNorm_0/0": {
+   "file": "decoder.layer01.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/0": {
+   "file": "decoder.layer01.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/cross_attn/0": {
+   "file": "decoder.layer01.block.cross_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/cross_attn/gate_proj/0": {
+   "file": "decoder.layer01.block.cross_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/cross_attn/k_norm/0": {
+   "file": "decoder.layer01.block.cross_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "decoder/layer01/block/cross_attn/k_proj/0": {
+   "file": "decoder.layer01.block.cross_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "decoder/layer01/block/cross_attn/out_proj/0": {
+   "file": "decoder.layer01.block.cross_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/cross_attn/q_norm/0": {
+   "file": "decoder.layer01.block.cross_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer01/block/cross_attn/q_proj/0": {
+   "file": "decoder.layer01.block.cross_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer01/block/cross_attn/v_proj/0": {
+   "file": "decoder.layer01.block.cross_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "decoder/layer01/block/cross_norm/0": {
+   "file": "decoder.layer01.block.cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/hadamard_mlp/0": {
+   "file": "decoder.layer01.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/post_attn_norm/0": {
+   "file": "decoder.layer01.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/post_cross_norm/0": {
+   "file": "decoder.layer01.block.post_cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/pre_hada_norm/0": {
+   "file": "decoder.layer01.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/self_attn/0": {
+   "file": "decoder.layer01.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/self_attn/gate_proj/0": {
+   "file": "decoder.layer01.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/self_attn/k_norm/0": {
+   "file": "decoder.layer01.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    48
+   ]
+  },
+  "decoder/layer01/block/self_attn/k_proj/0": {
+   "file": "decoder.layer01.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    96
+   ]
+  },
+  "decoder/layer01/block/self_attn/out_proj/0": {
+   "file": "decoder.layer01.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer01/block/self_attn/q_norm/0": {
+   "file": "decoder.layer01.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer01/block/self_attn/q_proj/0": {
+   "file": "decoder.layer01.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer01/block/self_attn/v_proj/0": {
+   "file": "decoder.layer01.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    128
+   ]
+  },
+  "decoder/layer02/lanes": {
+   "file": "decoder.layer02.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer02/0/0": {
+   "file": "decoder.layer02.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer02/block/ZCRMSNorm_0/0": {
+   "file": "decoder.layer02.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/0": {
+   "file": "decoder.layer02.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/cross_attn/0": {
+   "file": "decoder.layer02.block.cross_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/cross_attn/gate_proj/0": {
+   "file": "decoder.layer02.block.cross_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/cross_attn/k_norm/0": {
+   "file": "decoder.layer02.block.cross_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "decoder/layer02/block/cross_attn/k_proj/0": {
+   "file": "decoder.layer02.block.cross_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "decoder/layer02/block/cross_attn/out_proj/0": {
+   "file": "decoder.layer02.block.cross_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/cross_attn/q_norm/0": {
+   "file": "decoder.layer02.block.cross_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer02/block/cross_attn/q_proj/0": {
+   "file": "decoder.layer02.block.cross_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer02/block/cross_attn/v_proj/0": {
+   "file": "decoder.layer02.block.cross_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "decoder/layer02/block/cross_norm/0": {
+   "file": "decoder.layer02.block.cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/hadamard_mlp/0": {
+   "file": "decoder.layer02.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/post_attn_norm/0": {
+   "file": "decoder.layer02.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/post_cross_norm/0": {
+   "file": "decoder.layer02.block.post_cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/pre_hada_norm/0": {
+   "file": "decoder.layer02.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/self_attn/0": {
+   "file": "decoder.layer02.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/self_attn/gate_proj/0": {
+   "file": "decoder.layer02.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/self_attn/k_norm/0": {
+   "file": "decoder.layer02.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    48
+   ]
+  },
+  "decoder/layer02/block/self_attn/k_proj/0": {
+   "file": "decoder.layer02.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    96
+   ]
+  },
+  "decoder/layer02/block/self_attn/out_proj/0": {
+   "file": "decoder.layer02.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer02/block/self_attn/q_norm/0": {
+   "file": "decoder.layer02.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer02/block/self_attn/q_proj/0": {
+   "file": "decoder.layer02.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer02/block/self_attn/v_proj/0": {
+   "file": "decoder.layer02.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    128
+   ]
+  },
+  "decoder/layer03/lanes": {
+   "file": "decoder.layer03.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer03/0/0": {
+   "file": "decoder.layer03.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer03/block/ZCRMSNorm_0/0": {
+   "file": "decoder.layer03.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/0": {
+   "file": "decoder.layer03.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/cross_attn/0": {
+   "file": "decoder.layer03.block.cross_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/cross_attn/gate_proj/0": {
+   "file": "decoder.layer03.block.cross_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/cross_attn/k_norm/0": {
+   "file": "decoder.layer03.block.cross_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "decoder/layer03/block/cross_attn/k_proj/0": {
+   "file": "decoder.layer03.block.cross_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "decoder/layer03/block/cross_attn/out_proj/0": {
+   "file": "decoder.layer03.block.cross_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/cross_attn/q_norm/0": {
+   "file": "decoder.layer03.block.cross_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer03/block/cross_attn/q_proj/0": {
+   "file": "decoder.layer03.block.cross_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer03/block/cross_attn/v_proj/0": {
+   "file": "decoder.layer03.block.cross_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "decoder/layer03/block/cross_norm/0": {
+   "file": "decoder.layer03.block.cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/hadamard_mlp/0": {
+   "file": "decoder.layer03.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/post_attn_norm/0": {
+   "file": "decoder.layer03.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/post_cross_norm/0": {
+   "file": "decoder.layer03.block.post_cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/pre_hada_norm/0": {
+   "file": "decoder.layer03.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/self_attn/0": {
+   "file": "decoder.layer03.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/self_attn/gate_proj/0": {
+   "file": "decoder.layer03.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/self_attn/k_norm/0": {
+   "file": "decoder.layer03.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    48
+   ]
+  },
+  "decoder/layer03/block/self_attn/k_proj/0": {
+   "file": "decoder.layer03.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    96
+   ]
+  },
+  "decoder/layer03/block/self_attn/out_proj/0": {
+   "file": "decoder.layer03.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer03/block/self_attn/q_norm/0": {
+   "file": "decoder.layer03.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer03/block/self_attn/q_proj/0": {
+   "file": "decoder.layer03.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer03/block/self_attn/v_proj/0": {
+   "file": "decoder.layer03.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    128
+   ]
+  },
+  "decoder/layer04/lanes": {
+   "file": "decoder.layer04.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer04/0/0": {
+   "file": "decoder.layer04.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer04/block/ZCRMSNorm_0/0": {
+   "file": "decoder.layer04.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/0": {
+   "file": "decoder.layer04.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/cross_attn/0": {
+   "file": "decoder.layer04.block.cross_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/cross_attn/gate_proj/0": {
+   "file": "decoder.layer04.block.cross_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/cross_attn/k_norm/0": {
+   "file": "decoder.layer04.block.cross_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "decoder/layer04/block/cross_attn/k_proj/0": {
+   "file": "decoder.layer04.block.cross_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "decoder/layer04/block/cross_attn/out_proj/0": {
+   "file": "decoder.layer04.block.cross_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/cross_attn/q_norm/0": {
+   "file": "decoder.layer04.block.cross_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer04/block/cross_attn/q_proj/0": {
+   "file": "decoder.layer04.block.cross_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer04/block/cross_attn/v_proj/0": {
+   "file": "decoder.layer04.block.cross_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "decoder/layer04/block/cross_norm/0": {
+   "file": "decoder.layer04.block.cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/hadamard_mlp/0": {
+   "file": "decoder.layer04.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/post_attn_norm/0": {
+   "file": "decoder.layer04.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/post_cross_norm/0": {
+   "file": "decoder.layer04.block.post_cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/pre_hada_norm/0": {
+   "file": "decoder.layer04.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/self_attn/0": {
+   "file": "decoder.layer04.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/self_attn/gate_proj/0": {
+   "file": "decoder.layer04.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/self_attn/k_norm/0": {
+   "file": "decoder.layer04.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    48
+   ]
+  },
+  "decoder/layer04/block/self_attn/k_proj/0": {
+   "file": "decoder.layer04.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    96
+   ]
+  },
+  "decoder/layer04/block/self_attn/out_proj/0": {
+   "file": "decoder.layer04.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer04/block/self_attn/q_norm/0": {
+   "file": "decoder.layer04.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer04/block/self_attn/q_proj/0": {
+   "file": "decoder.layer04.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer04/block/self_attn/v_proj/0": {
+   "file": "decoder.layer04.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    128
+   ]
+  },
+  "decoder/layer05/lanes": {
+   "file": "decoder.layer05.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer05/0/0": {
+   "file": "decoder.layer05.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer05/block/ZCRMSNorm_0/0": {
+   "file": "decoder.layer05.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/0": {
+   "file": "decoder.layer05.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/cross_attn/0": {
+   "file": "decoder.layer05.block.cross_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/cross_attn/gate_proj/0": {
+   "file": "decoder.layer05.block.cross_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/cross_attn/k_norm/0": {
+   "file": "decoder.layer05.block.cross_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "decoder/layer05/block/cross_attn/k_proj/0": {
+   "file": "decoder.layer05.block.cross_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "decoder/layer05/block/cross_attn/out_proj/0": {
+   "file": "decoder.layer05.block.cross_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/cross_attn/q_norm/0": {
+   "file": "decoder.layer05.block.cross_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer05/block/cross_attn/q_proj/0": {
+   "file": "decoder.layer05.block.cross_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer05/block/cross_attn/v_proj/0": {
+   "file": "decoder.layer05.block.cross_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "decoder/layer05/block/cross_norm/0": {
+   "file": "decoder.layer05.block.cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/hadamard_mlp/0": {
+   "file": "decoder.layer05.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/post_attn_norm/0": {
+   "file": "decoder.layer05.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/post_cross_norm/0": {
+   "file": "decoder.layer05.block.post_cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/pre_hada_norm/0": {
+   "file": "decoder.layer05.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/self_attn/0": {
+   "file": "decoder.layer05.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/self_attn/gate_proj/0": {
+   "file": "decoder.layer05.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/self_attn/k_norm/0": {
+   "file": "decoder.layer05.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    48
+   ]
+  },
+  "decoder/layer05/block/self_attn/k_proj/0": {
+   "file": "decoder.layer05.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    96
+   ]
+  },
+  "decoder/layer05/block/self_attn/out_proj/0": {
+   "file": "decoder.layer05.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer05/block/self_attn/q_norm/0": {
+   "file": "decoder.layer05.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer05/block/self_attn/q_proj/0": {
+   "file": "decoder.layer05.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer05/block/self_attn/v_proj/0": {
+   "file": "decoder.layer05.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    128
+   ]
+  },
+  "decoder/layer06/lanes": {
+   "file": "decoder.layer06.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer06/0/0": {
+   "file": "decoder.layer06.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer06/block/ZCRMSNorm_0/0": {
+   "file": "decoder.layer06.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/0": {
+   "file": "decoder.layer06.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/cross_attn/0": {
+   "file": "decoder.layer06.block.cross_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/cross_attn/gate_proj/0": {
+   "file": "decoder.layer06.block.cross_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/cross_attn/k_norm/0": {
+   "file": "decoder.layer06.block.cross_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "decoder/layer06/block/cross_attn/k_proj/0": {
+   "file": "decoder.layer06.block.cross_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "decoder/layer06/block/cross_attn/out_proj/0": {
+   "file": "decoder.layer06.block.cross_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/cross_attn/q_norm/0": {
+   "file": "decoder.layer06.block.cross_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer06/block/cross_attn/q_proj/0": {
+   "file": "decoder.layer06.block.cross_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer06/block/cross_attn/v_proj/0": {
+   "file": "decoder.layer06.block.cross_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "decoder/layer06/block/cross_norm/0": {
+   "file": "decoder.layer06.block.cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/hadamard_mlp/0": {
+   "file": "decoder.layer06.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/post_attn_norm/0": {
+   "file": "decoder.layer06.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/post_cross_norm/0": {
+   "file": "decoder.layer06.block.post_cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/pre_hada_norm/0": {
+   "file": "decoder.layer06.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/self_attn/0": {
+   "file": "decoder.layer06.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/self_attn/gate_proj/0": {
+   "file": "decoder.layer06.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/self_attn/k_norm/0": {
+   "file": "decoder.layer06.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    48
+   ]
+  },
+  "decoder/layer06/block/self_attn/k_proj/0": {
+   "file": "decoder.layer06.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    96
+   ]
+  },
+  "decoder/layer06/block/self_attn/out_proj/0": {
+   "file": "decoder.layer06.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer06/block/self_attn/q_norm/0": {
+   "file": "decoder.layer06.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer06/block/self_attn/q_proj/0": {
+   "file": "decoder.layer06.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer06/block/self_attn/v_proj/0": {
+   "file": "decoder.layer06.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    128
+   ]
+  },
+  "decoder/layer07/lanes": {
+   "file": "decoder.layer07.lanes.npy",
+   "tier": "core",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer07/0/0": {
+   "file": "decoder.layer07.0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    4,
+    512
+   ]
+  },
+  "decoder/layer07/block/ZCRMSNorm_0/0": {
+   "file": "decoder.layer07.block.ZCRMSNorm_0.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/0": {
+   "file": "decoder.layer07.block.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/cross_attn/0": {
+   "file": "decoder.layer07.block.cross_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/cross_attn/gate_proj/0": {
+   "file": "decoder.layer07.block.cross_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/cross_attn/k_norm/0": {
+   "file": "decoder.layer07.block.cross_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    34,
+    48
+   ]
+  },
+  "decoder/layer07/block/cross_attn/k_proj/0": {
+   "file": "decoder.layer07.block.cross_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    384
+   ]
+  },
+  "decoder/layer07/block/cross_attn/out_proj/0": {
+   "file": "decoder.layer07.block.cross_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/cross_attn/q_norm/0": {
+   "file": "decoder.layer07.block.cross_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer07/block/cross_attn/q_proj/0": {
+   "file": "decoder.layer07.block.cross_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer07/block/cross_attn/v_proj/0": {
+   "file": "decoder.layer07.block.cross_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
+  "decoder/layer07/block/cross_norm/0": {
+   "file": "decoder.layer07.block.cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/hadamard_mlp/0": {
+   "file": "decoder.layer07.block.hadamard_mlp.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/post_attn_norm/0": {
+   "file": "decoder.layer07.block.post_attn_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/post_cross_norm/0": {
+   "file": "decoder.layer07.block.post_cross_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/pre_hada_norm/0": {
+   "file": "decoder.layer07.block.pre_hada_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/self_attn/0": {
+   "file": "decoder.layer07.block.self_attn.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/self_attn/gate_proj/0": {
+   "file": "decoder.layer07.block.self_attn.gate_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/self_attn/k_norm/0": {
+   "file": "decoder.layer07.block.self_attn.k_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    2,
+    22,
+    48
+   ]
+  },
+  "decoder/layer07/block/self_attn/k_proj/0": {
+   "file": "decoder.layer07.block.self_attn.k_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    96
+   ]
+  },
+  "decoder/layer07/block/self_attn/out_proj/0": {
+   "file": "decoder.layer07.block.self_attn.out_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
+  "decoder/layer07/block/self_attn/q_norm/0": {
+   "file": "decoder.layer07.block.self_attn.q_norm.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    8,
+    22,
+    48
+   ]
+  },
+  "decoder/layer07/block/self_attn/q_proj/0": {
+   "file": "decoder.layer07.block.self_attn.q_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    384
+   ]
+  },
+  "decoder/layer07/block/self_attn/v_proj/0": {
+   "file": "decoder.layer07.block.self_attn.v_proj.0.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    128
+   ]
+  }
+ }
+}
