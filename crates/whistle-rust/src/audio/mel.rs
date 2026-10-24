@@ -69,6 +69,34 @@ pub fn mel_matrix() -> Vec<f32> {
     bank
 }
 
+/// Each mel filter of `mel` (`[FFT_BINS, MELS]`) as its first nonzero bin and its weights (as
+/// f64) from there to its last nonzero bin, zeros inside the span kept; an all-zero filter has
+/// no weights. `features` sums only over these spans, in bin order, and gets the same bits as
+/// the sum over all 257 bins: power is never negative, so every skipped term is a zero, and a
+/// zero added to the running sum changes it only when the sum is still -0.0 (the empty sum) and
+/// the zero is +0.0. Before the span that leaves ±0.0, which the span's first term (a value of
+/// at least +0.0) replaces either way; after it the sum is at least +0.0 and the zeros leave it
+/// alone; an empty span gives ±0.0, which `ln(x + 2^-24)` cannot tell apart. Most of the matrix
+/// is zeros (each triangle covers a few bins), so this is most of the front end's multiply-adds.
+fn filter_spans(mel: &[f32]) -> Vec<(usize, Vec<f64>)> {
+    (0..MELS)
+        .map(|m| {
+            let weight = |b: usize| mel[b * MELS + m];
+            let Some(first) = (0..FFT_BINS).find(|&b| weight(b) != 0.0) else {
+                return (0, Vec::new());
+            };
+            let last = (0..FFT_BINS)
+                .rev()
+                .find(|&b| weight(b) != 0.0)
+                .unwrap_or(first);
+            (
+                first,
+                (first..=last).map(|b| f64::from(weight(b))).collect(),
+            )
+        })
+        .collect()
+}
+
 /// `np.hanning(WIN)` (symmetric), rounded to f32 as upstream stores it.
 fn window() -> Vec<f64> {
     (0..WIN)
@@ -99,7 +127,7 @@ fn window() -> Vec<f64> {
 pub fn features(samples: &[f32]) -> Features {
     let frames = 1 + samples.len() / HOP;
     let valid = samples.len() / HOP;
-    let mel = mel_matrix();
+    let filters = filter_spans(&mel_matrix());
     let window = window();
     let fft = Fft::new(FFT);
     let mut logmel = vec![0.0f64; valid * MELS];
@@ -121,9 +149,11 @@ pub fn features(samples: &[f32]) -> Features {
             *p = re[b] * re[b] + im[b] * im[b];
         }
         let row = &mut logmel[t * MELS..(t + 1) * MELS];
-        for (m, out) in row.iter_mut().enumerate() {
-            let energy: f64 = (0..FFT_BINS)
-                .map(|b| power[b] * f64::from(mel[b * MELS + m]))
+        for (out, (first, weights)) in row.iter_mut().zip(&filters) {
+            let energy: f64 = power[*first..*first + weights.len()]
+                .iter()
+                .zip(weights)
+                .map(|(p, w)| p * w)
                 .sum();
             *out = crate::math::ln(energy + 2f64.powi(-24));
         }

@@ -8,8 +8,9 @@ verification bar for every stage: CLAUDE.md "Tolerance policy".
 ## 6. Performance
 
 Transcription is fast enough for push-to-talk on every target, and the weights stay packed
-(`docs/design/performance.md`: ~41 MB resident after binding, a 3 s clip in ~75-85 ms on an M5
-at one beam, ~2.2 ms per decoder token); what is left.
+(`docs/design/performance.md`: ~41 MB resident after binding natively, ~59 MB on wasm simd128
+with its byte codes; a 3 s clip in ~82 ms natively and ~87 ms on Node simd128 at one beam, one
+thread); what is left.
 
 **Priority: single-threaded wasm32 (simd128).** The browser build has no threads, and phones and
 slower computers on the web are where transcription is slowest, so performance work is chosen
@@ -20,13 +21,11 @@ and measured for one thread on wasm first; native threads are a bonus.
   2^32 inputs) should win back the deterministic math's ~10% native / ~8% Node cost; the first
   numbers were taken at load ~40. CI's x86_64 jobs (Linux, Windows) confirm the SSE2 and AVX2
   paths bit for bit.
-- Optimise for one wasm thread, by the Node (V8) profile (`scripts/wasm-bench.sh profile`): the
-  decoder's packed kernel is 33% of a 3 s clip at one beam and 56% at three (each weight is
-  index-decoded for one multiply-add; batching helps at 3+ beams, a wasm-friendly index layout
-  prepared at bind time is the next lever); the encoder's dense panel kernel ~20%; the Hadamard
-  MLP ~9%; the f64 mel front end ~9% (most of the mel matrix is zeros). Re-measure on a quiet
-  machine with interleaved rounds; the first table was taken at load 15-28. Then the browser
-  itself once the Web Worker host exists (item 8).
+- Optimise for one wasm thread, by the Node (V8) profile (`scripts/wasm-bench.sh profile`, after
+  the byte codes and mel spans): the encoder's dense panel kernel is now the largest single
+  function (~26-32% of a 3 s clip at one beam), the decoder's rotated kernel 28% at one beam and
+  42% at three, the Hadamard MLP ~9%, decoder setup ~8%. Rerun the full `scripts/wasm-bench.sh`
+  table on a quiet machine; then the browser itself (item 8's demo).
 - The 3 s encoder alone is 5-12% slower than the dense build (it decodes ~19M packed weights per
   call); cut that if the encoder dominates a real workload.
 - Close the gap to the engine (`scripts/bench.sh`, `docs/design/performance.md` "Against the

@@ -57,6 +57,12 @@ pub(crate) struct PackedMatrix {
     group: usize,
     in_pad: usize,
     row_bytes: usize,
+    /// wasm simd128, rotated order only: every index as its own byte, `[rows, in_pad]`, so the
+    /// kernel loads 16 codes with one `v128_load` instead of unpacking them (`packed_wasm`).
+    /// wasm has no per-lane variable shift, and the unpack was most of the decoder's kernel;
+    /// this costs one byte per weight (`docs/design/performance.md`). Native keeps none.
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    codes: Vec<u8>,
 }
 
 /// Index `k` of an LSB-first stream of `bits`-bit fields, `bits` 2 or 4 (a field never
@@ -94,6 +100,16 @@ impl PackedMatrix {
             .map(|b| fp16_to_f32(u16::from_le_bytes([b[0], b[1]])))
             .collect();
         let (bits, group, in_pad, row_bytes) = (p.bits, p.group, p.in_pad, p.row_bytes);
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        let codes = if order == Order::Rotated {
+            p.packed
+                .chunks_exact(row_bytes)
+                .take(cq.rows())
+                .flat_map(|row| (0..in_pad).map(move |k| code(row, k, bits) as u8))
+                .collect()
+        } else {
+            Vec::new()
+        };
         Some(PackedMatrix {
             cq,
             order,
@@ -104,6 +120,8 @@ impl PackedMatrix {
             group,
             in_pad,
             row_bytes,
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            codes,
         })
     }
 

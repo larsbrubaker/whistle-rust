@@ -166,7 +166,7 @@ module's header.
 
 | Kernel | aarch64 | x86_64 | wasm32 |
 |---|---|---|---|
-| rotated projection (decoder) | NEON: `vqtbl` index and codebook lookups | AVX2 (`Avx2Detected`): `_mm256_srlv_epi32` index decode, `_mm256_permutevar8x32_ps` codebook lookup (`packed_x86.rs`) | simd128: nibble split with `i8x16_swizzle` and `v128_bitselect`, codebook as byte planes through `i8x16_swizzle` (`packed_wasm.rs`) |
+| rotated projection (decoder) | NEON: `vqtbl` index and codebook lookups | AVX2 (`Avx2Detected`): `_mm256_srlv_epi32` index decode, `_mm256_permutevar8x32_ps` codebook lookup (`packed_x86.rs`) | simd128: one 16-byte load of the codes kept as bytes at bind time (`PackedMatrix::codes`, wasm only), codebook as byte planes through `i8x16_swizzle` (`packed_wasm.rs`) |
 | band decode (encoder, stem, cross K/V) | NEON | AVX2: the same decode, butterflies by `_mm256_shuffle_ps` / `_mm256_blend_ps` / `_mm256_permute2f128_ps` | simd128: the same decode, butterflies by `i32x4_shuffle` |
 | anything else | scalar order | scalar order (no AVX2) | scalar order (no simd128) |
 
@@ -435,6 +435,58 @@ same text as native on 8 of the 9 clips at both beam counts; which clip differs 
 (the run's temp dir is deleted) and needs a rerun to identify, since the kernels are meant to
 be bit-identical across paths.
 
+### Byte codes and mel spans (A/B)
+
+Two bit-identical changes, measured as one A/B pair:
+
+- **Rotated kernel, codes as bytes (wasm simd128 only).** On wasm the per-16-weight index
+  unpack (a byte-spread swizzle, a nibble split by `v128_bitselect`, then a 2-bit split by
+  another) was most of `rows_into`, because simd128 has no per-lane variable shift. A rotated
+  matrix now also keeps every index as one byte (`[rows, in_pad]`, built in
+  `PackedMatrix::new`, `cfg(all(target_arch = "wasm32", target_feature = "simd128"))`), and
+  the kernel loads 16 codes with one `v128_load` straight into the byte-plane lookup. The codes
+  are the same, so the lookup, lanes and reduction are unchanged. **Memory:** one byte per
+  rotated weight, 18.09 M weights (the decoder's 64 matrices, the embedding/head's 4.2 M, the
+  mHC `phi`s and the Engram projections; 72 matrices), so about 18.1 MB (rows × padded width) more resident on
+  wasm simd128 only (their packed 2- and 4-bit indices are about 4.5–5 MB). Native
+  and scalar wasm keep no copy.
+- **Mel front end, span sums.** `features` summed `power[b] · mel[b, m]` over all 257 bins
+  for each of the 80 filters; each triangle has a few nonzero bins. It now keeps each
+  filter's first nonzero bin and its f64 weights up to its last (`filter_spans`) and sums
+  only those, in bin order. Same bits: power is never negative, so a skipped term is a zero,
+  and adding a zero changes the sum only when the sum is still -0.0 (the empty sum) and the
+  zero is +0.0; before a span that leaves ±0.0, which the span's first term (≥ +0.0)
+  replaces either way; after it the sum is ≥ +0.0 and zeros leave it alone; an empty span
+  gives ±0.0, which `ln(x + 2^-24)` cannot tell apart. The f64 FFT and the 80 `ln`s per frame
+  are left as they are: a real-input FFT or f32 would change the bits.
+
+Pinned by the existing nets: the stage identity hashes (`tests/transcribe/identity.rs`), the
+features tests against the oracle, the token contract, and
+`the_simd_path_reproduces_the_scalar_order_on_every_archive_matrix`, all green natively and
+under `scripts/wasm-test.sh simd128` and `scalar`.
+
+A/B, 2026-10-24 on the M5, base 36c3184 against the change, interleaved: 3 rounds, each
+running every runtime on both builds back to back with the build order alternating round to
+round, RUNS=3 per call; each cell the median of the 3 per-round medians (ms, one thread).
+Load average 27 at the start, 16, 10 and 8 after rounds 1–3. The per-round medians of a cell
+agree within 1% except one wasmtime long-clip round (777 against 716–719 ms), so the
+differences below are well outside the noise.
+
+| runtime | 3 s, beams 1 | 3 s, beams 3 | 26.6 s, beams 1 |
+|---|---|---|---|
+| native (NEON) | 85.2 → 81.8 (−4.0%) | 125.0 → 121.3 (−3.0%) | 694.3 → 671.4 (−3.3%) |
+| Node simd128 | 104.6 → 86.8 (−17.0%) | 154.3 → 132.2 (−14.3%) | 841.2 → 704.3 (−16.3%) |
+| wasmtime simd128 | 136.6 → 90.0 (−34.1%) | 163.2 → 141.3 (−13.4%) | 1078.1 → 719.0 (−33.3%) |
+
+Native gains only from the mel spans (its kernel did not change). Node simd128 is now about
+1.05–1.1× native single-thread on these clips.
+
+**NEON with byte codes too** was tried and not kept: NEON's own unpack is 4 instructions per
+16 codes (`vqtbl1q_u8`, `vshlq_u8`, `vandq_u8` and the load), so storing `4 · code` bytes
+saved 3.5–4% on a 3 s clip (81.6–83.8 → 78.3–78.5 ms at beams 1, 121.2–123.5 → 116.8–118.9 ms
+at beams 3, 3 interleaved pairs) and was mixed on the long clip at beams 3, for 18 MB more
+resident natively (the binding is about 41 MB). Not worth the memory.
+
 ### Where the time goes (Node, simd128)
 
 `node --cpu-prof` at a 200 µs interval on a simd128 build with debug info (V8 shows wasm
@@ -475,6 +527,33 @@ long clip at beams 1 (5080 ms), load average 15–17:
 | VAD | 0.6% | 0.3% | 0.3% |
 | Everything else | 0.3% | 0.1% | 0.1% |
 
+**After the byte codes and mel spans** (same method, load average 22–27, so the shares are a
+guide, not a measurement; 414 / 621 / 3291 ms sampled):
+
+| Bucket | 3 s, beams 1 | 3 s, beams 3 | 26.6 s, beams 1 |
+|---|---|---|---|
+| **Decoder step** | **36.4%** | **57.8%** | **37.1%** |
+| rotated packed kernel (`rows_into`) | 27.6% | 41.7% | 25.5% |
+| **Encoder** | **50.8%** | **34.0%** | **52.6%** |
+| dense kernel (`linear_panels_into`) | 25.8% | 17.5% | 25.6% |
+| Hadamard MLP | 9.4% | 6.4% | 9.6% |
+| band decode (packed CQ, per call) | 6.4% | 3.7% | 0.7% |
+| self-attention | 1.0% | 1.0% | 8.4% |
+| **Decoder setup** | **8.5%** | **5.5%** | **6.5%** |
+| **Front end + VAD** | **4.0%** | **2.4%** | **3.7%** |
+| mel/log (`mel::features`) | 0.8% | 0.3% | 0.6% |
+| FFT | 2.3% | 1.6% | 2.4% |
+
+Top functions on the 3 s clip at beams 1 now: `linear_panels_into` 32.3%, `rows_into` 27.6%,
+`band_into` 7.5%, `kron_apply` 6.7%, `fake_quant_rows` 3.0%, `HadamardMlp::forward` 2.9%,
+`Fft::forward` 2.3%, `PackedMatrix::project` 2.1%. The encoder's dense panel kernel is now the
+largest single function on one beam; the rotated kernel still leads at three beams. The
+rotated kernel's per-16-weight work is now 4 plane swizzles and 8 byte interleaves for the
+lookup against 4 loads, 4 multiplies and 4 adds per row; a further cut needs fewer bytes per
+value (a decoder-only f32 or bf16 weight copy, 36–72 MB) or more rows per decode.
+
+The profile below is from before (commit 507e07b).
+
 Top functions by self time on the 3 s clip at beams 1: `PackedMatrix::rows_into` 33.0%,
 `linear_panels_into` 24.4%, `PackedMatrix::band_into` 7.1%, `mel::features` 5.5%,
 `hadamard::kron_apply` 4.8%, `fake_quant_rows` 2.8%, `HadamardMlp::forward` 2.7%, `expf` 2.6%,
@@ -491,9 +570,10 @@ Shares are of the 3 s beams-1 / beams-3 / long beams-1 profiles above.
    (4 plane swizzles, 2 rounds of byte interleaves) to be used for one multiply-add, and at three
    beams that is repeated per hypothesis. Batching the beams' steps into one `rows_into` call
    (the `ROWS` path, in progress) amortizes the decode over 3 rows and should take most of the
-   beams-3 excess (56% of the beams-3 time is this kernel against 33% at beams 1). After that,
-   a cheaper wasm index decode (one swizzle per 16 codes into a pre-spread layout stored at bind
-   time) or an f32/bf16 decoder-only weight copy (a memory trade) are the levers.
+   beams-3 excess (56% of the beams-3 time is this kernel against 33% at beams 1). **Done
+   since:** the beams' steps are batched, and on wasm the codes are kept as bytes at bind time
+   (above, 28% / 42% / 26% after). What is left is an f32/bf16 decoder-only weight copy (a
+   memory trade).
 2. **The encoder's dense panel kernel, 20% / 12% / 20%.** `linear_panels_into` on simd128 is
    4-wide with mul then add (no FMA allowed by the accumulation order); it is the one place
    wider blocking (more input rows per broadcast, so each panel load feeds more accumulators)
@@ -505,7 +585,7 @@ Shares are of the 3 s beams-1 / beams-3 / long beams-1 profiles above.
    multiplies the power spectrum by the full dense mel matrix, most of which is zeros (each mel
    filter covers a few bins). Skipping the zero entries adds only exact zeros to a non-negative
    sum, so it keeps the bits; it should take most of the 5.6% mel share. The FFT (2.5%) is f64
-   too.
+   too. **Done since:** the span sums took mel/log from 5.6% to 0.8% (above); the FFT stays.
 5. **Per-call band decode of the packed encoder, 6% / 3% / 0.5%.** About 19M weights decoded
    per call whatever the clip length, so it matters on short push-to-talk clips only.
 6. **Decoder setup (cross-attention memory), 7% / 4% / 6%**, mostly the dense kernel: shares

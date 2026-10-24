@@ -12,6 +12,9 @@
 //! - 4-bit: byte `p` holds source byte `p / 2`; an even `p` takes the low nibble and an odd one
 //!   the high nibble.
 //!
+//! The rotated kernel skips this when the matrix kept its codes as bytes at bind time
+//! (`PackedMatrix::codes`, the decoder's matrices): one 16-byte load gives the same codes.
+//!
 //! **Value lookup.** The 16-entry codebook as four byte planes (plane `b` = byte `b` of every
 //! entry), so `i8x16_swizzle(plane_b, codes)` is byte `b` of all 16 values. Two rounds of byte
 //! interleaves (`i8x16_shuffle`) rebuild the little-endian f32s: the first pairs planes 0/1 and
@@ -121,17 +124,24 @@ impl PackedMatrix {
         let groups = self.in_pad / self.group;
         assert!(row.len() * 8 >= self.in_pad * B as usize);
         assert!(xr.iter().all(|x| x.len() >= self.in_pad));
+        // The bind-time byte codes when this matrix has them (`PackedMatrix::codes`).
+        let expanded = &self.codes[(o * self.in_pad).min(self.codes.len())..];
+        let expanded = (expanded.len() >= self.in_pad).then_some(expanded);
         let planes = planes(self.table());
         let mut out = [-0.0f32; R];
         // SAFETY: simd128 is enabled at compile time. The index loads read 4 or 8 bytes at
-        // `k0 · B / 8`, `k0 + 16 ≤ in_pad`, within `row` (asserted); the activation loads read
+        // `k0 · B / 8`, `k0 + 16 ≤ in_pad`, within `row` (asserted), or 16 byte codes at `k0`
+        // within `expanded` (at least `in_pad` long when present); the activation loads read
         // 4 floats at `k0 + 4v < in_pad` within each `xr` row (asserted); the store writes a
         // local 4-float array.
         unsafe {
             for g in 0..groups {
                 let mut acc = [[f32x4_splat(-0.0); 4]; R];
                 for k0 in (g * self.group..(g + 1) * self.group).step_by(16) {
-                    let codes = codes16::<B>(row.as_ptr().add(k0 * B as usize / 8));
+                    let codes = match expanded {
+                        Some(c) => v128_load(c.as_ptr().add(k0) as *const v128),
+                        None => codes16::<B>(row.as_ptr().add(k0 * B as usize / 8)),
+                    };
                     let w = lookup16(codes, &planes);
                     for v in 0..4 {
                         for r in 0..R {
