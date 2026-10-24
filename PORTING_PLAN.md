@@ -15,7 +15,10 @@ at one beam, ~2.2 ms per decoder token); what is left:
   are checked by construction and asm only); simd128 ran under wasmtime.
 - The 3 s encoder alone is 5-12% slower than the dense build (it decodes ~19M packed weights per
   call); cut that if the encoder dominates a real workload.
-- Bench against the engine CLI on the same clips and record the numbers.
+- Close the gap to the engine (`scripts/bench.sh`, `docs/design/performance.md` "Against the
+  engine"): about 2x slower at one beam and 3.5-7x at the default three. Batch the beams'
+  decoder steps into one multi-row projection per matrix (so the panel path and threads help),
+  then the encoder (~40 ms on a 3 s clip against the engine's 11-16 ms to first token).
 
 ## 7. Designed decode features
 

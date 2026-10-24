@@ -252,6 +252,80 @@ per call (about 19M weights at 0.4–0.6 ns): within the noise on 30 s, but a fe
 3 s clip, which has only about 39 frames to amortize it over. That is the one stage still
 measurably behind `main` on a quiet machine.
 
+## Against the engine
+
+`scripts/bench.sh` times this library and the closed Needle engine CLI (a black box: it is run
+and timed, nothing else) on the same clips on the same machine. `examples/bench.rs` loads the
+model once, makes one untimed warm-up call per clip, then times N calls (`--beams`, `--threads`)
+and prints a JSON line per clip. The script writes one extra clip, `long`, to a temp dir (nothing
+is committed): the 8 speech clips plus a repeat, joined by 0.3 s gaps, 26.6 s (the library
+rejects over 30 s). It runs our example at beams 1 and 3 with threads 1 and 4, and the engine at
+`--threads 1` and `4`, once per clip per invocation, interleaved in rounds. Run it with
+`scripts/bench.sh` (defaults `RUNS=10 ROUNDS=3`).
+
+**Conditions of the table below.** Apple M5 (10 cores), 24 GB, macOS, release build, commit
+`c1efadf` plus the bench files, 2026-10-24, `RUNS=5 ROUNDS=2`. Load average 9.5 at the start,
+11.0 at the end (the machine was shared with other builds; it was never idle). Figures are the
+median over the 2 rounds of each round's median over 5 calls. A first run of the same command
+at load 27 falling to 10 was discarded: its beams-1 times were 2–4× the beams-3 ones in the first
+round, which is noise, not signal. Even the kept run has about ±15% on any cell; read ratios to
+the nearest half.
+
+**Like for like.** The engine's wall time per invocation includes process start and model load;
+ours is a warm call on a loaded model. The engine on 0.2 s of silence (which the engine gates
+out before decoding, so it is an upper bound on its load and start) costs 10.4 ms at 1 thread and
+12.6 ms at 4: "net" below is the raw figure minus that floor. Our own load (`std::fs::read` plus
+`Whistle::from_cact`, four loads) is 3.8–4.0 ms, and is not in our columns, so
+add 4 ms to ours for a one-shot process. Either way it is small against the transcription.
+
+Median ms per transcription (`sec` is audio length; `enc t4` is features plus encoder on the
+whole clip with 4 threads, timed separately from the call; `eng ttft`/`eng tps` are the engine's
+own `ttft_ms`/`decode_tps` at 1 thread, from its last invocation):
+
+| clip | sec | ours b1 t1 | ours b1 t4 | ours b3 t1 | ours b3 t4 | ours enc t4 | eng t1 raw | eng t1 net | eng t4 raw | eng t4 net | eng ttft t1 | eng tps t1 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| de_anna | 2.6 | 99 | 94 | 186 | 209 | 40 | 59 | 48 | 53 | 40 | 11 | 572 |
+| en_daniel | 3.4 | 101 | 98 | 176 | 193 | 51 | 59 | 49 | 47 | 34 | 13 | 581 |
+| en_samantha | 3.1 | 102 | 92 | 177 | 196 | 46 | 48 | 38 | 46 | 33 | 12 | 600 |
+| es_monica | 2.6 | 107 | 89 | 205 | 229 | 36 | 55 | 45 | 53 | 41 | 11 | 600 |
+| fr_thomas | 3.0 | 111 | 97 | 234 | 272 | 41 | 61 | 51 | 65 | 52 | 16 | 442 |
+| it_alice | 2.3 | 108 | 80 | 161 | 186 | 37 | 61 | 50 | 41 | 29 | 13 | 452 |
+| nl_xander | 2.1 | 88 | 74 | 146 | 169 | 36 | 51 | 40 | 40 | 27 | 11 | 521 |
+| pl_zosia | 2.5 | 93 | 65 | 179 | 196 | 38 | 77 | 66 | 55 | 42 | 14 | 427 |
+| long | 26.6 | 873 | 694 | 1831 | 1856 | 338 | 392 | 381 | 250 | 237 | 152 | 351 |
+
+**Where we stand.** We are slower than the engine in every configuration.
+- **3 s clips, greedy (beams 1):** about 100 ms against the engine's 45–60 ms raw (40–50 net) at
+  1 thread, about 1.8× raw and 2× net; at 4 threads about 90 ms against 45–55 raw, about 2×
+  (2.5× net). Roughly 40 ms of ours is the encoder (the engine's whole time to first token is
+  11–16 ms) and the rest is the decode.
+- **3 s clips, 3 beams:** 150–270 ms, about 3.5× the engine's raw 4-thread time.
+- **26.6 s clip:** beams 1 takes 0.87 s at 1 thread and 0.69 s at 4, against 0.39 and 0.25 s
+  for the engine: 2.2× and 2.8×. Our encoder alone (0.34 s at 4 threads) exceeds the engine's
+  entire call (0.25 s) there. Beams 3 take 1.83–1.86 s, 7× the engine at 4 threads.
+- **Threads:** the engine's 4 threads cut its long-clip time 1.6×; ours cut beams 1 by 1.25× and
+  beams 3 by nothing (the 3-beam 4-thread cells are 5–15% slower than 1 thread on the 3 s clips;
+  noise-sized, but never faster). The decode step is single-threaded (see "What is left").
+- **Real-time factor:** at beams 1 and 4 threads we run a 3 s clip about 33× faster than
+  real time and the 26.6 s clip about 38×; the engine (raw, 4 threads) about 64× and 106×.
+
+**Which of our settings matches its text.** The engine CLI's default beam count is not
+documented, and it was not varied here (the CLI exposes no beam option). Its text equals ours at
+beams 3 on 8 of the 9 clips and at beams 1 on 7 of 9 (the engine at 1 thread, default options;
+which clips differ was not recorded), consistent with `decoding.md`: 3 beams is the smallest
+count that reproduced the engine on the test clips. So the fair speed comparison against the
+engine's text is ours at beams 3, and that gap is 3.5-4× on short clips and 7× on 30 s; the
+greedy 2× is the gap to an engine whose work we would only be guessing at. If the engine's
+default is 5 beams (believed, not verified), it decodes five hypotheses in 45-60 ms where we
+need 150-270 ms for three, and the true gap at equal beam width is wider than the table shows.
+
+Open from this: three beams cost 75-125 ms more than greedy on a 3 s clip at 1 thread (18
+tokens, two extra hypotheses: about 2 ms per extra hypothesis-token, close to the 2.7 ms a
+greedy token costs alone), so the beams' steps are not sharing any work. Batching them into one
+projection per matrix (the weights stream from memory once, and that stream bounds a step) is the
+first thing to try; then the encoder (338 ms of our 26.6 s call, against the engine's 250 ms
+total).
+
 ## What is left
 
 - **The decoder step** (about 2.7 ms per token) runs on one thread and is now bound by how the
