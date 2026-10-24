@@ -5,9 +5,11 @@ A pure Rust port of [Whistle](https://huggingface.co/Cactus-Compute/whistle), Ca
 out; English, German, French, Spanish, Italian, Dutch and Polish. One library for macOS,
 Windows, Linux and the browser (wasm32), with no native code and no runtime dependencies.
 
-**Status: in progress.** Greedy transcription of up to 30 s of audio works and reproduces the
-reference decode on every test clip; beam search, timestamps, streaming, windowing past 30 s
-and performance work are still to come (`PORTING_PLAN.md`).
+**Status: in progress.** Transcription of up to 30 s of audio works: greedy (`beams: 1`)
+reproduces the reference decode on every test clip, the default 3-beam search reproduces the
+engine's transcripts, and keyword biasing favours the names and jargon you list. Word
+timestamps, windowing past 30 s, streaming and packed (quantized in memory) weights are still
+to come (`PORTING_PLAN.md`).
 
 ## Usage
 
@@ -27,8 +29,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `Whistle::transcribe` takes 16 kHz mono `f32` samples instead. `Options` forces a language
 (`language: Some("de".into())`), sets how the voice-activity detector gates the audio (`vad`:
-`GateAndTrim` by default, so silence gives an empty transcript), and takes a `Cancel` handle
-that stops a transcription from another thread with `Error::Cancelled`.
+`GateAndTrim` by default, so silence gives an empty transcript), takes a `Cancel` handle
+that stops a transcription from another thread with `Error::Cancelled`, runs a beam search
+(`beams`: 3 by default, the smallest count that reproduced every engine transcript on the test
+clips, for about +195 ms on a 3.3 s clip; `beams: 1` is the greedy decode; up to 16), and favours names, places and jargon you list
+(`keywords: vec!["PETG".into()]`, strength `keyword_bonus`). See `docs/design/decoding.md`.
 
 ## How it is built
 

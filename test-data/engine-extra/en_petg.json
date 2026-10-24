@@ -1,0 +1,66 @@
+{
+ "text": "Open the matter hackers library and pick the PETG profile.",
+ "language": "en",
+ "words": [
+  {
+   "word": "Open",
+   "start": 0.08,
+   "end": 0.32,
+   "probability": 0.945
+  },
+  {
+   "word": "the",
+   "start": 0.32,
+   "end": 0.56,
+   "probability": 0.93
+  },
+  {
+   "word": "matter",
+   "start": 0.56,
+   "end": 0.8,
+   "probability": 0.217
+  },
+  {
+   "word": "hackers",
+   "start": 0.8,
+   "end": 1.28,
+   "probability": 0.891
+  },
+  {
+   "word": "library",
+   "start": 1.28,
+   "end": 1.68,
+   "probability": 0.848
+  },
+  {
+   "word": "and",
+   "start": 1.68,
+   "end": 1.92,
+   "probability": 0.999
+  },
+  {
+   "word": "pick",
+   "start": 1.92,
+   "end": 2.16,
+   "probability": 0.998
+  },
+  {
+   "word": "the",
+   "start": 2.16,
+   "end": 2.32,
+   "probability": 0.996
+  },
+  {
+   "word": "PETG",
+   "start": 2.32,
+   "end": 3.12,
+   "probability": 0.926
+  },
+  {
+   "word": "profile.",
+   "start": 3.12,
+   "end": 3.76,
+   "probability": 0.993
+  }
+ ]
+}

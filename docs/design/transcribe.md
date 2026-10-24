@@ -32,7 +32,11 @@ rate, then transcribes. A `Transcript` is the text, the language code, and the t
    not an error.
 7. The front end (`audio::features`), the encoder (`Encoder::forward_with`), and the decoder
    memory (`Weights::decoder_memory`), each once.
-8. **Greedy decode** over the KV cache (below), following `whistle_finetune._score_quantised`:
+8. **Decode** over the KV cache (below). By default (`Options::beams = 3`, `DEFAULT_BEAMS`)
+   it is a 3-beam search: the smallest count that reproduced every engine transcript on the
+   test clips, with the best word error rate against the true texts, for about +195 ms on a
+   3.3 s clip (`docs/design/decoding.md`). With `beams: 1` and no keywords it is the greedy
+   decode `whistle_finetune._score_quantised` defines, which the fixtures pin:
    the sequence starts `[BOS]`; step `pos` feeds the token at `pos` and scores the next one.
    Step 0 picks among the language tags only (the reference sets every other score to −∞), or,
    with a forced language, feeds that tag without looking. Later steps pick among the text ids
@@ -42,6 +46,12 @@ rate, then transcribes. A `Transcript` is the text, the language code, and the t
    EOS (1) or after `max_seq_len − 1` steps, so the sequence never exceeds `max_seq_len` (320)
    tokens. `from_cact` checks that the seven tags are exactly the last ids of the vocabulary,
    as the reference's `arange(vocab) >= text` mask assumes.
+   With more beams (the default), or with `Options::keywords`, step 0 is the same and the text
+   search is
+   `transcribe::search` (`docs/design/decoding.md`): a beam search ranked by the mean
+   log-probability per token, and keyword biasing through a token prefix trie with
+   retraction. `beams` outside 1 to 16 or a negative or non-finite `keyword_bonus` is
+   `Error::Input`, checked with the language before anything runs.
 9. **Text.** The ids after the tag decode through the tokenizer. No text ids gives an empty
    transcript (language `None`); otherwise the language is the detected or forced tag's code.
    Forcing a language feeds its tag; it does not translate (English audio forced to `fr` still
@@ -95,6 +105,8 @@ cache updates and unusable.
 Measured 2026-10-24 on en_samantha (3.09 s), release build, Apple Silicon, default threads:
 the encoder 31 ms, the decoder setup (cross-attention memory for 8 layers) 3.4 ms, then about
 2.7 ms per decoder token (on one thread whatever the setting; the few-row kernel path); the
-whole default call (trimmed to the speech span) 81–87 ms (661 ms before the kernel work; the
-breakdown, both thread counts and what was done are in `performance.md`). Weights stay dequantized to f32 here, and each
+whole one-beam call (trimmed to the speech span) 81–87 ms (661 ms before the kernel work; the
+breakdown, both thread counts and what was done are in `performance.md`; the default three
+beams cost about twice the decoder time, `decoding.md`). Weights stay dequantized to f32 here,
+and each
 self-attention step copies its cache into one contiguous block.

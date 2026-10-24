@@ -1,0 +1,66 @@
+{
+ "text": "Bitte schick das Modell an Jürgen Oberhäuser in Fort Simps.",
+ "language": "de",
+ "words": [
+  {
+   "word": "Bitte",
+   "start": 0.08,
+   "end": 0.32,
+   "probability": 0.834
+  },
+  {
+   "word": "schick",
+   "start": 0.32,
+   "end": 0.64,
+   "probability": 0.786
+  },
+  {
+   "word": "das",
+   "start": 0.64,
+   "end": 0.8,
+   "probability": 0.997
+  },
+  {
+   "word": "Modell",
+   "start": 0.8,
+   "end": 1.28,
+   "probability": 0.996
+  },
+  {
+   "word": "an",
+   "start": 1.28,
+   "end": 1.44,
+   "probability": 0.843
+  },
+  {
+   "word": "Jürgen",
+   "start": 1.44,
+   "end": 1.84,
+   "probability": 0.922
+  },
+  {
+   "word": "Oberhäuser",
+   "start": 1.84,
+   "end": 2.48,
+   "probability": 0.966
+  },
+  {
+   "word": "in",
+   "start": 2.48,
+   "end": 2.72,
+   "probability": 0.842
+  },
+  {
+   "word": "Fort",
+   "start": 2.72,
+   "end": 2.96,
+   "probability": 0.949
+  },
+  {
+   "word": "Simps.",
+   "start": 2.96,
+   "end": 3.36,
+   "probability": 0.322
+  }
+ ]
+}

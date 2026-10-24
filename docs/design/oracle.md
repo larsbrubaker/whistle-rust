@@ -18,6 +18,8 @@ port loads. Nothing in the Rust build calls Python; the oracle only writes fixtu
 | `oracle/dump_mel.py` | Writes `test-data/fixtures/mel.npy`, upstream's `mel_matrix` for the default config. |
 | `oracle/make_clips.py` | Synthesizes `test-data/clips/*.wav` with macOS `say` (16 kHz mono PCM16) from `oracle/clips.json`, plus one second of silence. |
 | `oracle/engine_transcripts.py` | Runs the engine CLI over the clips into `test-data/engine/*.json`. |
+| `oracle/make_extra_clips.py` | Synthesizes `test-data/clips-extra/*.wav` (names, places and jargon) with macOS `say` from `test-data/clips-extra/clips.json`, which also lists each clip's keywords. |
+| `oracle/engine_extra_transcripts.py` | Runs the engine CLI over the extra clips, plain and with `--audio-keywords`, into `test-data/engine-extra/<clip>.json` and `<clip>.keywords.json`. |
 
 ## Weights: the archive, not the checkpoint
 

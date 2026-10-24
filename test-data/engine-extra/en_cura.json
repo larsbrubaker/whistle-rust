@@ -1,0 +1,48 @@
+{
+ "text": "Ask knee-off about the ultimate procureur settings.",
+ "language": "en",
+ "words": [
+  {
+   "word": "Ask",
+   "start": 0.08,
+   "end": 0.4,
+   "probability": 0.795
+  },
+  {
+   "word": "knee-off",
+   "start": 0.4,
+   "end": 0.72,
+   "probability": 0.693
+  },
+  {
+   "word": "about",
+   "start": 0.72,
+   "end": 0.96,
+   "probability": 0.991
+  },
+  {
+   "word": "the",
+   "start": 0.96,
+   "end": 1.2,
+   "probability": 1.0
+  },
+  {
+   "word": "ultimate",
+   "start": 1.2,
+   "end": 1.6,
+   "probability": 0.918
+  },
+  {
+   "word": "procureur",
+   "start": 1.6,
+   "end": 2.24,
+   "probability": 0.78
+  },
+  {
+   "word": "settings.",
+   "start": 2.24,
+   "end": 2.56,
+   "probability": 0.931
+  }
+ ]
+}

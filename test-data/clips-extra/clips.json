@@ -1,0 +1,7 @@
+[
+  {"name": "en_names", "language": "en", "voice": "Samantha", "text": "Send the file to Siobhan and Krzysztof.", "keywords": ["Siobhan", "Krzysztof"]},
+  {"name": "en_petg", "language": "en", "voice": "Daniel", "text": "Open the MatterHackers library and pick the PETG profile.", "keywords": ["MatterHackers", "PETG"]},
+  {"name": "en_cura", "language": "en", "voice": "Moira", "text": "Ask Niamh about the Ultimaker Cura settings.", "keywords": ["Niamh", "Ultimaker", "Cura"]},
+  {"name": "de_names", "language": "de", "voice": "Anna", "text": "Bitte schick das Modell an Jürgen Oberhäuser in Pforzheim.", "keywords": ["Jürgen", "Oberhäuser", "Pforzheim"]},
+  {"name": "pl_names", "language": "pl", "voice": "Zosia", "text": "Wyślij plik do Grzegorza Brzęczyszczykiewicza w Szczebrzeszynie.", "keywords": ["Grzegorza", "Brzęczyszczykiewicza", "Szczebrzeszynie"]}
+]

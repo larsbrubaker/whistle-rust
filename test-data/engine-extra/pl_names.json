@@ -1,0 +1,72 @@
+{
+ "text": "Wyszyli plik dobrze go, żebrzeń czy szczykiewi czas szczebrze się nie.",
+ "language": "pl",
+ "words": [
+  {
+   "word": "Wyszyli",
+   "start": 0.08,
+   "end": 0.48,
+   "probability": 0.767
+  },
+  {
+   "word": "plik",
+   "start": 0.48,
+   "end": 0.72,
+   "probability": 0.339
+  },
+  {
+   "word": "dobrze",
+   "start": 0.72,
+   "end": 1.12,
+   "probability": 0.967
+  },
+  {
+   "word": "go,",
+   "start": 1.12,
+   "end": 1.28,
+   "probability": 0.64
+  },
+  {
+   "word": "żebrzeń",
+   "start": 1.28,
+   "end": 1.68,
+   "probability": 0.861
+  },
+  {
+   "word": "czy",
+   "start": 1.68,
+   "end": 1.84,
+   "probability": 0.651
+  },
+  {
+   "word": "szczykiewi",
+   "start": 1.84,
+   "end": 2.32,
+   "probability": 0.87
+  },
+  {
+   "word": "czas",
+   "start": 2.32,
+   "end": 2.48,
+   "probability": 0.554
+  },
+  {
+   "word": "szczebrze",
+   "start": 2.48,
+   "end": 2.96,
+   "probability": 0.896
+  },
+  {
+   "word": "się",
+   "start": 2.96,
+   "end": 3.12,
+   "probability": 0.65
+  },
+  {
+   "word": "nie.",
+   "start": 3.12,
+   "end": 3.28,
+   "probability": 0.995
+  }
+ ]
+}

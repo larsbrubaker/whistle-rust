@@ -2,8 +2,9 @@
 // private per-stage hook (`Whistle::run`, `Stage`): a `Cancel` fired at any stage (after
 // resampling, the detector, the features, before an encoder layer, before a decoder step, from
 // another thread) stops the call at that check with `Error::Cancelled` and runs nothing after
-// it; and 10 minutes of 44.1 kHz audio is rejected before it is resampled. Uses
-// models/whistle.cact and test-data/clips/ from the workspace root.
+// it; and 10 minutes of 44.1 kHz audio is rejected before it is resampled. Also the ignored
+// measurement of the beam search's final ranking (mean against sum, which needs the private
+// `Whistle::run_ranked`). Uses models/whistle.cact and test-data/ from the workspace root.
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -40,6 +41,8 @@ fn cancel_at(samples: Vec<f32>, rate: u32, at: Stage) -> (Result<(), Error>, Vec
     let cancel = Cancel::new();
     let options = Options {
         cancel: Some(cancel.clone()),
+        // One beam: one decoder step per position, as the stage counts assume.
+        beams: 1,
         ..Options::default()
     };
     let mut seen = Vec::new();
@@ -118,4 +121,71 @@ fn ten_minutes_at_44_1_khz_with_vad_off_is_rejected_before_resampling() {
     assert!(seen.is_empty(), "{seen:?}");
     println!("rejected in {:.1} ms", elapsed.as_secs_f64() * 1e3);
     assert!(elapsed.as_millis() < 100, "{elapsed:?}");
+}
+
+#[path = "../../tests/decoding/wer.rs"]
+mod wer;
+
+/// The beam search's final ranking measured on the contract clips: normalized WER against the
+/// true texts (oracle/clips.json) and the engine's transcripts (test-data/engine/), per beam
+/// count, under the mean per token (the default) and the plain sum. Prints the tables in
+/// docs/design/decoding.md: `cargo test --release --lib ranking -- --ignored --nocapture`.
+#[test]
+#[ignore = "measurement for docs/design/decoding.md"]
+fn ranking_word_error_rates() {
+    use super::search::Ranking;
+    let read = |p: &str| -> serde_json::Value {
+        serde_json::from_slice(&std::fs::read(root().join(p)).unwrap()).unwrap()
+    };
+    let clips = read("oracle/clips.json");
+    for ranking in [Ranking::Mean, Ranking::Sum] {
+        for n in [1, 2, 3, 5, 8] {
+            let (mut truth_edits, mut engine_edits, mut truth_words, mut engine_words) =
+                (0, 0, 0, 0);
+            for c in clips.as_array().unwrap() {
+                let name = c["name"].as_str().unwrap();
+                let truth = c["text"].as_str().unwrap();
+                let engine = read(&format!("test-data/engine/{name}.json"))["text"]
+                    .as_str()
+                    .unwrap()
+                    .to_string();
+                let bytes =
+                    std::fs::read(root().join(format!("test-data/clips/{name}.wav"))).unwrap();
+                let audio = read_wav(&bytes).unwrap();
+                let options = Options {
+                    beams: n,
+                    ..Options::default()
+                };
+                let text = whistle()
+                    .run_ranked(
+                        Cow::Owned(audio.samples),
+                        audio.sample_rate,
+                        &options,
+                        &mut |_| {},
+                        ranking,
+                    )
+                    .unwrap()
+                    .text;
+                let (t, e) = (wer::normalize(truth), wer::normalize(&engine));
+                let h = wer::normalize(&text);
+                let (te, ee) = (wer::edits(&t, &h), wer::edits(&e, &h));
+                println!(
+                    "{ranking:?} beams {n} {name:12} truth {:.3} (raw {:.3}) engine {:.3}  {text}",
+                    wer::wer(truth, &text),
+                    wer::raw_wer(truth, &text),
+                    ee as f64 / e.len().max(1) as f64
+                );
+                truth_edits += te;
+                engine_edits += ee;
+                truth_words += t.len();
+                engine_words += e.len();
+            }
+            println!(
+                "{ranking:?} beams {n}: corpus truth {truth_edits}/{truth_words} = {:.4}, engine \
+                 {engine_edits}/{engine_words} = {:.4}",
+                truth_edits as f64 / truth_words as f64,
+                engine_edits as f64 / engine_words as f64
+            );
+        }
+    }
 }

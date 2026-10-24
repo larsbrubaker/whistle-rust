@@ -1,0 +1,60 @@
+{
+ "text": "Open the Matterhackers library and pick the PETG profile.",
+ "language": "en",
+ "words": [
+  {
+   "word": "Open",
+   "start": 0.08,
+   "end": 0.32,
+   "probability": 0.945
+  },
+  {
+   "word": "the",
+   "start": 0.32,
+   "end": 0.56,
+   "probability": 0.93
+  },
+  {
+   "word": "Matterhackers",
+   "start": 0.56,
+   "end": 1.2,
+   "probability": 0.605
+  },
+  {
+   "word": "library",
+   "start": 1.2,
+   "end": 1.68,
+   "probability": 0.699
+  },
+  {
+   "word": "and",
+   "start": 1.68,
+   "end": 1.92,
+   "probability": 1.0
+  },
+  {
+   "word": "pick",
+   "start": 1.92,
+   "end": 2.16,
+   "probability": 0.996
+  },
+  {
+   "word": "the",
+   "start": 2.16,
+   "end": 2.32,
+   "probability": 0.997
+  },
+  {
+   "word": "PETG",
+   "start": 2.32,
+   "end": 3.12,
+   "probability": 0.923
+  },
+  {
+   "word": "profile.",
+   "start": 3.12,
+   "end": 3.76,
+   "probability": 0.99
+  }
+ ]
+}

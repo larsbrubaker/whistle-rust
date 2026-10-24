@@ -1,0 +1,54 @@
+{
+ "text": "Wyszyli plik dobrze go, że brzęczyszczykiewicza w szczebrzeszynie.",
+ "language": "pl",
+ "words": [
+  {
+   "word": "Wyszyli",
+   "start": 0.08,
+   "end": 0.48,
+   "probability": 0.767
+  },
+  {
+   "word": "plik",
+   "start": 0.48,
+   "end": 0.72,
+   "probability": 0.339
+  },
+  {
+   "word": "dobrze",
+   "start": 0.72,
+   "end": 1.12,
+   "probability": 0.967
+  },
+  {
+   "word": "go,",
+   "start": 1.12,
+   "end": 1.28,
+   "probability": 0.64
+  },
+  {
+   "word": "że",
+   "start": 1.28,
+   "end": 1.36,
+   "probability": 0.988
+  },
+  {
+   "word": "brzęczyszczykiewicza",
+   "start": 1.36,
+   "end": 2.48,
+   "probability": 0.614
+  },
+  {
+   "word": "w",
+   "start": 2.48,
+   "end": 2.56,
+   "probability": 0.912
+  },
+  {
+   "word": "szczebrzeszynie.",
+   "start": 2.56,
+   "end": 3.28,
+   "probability": 0.604
+  }
+ ]
+}

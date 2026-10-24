@@ -5,7 +5,11 @@
 //! after norm, RoPE and the KV path, the values after the KV path); each Engram site keeps its
 //! projected values for the value conv (`engram`). Every step runs the same functions the full
 //! pass does on the new row only (the block core, the mHC step, the final norm and the head),
-//! so its logits equal [`super::Decoder::forward`]'s row for that position.
+//! so its logits equal [`super::Decoder::forward`]'s row for that position. A state is
+//! [`Clone`] so a beam search can fork a hypothesis: the RoPE table and the cross-attention
+//! memory are fixed for the decode and shared (`Arc`); only the growing caches are copied.
+
+use std::sync::Arc;
 
 use crate::error::Error;
 
@@ -19,16 +23,19 @@ use super::Decoder;
 
 /// One Engram site's running state: every position's projected values before the value conv
 /// (`[positions, d_model]`), which the conv reads back up to `(taps − 1) · dilation` positions.
+#[derive(Clone)]
 struct EngramCache {
     values: Vec<f32>,
 }
 
 /// A decode in progress against one decoder memory. [`DecoderState::step`] feeds the token at
-/// the next position (BOS first) and returns the scores for the token after it.
+/// the next position (BOS first) and returns the scores for the token after it. Cloning copies
+/// the self-attention and Engram caches (they grow with the position) and shares the rest.
+#[derive(Clone)]
 pub struct DecoderState<'w> {
     weights: &'w Weights,
-    rope: Rope,
-    cross: Vec<CrossMemory>,
+    rope: Arc<Rope>,
+    cross: Arc<Vec<CrossMemory>>,
     layers: Vec<KvCache>,
     engrams: Vec<EngramCache>,
     tokens: Vec<u32>,
@@ -48,8 +55,12 @@ impl<'w> DecoderState<'w> {
         let g = &weights.geometry;
         Ok(DecoderState {
             weights,
-            rope: Rope::new(g.qk_head_dim as usize, max_positions, g.rope_theta),
-            cross: cross_memories(weights, memory)?,
+            rope: Arc::new(Rope::new(
+                g.qk_head_dim as usize,
+                max_positions,
+                g.rope_theta,
+            )),
+            cross: Arc::new(cross_memories(weights, memory)?),
             layers: weights.decoder.iter().map(|_| KvCache::new()).collect(),
             engrams: weights
                 .engrams

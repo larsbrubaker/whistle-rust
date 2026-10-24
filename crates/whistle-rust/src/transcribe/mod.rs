@@ -1,11 +1,13 @@
 //! Transcription, the library's front door: [`Whistle`] owns the bound weights and the tokenizer
 //! of one archive and turns 16 kHz mono audio (or a WAV file, through `audio`) into a
 //! [`Transcript`]. It runs the voice-activity detector (`vad`) as [`Options::vad`] asks, the
-//! front end and the encoder once, then the greedy decode that `whistle_finetune._score_quantised`
-//! defines, one token at a time over the decoder's KV cache (`model::DecoderState`): step 0
-//! picks a language tag (or feeds the forced one), later steps pick only text tokens, and the
-//! decode stops at EOS or after `max_seq_len` tokens. A [`Cancel`] handle is checked between
-//! the stages, between encoder layers and between decoder steps. `docs/design/transcribe.md` describes the loop.
+//! front end and the encoder once, then the decode over the decoder's KV cache
+//! (`model::DecoderState`): step 0 picks a language tag (or feeds the forced one), then
+//! `search` picks text tokens, greedily as `whistle_finetune._score_quantised` defines with one
+//! beam or by beam search with more, optionally biased towards [`Options::keywords`]
+//! (`keywords`), until EOS or `max_seq_len` tokens. A [`Cancel`] handle is checked between the
+//! stages, between encoder layers and between decoder steps. `docs/design/transcribe.md`
+//! describes the call and `docs/design/decoding.md` the search.
 
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,6 +19,20 @@ use crate::error::Error;
 use crate::model::{DecoderState, Encoder, Weights};
 use crate::tokenizer::Tokenizer;
 use crate::vad;
+
+mod keywords;
+mod search;
+
+use keywords::KeywordTrie;
+pub use keywords::DEFAULT_KEYWORD_BONUS;
+use search::{Ranking, Search};
+
+/// The most beams [`Options::beams`] accepts: each beam is a decoder state stepped every
+/// position, so the cost grows linearly (`docs/design/decoding.md`).
+pub const MAX_BEAMS: usize = 16;
+
+/// The default [`Options::beams`]: a 3-beam search (measured in `docs/design/decoding.md`).
+pub const DEFAULT_BEAMS: usize = 3;
 
 /// The language codes Whistle transcribes, in tag order.
 pub const LANGUAGES: [&str; 7] = ["en", "de", "fr", "es", "it", "nl", "pl"];
@@ -96,15 +112,40 @@ impl Cancel {
 }
 
 /// What one transcription does beyond the defaults.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Options {
     /// Force the language (one of [`LANGUAGES`]); `None` lets the model detect it.
     pub language: Option<String>,
     /// How the voice-activity detector gates the audio; [`VadMode::GateAndTrim`] by default.
     pub vad: VadMode,
     /// Checked between the stages (resampling, detection, features), before each encoder layer
-    /// and before each decoder step.
+    /// and before every decoder step (each beam's step at each position).
     pub cancel: Option<Cancel>,
+    /// Hypotheses the decode keeps, 1 to [`MAX_BEAMS`]. The default, [`DEFAULT_BEAMS`] (3), is
+    /// the smallest count that reproduced every engine transcript on the test clips, with the
+    /// best word error rate against the true texts, for about +195 ms on a 3.3 s clip
+    /// (`docs/design/decoding.md`). `beams: 1` is the greedy decode the reference defines.
+    /// 0 or more than [`MAX_BEAMS`] is [`Error::Input`].
+    pub beams: usize,
+    /// Words and phrases to favour during the search (names, places, product words, jargon);
+    /// blank entries are ignored. Works with any number of beams.
+    pub keywords: Vec<String>,
+    /// The log-probability bonus per keyword token ([`DEFAULT_KEYWORD_BONUS`] by default);
+    /// it must be finite and not negative.
+    pub keyword_bonus: f32,
+}
+
+impl Default for Options {
+    fn default() -> Options {
+        Options {
+            language: None,
+            vad: VadMode::default(),
+            cancel: None,
+            beams: DEFAULT_BEAMS,
+            keywords: Vec::new(),
+            keyword_bonus: DEFAULT_KEYWORD_BONUS,
+        }
+    }
 }
 
 /// The result of a transcription.
@@ -232,10 +273,35 @@ impl Whistle {
         options: &Options,
         hook: &mut dyn FnMut(Stage),
     ) -> Result<Transcript, Error> {
+        self.run_ranked(samples, rate, options, hook, Ranking::Mean)
+    }
+
+    /// [`Whistle::run`] with the beam search's final ranking chosen (the tests measure the
+    /// alternatives against the default).
+    pub(crate) fn run_ranked(
+        &self,
+        samples: Cow<'_, [f32]>,
+        rate: u32,
+        options: &Options,
+        hook: &mut dyn FnMut(Stage),
+        ranking: Ranking,
+    ) -> Result<Transcript, Error> {
         let forced = match options.language.as_deref() {
             None => None,
             Some(code) => Some(self.language_index(code)?),
         };
+        if options.beams == 0 || options.beams > MAX_BEAMS {
+            return Err(Error::Input(format!(
+                "{} beams; the decode takes 1 to {MAX_BEAMS}",
+                options.beams
+            )));
+        }
+        if !options.keyword_bonus.is_finite() || options.keyword_bonus < 0.0 {
+            return Err(Error::Input(format!(
+                "keyword bonus {}; it must be finite and not negative",
+                options.keyword_bonus
+            )));
+        }
         if let Some(i) = samples.iter().position(|v| !v.is_finite()) {
             return Err(Error::Input(format!(
                 "sample {i} is {}; audio must be finite",
@@ -304,30 +370,32 @@ impl Whistle {
         let max = w.geometry.max_seq_len as usize;
         let mut state = DecoderState::new(w, &memory, max)?;
         let (bos, eos) = (self.tokenizer.bos_id(), self.tokenizer.eos_id());
-        let mut tokens = vec![bos];
-        let mut language = forced;
-        // `_score_quantised`: position `pos` scores the token at `pos + 1`, for at most
-        // `max − 1` steps, so the sequence never exceeds `max` tokens.
-        for pos in 0..max.saturating_sub(1) {
-            check(Stage::DecoderStep(pos))?;
-            let scores = state.step(tokens[pos])?;
-            let pick = if pos == 0 {
-                let index = match forced {
-                    Some(i) => i,
-                    None => self.detect_language(&scores),
-                };
-                language = Some(index);
-                self.tags[index]
-            } else {
-                argmax(&scores[..self.first_tag.min(scores.len())]) as u32
-            };
-            if pick == eos {
-                break;
-            }
-            tokens.push(pick);
-        }
+        // Step 0 picks the language every hypothesis shares.
+        check(Stage::DecoderStep(0))?;
+        let scores = state.step(bos)?;
+        let index = match forced {
+            Some(i) => i,
+            None => self.detect_language(&scores),
+        };
+        let language = Some(index);
+        let trie = KeywordTrie::new(
+            &self.tokenizer,
+            &options.keywords,
+            self.first_tag,
+            options.keyword_bonus,
+        );
+        let search = Search {
+            beams: options.beams,
+            eos,
+            text_ids: self.first_tag,
+            max_len: max,
+            trie: trie.as_ref(),
+            ranking,
+        };
+        let text_tokens = search::decode(&search, state, self.tags[index], &mut |pos| {
+            check(Stage::DecoderStep(pos))
+        })?;
         check(Stage::Done)?;
-        let text_tokens = tokens.get(2..).unwrap_or_default().to_vec();
         if text_tokens.is_empty() {
             return Ok(Transcript::empty());
         }

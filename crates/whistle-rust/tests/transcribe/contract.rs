@@ -1,6 +1,7 @@
 // The end-to-end contract on every speech clip (CLAUDE.md "Testing framework", net 2): from the
 // WAV file through our features, encoder and cached greedy decode, the text tokens equal the
-// manifest's `tokens[2..len-1]`, and the language and text equal the manifest's, with the VAD
+// manifest's `tokens[2..len-1]`, and the language and text equal the manifest's, with one beam
+// (`beams: 1`, the greedy decode the fixtures pin; the default is a 3-beam search), the VAD
 // off (`VadMode::Off`, the whole clip as the reference decodes it) and with the default
 // options (`VadMode::GateAndTrim`, only the speech span). A mismatch reports the first differing
 // position and the top-2 score margin there, from the full decoder on our own encoder output,
@@ -72,6 +73,7 @@ fn check_every_clip(options: &Options) {
 fn every_speech_clip_transcribes_to_the_reference_tokens_with_vad_off() {
     check_every_clip(&Options {
         vad: VadMode::Off,
+        beams: 1,
         ..Options::default()
     });
 }
@@ -79,5 +81,8 @@ fn every_speech_clip_transcribes_to_the_reference_tokens_with_vad_off() {
 #[test]
 fn every_speech_clip_transcribes_to_the_reference_text_with_the_default_trim() {
     assert_eq!(Options::default().vad, VadMode::GateAndTrim);
-    check_every_clip(&Options::default());
+    check_every_clip(&Options {
+        beams: 1,
+        ..Options::default()
+    });
 }

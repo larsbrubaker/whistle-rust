@@ -44,7 +44,13 @@ fn one_clip() {
 
     let start = Instant::now();
     let got = whistle()
-        .transcribe_wav(&wav("en_samantha"), &Options::default())
+        .transcribe_wav(
+            &wav("en_samantha"),
+            &Options {
+                beams: 1,
+                ..Options::default()
+            },
+        )
         .unwrap();
     let total_ms = start.elapsed().as_secs_f64() * 1e3;
     println!(

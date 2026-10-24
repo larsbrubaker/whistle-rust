@@ -13,6 +13,7 @@ fn silence_gives_an_empty_transcript_with_the_gate_on() {
     for vad in [VadMode::GateAndTrim, VadMode::Gate] {
         let options = Options {
             vad,
+            beams: 1,
             ..Options::default()
         };
         let got = whistle().transcribe_wav(&wav("silence"), &options).unwrap();
@@ -27,6 +28,7 @@ fn empty_audio_gives_an_empty_transcript() {
     for vad in [VadMode::Off, VadMode::Gate, VadMode::GateAndTrim] {
         let options = Options {
             vad,
+            beams: 1,
             ..Options::default()
         };
         let got = whistle().transcribe(&[], &options).unwrap();

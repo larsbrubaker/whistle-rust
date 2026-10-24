@@ -12,6 +12,7 @@ fn forcing_a_clips_own_language_gives_the_reference_tokens() {
     let f = Fixture::load("de_anna");
     let options = Options {
         language: Some("de".into()),
+        beams: 1,
         ..Options::default()
     };
     let got = whistle().transcribe_wav(&wav("de_anna"), &options).unwrap();
@@ -24,6 +25,7 @@ fn forcing_a_clips_own_language_gives_the_reference_tokens() {
 fn forcing_another_language_still_transcribes_in_it() {
     let options = Options {
         language: Some("fr".into()),
+        beams: 1,
         ..Options::default()
     };
     let got = whistle()

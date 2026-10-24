@@ -25,7 +25,8 @@ Citation: "Whistle: Speech Recognition for Tiny Devices" (2026), Cactus Compute,
 ## Test fixtures
 
 `test-data/fixtures/` holds tensors computed by the needle model code from the Whistle weights
-(Apache-2.0, as above). `test-data/clips/` is synthesized speech generated for this project.
-`test-data/engine/` holds transcripts produced by the Needle 3 engine binary
+(Apache-2.0, as above). `test-data/clips/` and `test-data/clips-extra/` are synthesized speech
+(macOS `say`) generated for this project. `test-data/engine/` and `test-data/engine-extra/`
+hold transcripts produced by the Needle 3 engine binary
 (huggingface.co/Cactus-Compute/needle3, Apache-2.0 model card), used only as a black-box
-reference.
+reference (`engine-extra/` with and without its `--audio-keywords` option).

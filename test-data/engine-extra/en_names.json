@@ -1,0 +1,48 @@
+{
+ "text": "Send a file to Shivan and Krishtov.",
+ "language": "en",
+ "words": [
+  {
+   "word": "Send",
+   "start": 0.08,
+   "end": 0.32,
+   "probability": 0.764
+  },
+  {
+   "word": "a",
+   "start": 0.32,
+   "end": 0.56,
+   "probability": 0.964
+  },
+  {
+   "word": "file",
+   "start": 0.56,
+   "end": 0.72,
+   "probability": 0.996
+  },
+  {
+   "word": "to",
+   "start": 0.72,
+   "end": 0.96,
+   "probability": 1.0
+  },
+  {
+   "word": "Shivan",
+   "start": 0.96,
+   "end": 1.36,
+   "probability": 0.722
+  },
+  {
+   "word": "and",
+   "start": 1.36,
+   "end": 1.52,
+   "probability": 0.975
+  },
+  {
+   "word": "Krishtov.",
+   "start": 1.52,
+   "end": 2.16,
+   "probability": 0.922
+  }
+ ]
+}
