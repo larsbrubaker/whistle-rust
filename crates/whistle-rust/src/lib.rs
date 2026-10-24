@@ -32,6 +32,7 @@ mod transcribe;
 pub mod vad;
 
 pub use error::Error;
+pub use model::{set_threads, threads, MAX_THREADS};
 pub use transcribe::{
     Cancel, Options, Transcript, VadMode, Whistle, LANGUAGES, MAX_INPUT_SAMPLES, MAX_SAMPLES,
 };

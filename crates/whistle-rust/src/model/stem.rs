@@ -41,38 +41,58 @@ fn halved(n: usize) -> usize {
     n.div_ceil(2)
 }
 
+/// A convolution's input: one mel plane `[time, mel]` read by every output channel (stage 1), or
+/// a `[time, mel, channel]` plane read depthwise.
+#[derive(Clone, Copy)]
+enum ConvInput<'a> {
+    Mono(&'a [f32]),
+    Depthwise(&'a [f32]),
+}
+
 /// A 3×3, stride 2, padding 1 convolution over `[time, mel]` writing `channels` outputs,
-/// cross-correlation as `lax.conv_general_dilated` computes it. `input(t, m, c)` reads the
-/// (in-bounds) input for output channel `c`; `w` is `[9, channels]`, tap `3·i + j` for time
-/// offset `i` and mel offset `j`. Output frames at or past `valid` are zeroed.
+/// cross-correlation as `lax.conv_general_dilated` computes it. `w` is `[9, channels]`, tap
+/// `3·i + j` for time offset `i` and mel offset `j`. Each output channel sums its taps in tap
+/// order from 0; the channels of one cell run together so the loop vectorizes. Output frames at
+/// or past `valid` are zeroed.
 fn conv3x3(
     time: usize,
     mel: usize,
     channels: usize,
     w: &Matrix,
     valid: usize,
-    input: impl Fn(usize, usize, usize) -> f32,
+    input: ConvInput<'_>,
 ) -> Plane {
     let (t_out, m_out) = (halved(time), halved(mel));
     let mut data = vec![0.0f32; t_out * m_out * channels];
     for t in 0..valid.min(t_out) {
         for m in 0..m_out {
             let cell = &mut data[(t * m_out + m) * channels..(t * m_out + m + 1) * channels];
-            for (c, out) in cell.iter_mut().enumerate() {
-                let mut acc = 0.0f32;
-                for i in 0..3 {
-                    // Input row 2t + i - 1; row -1 and rows past the end are the zero padding.
-                    let Some(ti) = (2 * t + i).checked_sub(1).filter(|&ti| ti < time) else {
+            for i in 0..3 {
+                // Input row 2t + i - 1; row -1 and rows past the end are the zero padding.
+                let Some(ti) = (2 * t + i).checked_sub(1).filter(|&ti| ti < time) else {
+                    continue;
+                };
+                for j in 0..3 {
+                    let Some(mj) = (2 * m + j).checked_sub(1).filter(|&mj| mj < mel) else {
                         continue;
                     };
-                    for j in 0..3 {
-                        let Some(mj) = (2 * m + j).checked_sub(1).filter(|&mj| mj < mel) else {
-                            continue;
-                        };
-                        acc += input(ti, mj, c) * w.data[(3 * i + j) * channels + c];
+                    let tap = &w.data[(3 * i + j) * channels..(3 * i + j + 1) * channels];
+                    match input {
+                        ConvInput::Mono(x) => {
+                            let v = x[ti * mel + mj];
+                            for (o, &k) in cell.iter_mut().zip(tap) {
+                                *o += v * k;
+                            }
+                        }
+                        ConvInput::Depthwise(x) => {
+                            let at = (ti * mel + mj) * channels;
+                            for ((o, &k), &v) in cell.iter_mut().zip(tap).zip(&x[at..at + channels])
+                            {
+                                *o += v * k;
+                            }
+                        }
                     }
                 }
-                *out = acc;
             }
         }
     }
@@ -106,14 +126,19 @@ impl Stem {
         let x = &features.data;
         // Each stage halves the valid length, rounding up; frames past it are zeroed.
         let mut valid = halved(features.valid_frames);
-        let mut plane = conv3x3(frames, mels, c, &self.w, valid, |t, m, _| x[t * mels + m]);
+        let mut plane = conv3x3(frames, mels, c, &self.w, valid, ConvInput::Mono(x));
         for stage in &self.stages {
             let act: Vec<f32> = plane.data.iter().map(|&v| silu(v)).collect();
             valid = halved(valid);
             let mel = plane.mel;
-            let down = conv3x3(plane.time, mel, c, &stage.dw, valid, |t, m, ch| {
-                act[(t * mel + m) * c + ch]
-            });
+            let down = conv3x3(
+                plane.time,
+                mel,
+                c,
+                &stage.dw,
+                valid,
+                ConvInput::Depthwise(&act),
+            );
             plane = Plane {
                 data: stage.pw.project(&down.data),
                 time: down.time,

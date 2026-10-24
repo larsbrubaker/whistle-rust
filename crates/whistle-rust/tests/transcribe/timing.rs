@@ -1,6 +1,8 @@
-// The baseline cost of one transcription (phase 6 does performance): the encoder, the cached
-// decoder per token and the whole call on en_samantha, printed for the report. Run it in
-// release for the real numbers: `cargo test --release --test transcribe timing -- --nocapture`.
+// The cost of one transcription: the encoder, the cached decoder per token and the whole call
+// on en_samantha, and the stem and each encoder layer on 30 s, each on one worker thread and on
+// the default count (`whistle::model::with_threads`, per calling thread), printed for
+// `docs/design/performance.md`. Run in release for the real numbers:
+// `cargo test --release --test transcribe timing -- --include-ignored --nocapture --test-threads=1`.
 // It asserts nothing about speed; it only checks the clip still transcribes.
 
 use std::time::Instant;
@@ -14,6 +16,12 @@ use crate::support::Fixture;
 
 #[test]
 fn timing_of_one_clip() {
+    for threads in [1, 0] {
+        whistle::model::with_threads(threads, one_clip);
+    }
+}
+
+fn one_clip() {
     let w = weights();
     let audio = read_wav(&wav("en_samantha")).unwrap();
     let start = Instant::now();
@@ -40,8 +48,9 @@ fn timing_of_one_clip() {
         .unwrap();
     let total_ms = start.elapsed().as_secs_f64() * 1e3;
     println!(
-        "en_samantha ({:.2} s): encoder {encoder_ms:.1} ms, decoder setup {setup_ms:.1} ms, \
+        "{} thread(s), en_samantha ({:.2} s): encoder {encoder_ms:.1} ms, decoder setup {setup_ms:.1} ms, \
          decoder {per_token_ms:.2} ms per token ({} tokens), whole call {total_ms:.1} ms",
+        whistle::threads(),
         audio.samples.len() as f64 / audio.sample_rate as f64,
         tokens.len()
     );
@@ -54,6 +63,12 @@ fn timing_of_one_clip() {
 #[test]
 #[ignore = "release measurement for docs/design/transcribe.md"]
 fn the_longest_gap_between_cancellation_checks_on_thirty_seconds() {
+    for threads in [1, 0] {
+        whistle::model::with_threads(threads, thirty_seconds);
+    }
+}
+
+fn thirty_seconds() {
     let w = weights();
     let clip = read_wav(&wav("en_samantha")).unwrap().samples;
     let samples: Vec<f32> = clip.iter().copied().cycle().take(480_000).collect();
@@ -77,9 +92,11 @@ fn the_longest_gap_between_cancellation_checks_on_thirty_seconds() {
         .windows(2)
         .map(|p| (p[1] - p[0]).as_secs_f64() * 1e3)
         .collect();
+    let total_ms = features_ms + gaps.iter().sum::<f64>();
     println!(
-        "30 s: features {features_ms:.0} ms, VAD {vad_ms:.0} ms; stem {:.0} ms; encoder layers \
-         {:?} ms (the last includes the final norm)",
+        "{} thread(s), 30 s: features {features_ms:.0} ms, VAD {vad_ms:.0} ms; stem {:.0} ms; encoder layers \
+         {:?} ms (the last includes the final norm); features to encoder output {total_ms:.0} ms",
+        whistle::threads(),
         gaps[0],
         gaps[1..].iter().map(|g| g.round()).collect::<Vec<_>>()
     );

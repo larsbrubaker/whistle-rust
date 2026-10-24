@@ -10,16 +10,15 @@ use super::ops::{a8, rms_unit, sigmoid, sinkhorn, zc_rms_norm};
 use super::stem::Lanes;
 use super::weights::{Mhc, Norm};
 
-/// `nx · phi[row]ᵀ` for each of `count` rows starting at `first`, per token.
+/// `nx · phi[row]ᵀ` for each of `count` rows starting at `first`, per token: a projection by
+/// that band of `phi`'s rows.
 fn mix_logits(nx: &[f32], phi: &[f32], width: usize, first: usize, count: usize) -> Vec<f32> {
-    let mut out = Vec::with_capacity(nx.len() / width * count);
-    for row in nx.chunks_exact(width) {
-        for r in first..first + count {
-            let p = &phi[r * width..(r + 1) * width];
-            out.push(row.iter().zip(p).map(|(a, b)| a * b).sum());
-        }
-    }
-    out
+    super::ops::linear(
+        nx,
+        &phi[first * width..(first + count) * width],
+        width,
+        count,
+    )
 }
 
 impl Mhc {

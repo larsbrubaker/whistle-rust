@@ -1,5 +1,6 @@
 //! The Whistle model: its weights bound by role from the archive (`weights`, built by `bind`),
-//! the shared numeric primitives (`ops`), and the forward passes ported so far: the
+//! the shared numeric primitives (`ops`) over the SIMD dense kernels and thread setting
+//! (`kernels`), and the forward passes ported so far: the
 //! convolutional stem with the encoder's input step (`stem`), ZC-RMSNorm and the Hadamard MLP
 //! (`hadamard`), gated self-attention (`attention`), the mHC lane stack step (`mhc`), and the
 //! encoder (`encoder`). Each follows upstream's `whistle.py` and `architecture.py`.
@@ -16,6 +17,7 @@ mod decoder_step;
 mod encoder;
 mod engram;
 mod hadamard;
+mod kernels;
 mod mhc;
 pub(crate) mod ops;
 mod stem;
@@ -29,6 +31,7 @@ pub use decoder_input::DecoderMemory;
 pub use decoder_step::DecoderState;
 pub use encoder::{Encoder, EncoderContext, EncoderOutput};
 pub use engram::{engram_add, engram_indices, ngram_in_sequence, tap_in_sequence, MAX_NGRAM_ORDER};
+pub use kernels::{set_threads, threads, with_threads, MAX_THREADS};
 pub use stem::{Lanes, StemOutput};
 pub use weights::{
     AudioManifest, CrossAttention, DecoderLayer, EncoderLayer, Engram, EngramHash, HadaPerms,

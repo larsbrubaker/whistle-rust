@@ -11,18 +11,20 @@ pub(crate) const NORM_EPS: f32 = 1e-6;
 pub(crate) const ACT_BITS: u32 = 8;
 
 /// `x [T, in] @ w[out, in]ᵀ -> [T, out]`: a Dense layer whose kernel the archive stores
-/// transposed, one f32 dot product per output, accumulated in input order.
+/// transposed: each output one sequential f32 sum of products in input order (`kernels`
+/// vectorizes across outputs, never within a sum), on the fastest SIMD path and the library's
+/// worker threads.
 pub(crate) fn linear(x: &[f32], w: &[f32], inputs: usize, outputs: usize) -> Vec<f32> {
     debug_assert_eq!(w.len(), inputs * outputs);
     debug_assert_eq!(x.len() % inputs.max(1), 0);
-    let rows = x.len().checked_div(inputs).unwrap_or(0);
-    let mut out = vec![0.0f32; rows * outputs];
-    for (xr, or) in x.chunks_exact(inputs).zip(out.chunks_exact_mut(outputs)) {
-        for (o, wr) in or.iter_mut().zip(w.chunks_exact(inputs)) {
-            *o = xr.iter().zip(wr).map(|(a, b)| a * b).sum();
-        }
-    }
-    out
+    super::kernels::linear_with(
+        super::kernels::best_path(),
+        super::kernels::threads(),
+        x,
+        w,
+        inputs,
+        outputs,
+    )
 }
 
 /// Symmetric per-row fake quantization at `bits` (`quantize.fake_quant` with the group the

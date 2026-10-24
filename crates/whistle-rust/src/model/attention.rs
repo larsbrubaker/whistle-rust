@@ -9,7 +9,7 @@
 
 use crate::error::Error;
 
-use super::ops::{a8, fake_quant_rows, sigmoid, softmax, zc_rms_norm, Rope};
+use super::ops::{a8, fake_quant_rows, linear, sigmoid, softmax, zc_rms_norm, Rope};
 use super::weights::{Matrix, SelfAttention};
 
 /// The four projections of one sequence from its A8 input, each `[T, width]` row-major.
@@ -368,29 +368,25 @@ pub(crate) fn attend(
     if tk == 0 {
         return out;
     }
-    let mut logits = vec![0.0f32; tk];
-    let mut qs = vec![0.0f32; h.qk_dim];
+    let mut qs = vec![0.0f32; tq * h.qk_dim];
     for head in 0..h.heads {
         let g = head / group;
         let keys = &k[g * tk * h.qk_dim..(g + 1) * tk * h.qk_dim];
         let values = &v[g * tk * h.v_dim..(g + 1) * tk * h.v_dim];
-        for t in 0..tq {
-            let qrow = &q[(head * tq + t) * h.qk_dim..(head * tq + t + 1) * h.qk_dim];
-            for (s, &x) in qs.iter_mut().zip(qrow) {
-                *s = x * q_scale;
+        for (s, &x) in qs
+            .iter_mut()
+            .zip(&q[head * tq * h.qk_dim..(head + 1) * tq * h.qk_dim])
+        {
+            *s = x * q_scale;
+        }
+        // Every query's logit against every key at once: each is still one in-order dot
+        // product (`ops::linear`), then the scale and the mask.
+        let mut all = linear(&qs, keys, h.qk_dim, tk);
+        for (t, logits) in all.chunks_exact_mut(tk).enumerate() {
+            for (s, l) in logits.iter_mut().enumerate() {
+                *l = if allowed(t, s) { *l * scale } else { MASKED };
             }
-            for (s, (l, kr)) in logits
-                .iter_mut()
-                .zip(keys.chunks_exact(h.qk_dim))
-                .enumerate()
-            {
-                *l = if allowed(t, s) {
-                    qs.iter().zip(kr).map(|(a, b)| a * b).sum::<f32>() * scale
-                } else {
-                    MASKED
-                };
-            }
-            softmax(&mut logits, tk);
+            softmax(logits, tk);
             let o = &mut out[t * width + head * h.v_dim..t * width + (head + 1) * h.v_dim];
             for (&p, vr) in logits.iter().zip(values.chunks_exact(h.v_dim)) {
                 for (o, &x) in o.iter_mut().zip(vr) {

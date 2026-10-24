@@ -7,12 +7,19 @@ verification bar for every stage: CLAUDE.md "Tolerance policy".
 
 ## 6. Performance
 
-Transcription is fast enough for push-to-talk on every target.
+Transcription is fast enough for push-to-talk on every target. Dense SIMD kernels (NEON, AVX2,
+simd128) and native threads are in, bit-identical to the scalar order
+(`docs/design/performance.md`: a 3 s clip in ~125 ms, 30 s from features to encoder output in
+~0.35 s, 4.5 ms per decoder token); what is left:
 
-- Keep CQ weights packed in memory (17 MB) and rotate activations by a fast Walsh–Hadamard
-  transform per group instead of dequantizing; SIMD paths (NEON, AVX2, wasm simd128) behind one
-  portable fallback with identical results; native worker threads.
-- Bench against the engine CLI on the same clips; record the numbers in `docs/design/`.
+- The decoder step's single-row projections: an in-register transpose (same order, same bits)
+  or weights stored pre-transposed in panels, and a persistent worker pool if threads are to
+  help per-token work.
+- Keep CQ weights packed in memory (17 MB instead of ~160 MB) and rotate activations by a fast
+  Walsh–Hadamard transform per group instead of dequantizing; this changes rounding, so the
+  token contract decides whether it can land.
+- Run the AVX2 path's bit-identity tests on x86 hardware; bench against the engine CLI on the
+  same clips and record the numbers.
 
 ## 7. Designed decode features
 

@@ -53,9 +53,10 @@ call `cancel()` while the decode runs elsewhere. A fired handle makes the call r
 detector, after the features, before each encoder layer (`Encoder::forward_with` takes the check
 as a closure, so the encoder does not depend on this module), before each decoder step, and
 after the decode. The worst-case latency is the longest gap between two checks: on 30 s of
-audio (release build, Apple Silicon, one thread, measured 2026-10-24) the features take 73 ms
-and the detector 18 ms, the stem before the first layer check 719 ms, and the encoder layers 494
-to 847 ms each, so a cancel returns within about 0.85 s; a decoder step is about 11 ms.
+audio (release build, Apple Silicon, measured 2026-10-24 after the kernel work in
+`performance.md`, on a loaded machine) the features take about 50 ms and the detector 13 ms,
+the stem before the first layer check 28–46 ms, and the encoder layers 40–55 ms each, so a
+cancel returns within about 0.07 s; a decoder step is about 5 ms.
 
 ## The KV cache (`model::DecoderState`)
 
@@ -91,8 +92,9 @@ cache updates and unusable.
 
 ## Cost
 
-Measured 2026-10-24 on en_samantha (3.09 s), release build, Apple Silicon, one thread: the
-encoder 567 ms, the decoder setup (cross-attention memory for 8 layers) 95 ms, then 10.8 ms
-per decoder token; the whole default call (trimmed to the speech span) 661 ms. Phase 6 is the
-performance work: weights stay dequantized to f32 here, and each self-attention step copies its
-cache into one contiguous block.
+Measured 2026-10-24 on en_samantha (3.09 s), release build, Apple Silicon, default threads:
+the encoder 36 ms, the decoder setup (cross-attention memory for 8 layers) 4 ms, then about
+4.5 ms per decoder token (on one thread whatever the setting); the whole default call (trimmed
+to the speech span) 114 ms (661 ms before the kernel work; the breakdown, both thread counts
+and what was done are in `performance.md`). Weights stay dequantized to f32 here, and each
+self-attention step copies its cache into one contiguous block.
