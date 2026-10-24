@@ -2,6 +2,9 @@
 //! (16 kHz mono audio in; text, language and word timings out; English, German, French, Spanish,
 //! Italian, Dutch and Polish).
 //!
+//! [`Whistle::from_cact`] loads the model, and [`Whistle::transcribe`] (or
+//! [`Whistle::transcribe_wav`]) turns audio into a [`Transcript`]: text, language and token ids.
+//!
 //! The library takes the model archive (`whistle.cact`) as bytes and never fetches anything, so
 //! the same code runs natively and in the browser. The port follows upstream's Apache-2.0 JAX
 //! reference (`needle-reference/`, pinned in `REFERENCE`); `docs/design/` describes the model
@@ -16,12 +19,19 @@
 //! The decoder's inputs are ported too: [`model::Weights::embed`], the Engram keys and values
 //! ([`model::Engram::keys_values`], [`model::engram_add`]) and [`model::Weights::decoder_memory`].
 
+// The README follows as the rest of the crate docs, so its usage example compiles as a doctest.
+#![doc = include_str!("../../../README.md")]
+
 pub mod audio;
 pub mod cact;
 pub mod error;
 pub mod model;
 pub mod quant;
 pub mod tokenizer;
+mod transcribe;
 pub mod vad;
 
 pub use error::Error;
+pub use transcribe::{
+    Cancel, Options, Transcript, VadMode, Whistle, LANGUAGES, MAX_INPUT_SAMPLES, MAX_SAMPLES,
+};

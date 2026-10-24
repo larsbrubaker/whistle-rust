@@ -199,11 +199,25 @@ impl<'w> Encoder<'w> {
     /// lanes, every encoder layer, then [`Encoder::finish`]. Inconsistent features are
     /// [`Error::Input`].
     pub fn forward(&self, features: &Features) -> Result<EncoderOutput, Error> {
+        self.forward_with(features, &mut || false)
+    }
+
+    /// [`Encoder::forward`] asking `cancelled` before each encoder layer (after the stem); when
+    /// it answers true the pass stops with [`Error::Cancelled`], so a caller can abandon a long
+    /// clip within one layer's time.
+    pub fn forward_with(
+        &self,
+        features: &Features,
+        cancelled: &mut dyn FnMut() -> bool,
+    ) -> Result<EncoderOutput, Error> {
         let w = self.weights;
         let lanes = w.stem.forward(features)?.to_lanes(w.encoder_mhc.lanes);
         let ctx = EncoderContext::new(w, lanes.frames, lanes.valid_frames)?;
         let mut lanes = lanes;
         for (l, layer) in w.encoder.iter().enumerate() {
+            if cancelled() {
+                return Err(Error::Cancelled);
+            }
             lanes = layer.forward(&lanes, l, &ctx)?;
         }
         self.finish(&lanes)

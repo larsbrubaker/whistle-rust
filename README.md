@@ -5,8 +5,30 @@ A pure Rust port of [Whistle](https://huggingface.co/Cactus-Compute/whistle), Ca
 out; English, German, French, Spanish, Italian, Dutch and Polish. One library for macOS,
 Windows, Linux and the browser (wasm32), with no native code and no runtime dependencies.
 
-**Status: in progress.** The oracle and its fixtures are in place; the port itself lands phase
-by phase (`PORTING_PLAN.md`).
+**Status: in progress.** Greedy transcription of up to 30 s of audio works and reproduces the
+reference decode on every test clip; beam search, timestamps, streaming, windowing past 30 s
+and performance work are still to come (`PORTING_PLAN.md`).
+
+## Usage
+
+```rust,no_run
+use whistle::{Options, Whistle};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // The library never fetches anything: the caller reads, bundles or downloads the archive.
+    let model = std::fs::read("models/whistle.cact")?;
+    let whistle = Whistle::from_cact(&model)?;
+    let wav = std::fs::read("speech.wav")?;
+    let transcript = whistle.transcribe_wav(&wav, &Options::default())?;
+    println!("{:?}: {}", transcript.language, transcript.text);
+    Ok(())
+}
+```
+
+`Whistle::transcribe` takes 16 kHz mono `f32` samples instead. `Options` forces a language
+(`language: Some("de".into())`), sets how the voice-activity detector gates the audio (`vad`:
+`GateAndTrim` by default, so silence gives an empty transcript), and takes a `Cancel` handle
+that stops a transcription from another thread with `Error::Cancelled`.
 
 ## How it is built
 

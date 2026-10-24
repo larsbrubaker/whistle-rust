@@ -150,23 +150,39 @@ impl Engram {
     /// The hashing geometry is the site's own (`hash`, checked when bound). Tables, projections
     /// and taps whose shapes do not fit together (or that geometry) are [`Error::Archive`].
     pub fn keys_values(&self, tokens: &[u32]) -> Result<(Matrix, Matrix), Error> {
+        let (k, v) = self.project_rows(tokens, 0)?;
+        let conv = self.value_conv(&v, 0)?;
+        let n = tokens.len();
+        let keys = Matrix {
+            rows: n,
+            cols: self.key_proj.rows,
+            data: k,
+        };
+        let values = Matrix {
+            rows: n,
+            cols: self.value_proj.rows,
+            data: conv,
+        };
+        Ok((keys, values))
+    }
+
+    /// The site's shapes checked against its hashing geometry; returns `(tables, sub_dim)`.
+    fn check_shapes(&self) -> Result<(usize, usize), Error> {
         let EngramHash {
             orders,
             heads,
             slots,
-            dilation,
+            ..
         } = &self.hash;
-        let (heads, dilation) = (*heads, *dilation);
-        let slots_usize = *slots as usize;
-        let tables = orders.len().checked_mul(heads).unwrap_or(0);
+        let tables = orders.len().checked_mul(*heads).unwrap_or(0);
         let sub_dim = self.tables.cols();
         let width = tables.checked_mul(sub_dim);
         let d = self.value_proj.rows;
-        if tables == 0 || tables.checked_mul(slots_usize) != Some(self.tables.rows()) {
+        if tables == 0 || tables.checked_mul(*slots as usize) != Some(self.tables.rows()) {
             return Err(Error::Archive(format!(
                 "{} Engram tables of {slots} slots ({orders:?} × {heads}) do not fit {} table \
                  rows",
-                orders.len().saturating_mul(heads),
+                orders.len().saturating_mul(*heads),
                 self.tables.rows()
             )));
         }
@@ -185,34 +201,77 @@ impl Engram {
                 self.taps.cols
             )));
         }
+        Ok((tables, sub_dim))
+    }
+
+    /// The keys and the values before the value conv for positions `first..` of the decoder
+    /// input `tokens` (the whole prefix, so each n-gram sees its earlier tokens), each
+    /// `[T − first, d_model]`: the site's four table rows per position gathered (zeroed where
+    /// the n-gram reaches before the sequence), joined, A8, then `key_proj` and `value_proj`.
+    /// [`Engram::keys_values`] runs it from 0; a cached decoder step runs it for its one new
+    /// position. Errors are [`Engram::keys_values`]'s.
+    pub(crate) fn project_rows(
+        &self,
+        tokens: &[u32],
+        first: usize,
+    ) -> Result<(Vec<f32>, Vec<f32>), Error> {
+        let (tables, sub_dim) = self.check_shapes()?;
+        let EngramHash {
+            orders,
+            heads,
+            slots,
+            ..
+        } = &self.hash;
+        let (heads, slots_usize) = (*heads, *slots as usize);
         let width = tables * sub_dim;
         let indices = engram_indices(tokens, orders, heads, *slots, 0)?;
         let n = tokens.len();
-        let too_long = || Error::Input(format!("{n} tokens of Engram rows overflow"));
-        let gathered = n.checked_mul(width).ok_or_else(too_long)?;
-        let conv_len = n.checked_mul(d).ok_or_else(too_long)?;
-        // Gathered rows, `[T, tables · sub_dim]`: table `t`'s slice is its row times ngram_ok.
+        if first > n {
+            return Err(Error::Input(format!(
+                "Engram rows from {first} of {n} tokens"
+            )));
+        }
+        let gathered = (n - first)
+            .checked_mul(width)
+            .ok_or_else(|| Error::Input(format!("{n} tokens of Engram rows overflow")))?;
+        // Gathered rows, `[T − first, tables · sub_dim]`: table `t`'s slice is its row times
+        // ngram_ok.
         let mut e = vec![0.0f32; gathered];
-        for t in 0..n {
+        for t in first..n {
+            let r = t - first;
             for table in 0..tables {
                 let order = orders[table / heads] as usize;
                 if !ngram_in_sequence(t, order) {
                     continue;
                 }
                 let row = table * slots_usize + indices[t * tables + table] as usize;
-                let out = &mut e[t * width + table * sub_dim..t * width + (table + 1) * sub_dim];
+                let out = &mut e[r * width + table * sub_dim..r * width + (table + 1) * sub_dim];
                 self.tables.row_into(row, out)?;
             }
         }
         a8(&mut e, width);
-        let k = self.key_proj.project(&e);
-        let v = self.value_proj.project(&e);
+        Ok((self.key_proj.project(&e), self.value_proj.project(&e)))
+    }
+
+    /// The causal value conv `Σ_j taps[j] · v[t − j · dilation]` for positions `first..` of
+    /// `v` (`[T, d_model]`, every position's projected values from 0), `[T − first, d_model]`.
+    /// A `v` that is not whole rows, or `first` past it, is [`Error::Input`].
+    pub(crate) fn value_conv(&self, v: &[f32], first: usize) -> Result<Vec<f32>, Error> {
+        let d = self.value_proj.rows;
+        if d == 0 || !v.len().is_multiple_of(d) || first > v.len() / d {
+            return Err(Error::Input(format!(
+                "Engram values of {} from position {first} are not rows of {d}",
+                v.len()
+            )));
+        }
+        let n = v.len() / d;
         let taps = &self.taps;
+        let dilation = self.hash.dilation;
         // `sum(taps[j] * shift_right(v, j · dilation) * tap_ok[j])`: Python's `sum` starts at 0
         // and adds the taps in order, which this keeps so the f32 sums round the same way.
-        let mut conv = vec![0.0f32; conv_len];
-        for t in 0..n {
-            let out = &mut conv[t * d..(t + 1) * d];
+        let mut conv = vec![0.0f32; (n - first) * d];
+        for t in first..n {
+            let out = &mut conv[(t - first) * d..(t - first + 1) * d];
             for j in 0..taps.rows {
                 let tap = &taps.data[j * d..(j + 1) * d];
                 // `tap_in_sequence` holds exactly when the shift neither overflows nor reaches
@@ -226,17 +285,7 @@ impl Engram {
                 }
             }
         }
-        let keys = Matrix {
-            rows: n,
-            cols: self.key_proj.rows,
-            data: k,
-        };
-        let values = Matrix {
-            rows: n,
-            cols: d,
-            data: conv,
-        };
-        Ok((keys, values))
+        Ok(conv)
     }
 }
 

@@ -2,7 +2,8 @@
 //! as the encoder runs it: A8 on the input, the Q, K, V and gate projections, ZC-RMSNorm on q and
 //! k per head, RoPE, A8 on q and on the KV path, grouped-query attention, the sigmoid gate, A8,
 //! and `out_proj`. The pieces are separate so the decoder's tapped, causal variant
-//! ([`SelfAttention::causal_taps`], `forward_causal`) reuses them, and so does cross-attention
+//! ([`SelfAttention::causal_taps`], `forward_causal`, and its cached one-position step
+//! `forward_step` over a [`KvCache`]) reuses them, and so does cross-attention
 //! (`cross_attention`); the weights are the [`SelfAttention`] bound in `weights`, the arithmetic
 //! is `ops`.
 
@@ -22,6 +23,34 @@ pub struct Projections {
     pub v: Vec<f32>,
     /// `[T, heads · v_dim]`, before the sigmoid.
     pub gate: Vec<f32>,
+}
+
+/// One decoder layer's self-attention cache for incremental decoding: the raw projections of
+/// the last `n_taps − 1` positions (the taps' history), and every earlier position's key (after
+/// norm, RoPE and the KV path) and value (after the KV path) per KV head, `[positions, dim]`
+/// each. Filled one position at a time by [`SelfAttention::forward_step`].
+#[derive(Debug, Clone)]
+pub(crate) struct KvCache {
+    history: Projections,
+    k: Vec<Vec<f32>>,
+    v: Vec<Vec<f32>>,
+    positions: usize,
+}
+
+impl KvCache {
+    pub(crate) fn new() -> KvCache {
+        KvCache {
+            history: Projections {
+                q: Vec::new(),
+                k: Vec::new(),
+                v: Vec::new(),
+                gate: Vec::new(),
+            },
+            k: Vec::new(),
+            v: Vec::new(),
+            positions: 0,
+        }
+    }
 }
 
 /// The attention's head geometry, derived from the bound weights.
@@ -139,20 +168,37 @@ impl SelfAttention {
     ) -> Vec<f32> {
         let h = self.heads();
         let p = self.projections(x);
+        let (q, k, v) = self.attention_heads(&p, rope, 0, kv_bits);
+        let out = attend(&q, &k, &v, h, |_, s| s < valid_frames);
+        self.gate_out(out, &p.gate)
+    }
+
+    /// The projections (`p`, tapped already in the decoder) made ready to attend, its rows at
+    /// positions `start..`: the head split, `q_norm` and `k_norm`, RoPE, then A8 on q and the KV
+    /// path at `kv_bits` on k and v (`maybe_quant_query`, `maybe_quant_kv`: per head and
+    /// position, over the head dim). Returns q `[heads, T, qk_dim]`, k `[kv_heads, T, qk_dim]`
+    /// and v `[kv_heads, T, v_dim]`. The whole-sequence paths and the cached decoder step share
+    /// it, so a step computes each position exactly as the full pass does.
+    fn attention_heads(
+        &self,
+        p: &Projections,
+        rope: &Rope,
+        start: usize,
+        kv_bits: u32,
+    ) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
+        let h = self.heads();
+        let frames = p.q.len() / (h.heads * h.qk_dim).max(1);
         let mut q = self.query_heads(&p.q);
         let mut k = self.key_heads(&p.k);
         let mut v = split_heads(&p.v, h.kv_heads, h.v_dim);
-        let frames = x.len() / self.q_proj.cols.max(1);
-        rotate(&mut q, rope, h.qk_dim, frames, 0);
-        rotate(&mut k, rope, h.qk_dim, frames, 0);
-        // maybe_quant_query and maybe_quant_kv: per head and position, over the head dim.
+        rotate(&mut q, rope, h.qk_dim, frames, start);
+        rotate(&mut k, rope, h.qk_dim, frames, start);
         a8(&mut q, h.qk_dim);
         if kv_bits > 0 {
             fake_quant_rows(&mut k, h.qk_dim, kv_bits);
             fake_quant_rows(&mut v, h.v_dim, kv_bits);
         }
-        let out = attend(&q, &k, &v, h, |_, s| s < valid_frames);
-        self.gate_out(out, &p.gate)
+        (q, k, v)
     }
 
     /// The decoder's causal taps on Q, K and V (`q_taps`, `k_taps`, `v_taps`) over projections
@@ -204,18 +250,69 @@ impl SelfAttention {
     ) -> Result<Vec<f32>, Error> {
         let h = self.heads();
         let p = self.causal_taps(&self.projections(x), 0, 0)?;
-        let frames = x.len() / self.q_proj.cols.max(1);
-        let mut q = self.query_heads(&p.q);
-        let mut k = self.key_heads(&p.k);
-        let mut v = split_heads(&p.v, h.kv_heads, h.v_dim);
-        rotate(&mut q, rope, h.qk_dim, frames, 0);
-        rotate(&mut k, rope, h.qk_dim, frames, 0);
-        a8(&mut q, h.qk_dim);
-        if kv_bits > 0 {
-            fake_quant_rows(&mut k, h.qk_dim, kv_bits);
-            fake_quant_rows(&mut v, h.v_dim, kv_bits);
-        }
+        let (q, k, v) = self.attention_heads(&p, rope, 0, kv_bits);
         let out = attend(&q, &k, &v, h, |t, s| s <= t);
+        Ok(self.gate_out(out, &p.gate))
+    }
+
+    /// One cached decoder step of [`SelfAttention::forward_causal`]: `x` is the normed input of
+    /// the single new position `cache.positions`. Its raw projections join the cache's history
+    /// for the taps, its key (after norm, RoPE and the KV path) and value join the cache, and its
+    /// query attends to every cached key, which is exactly the causal row of the full pass: the
+    /// keys the full pass masks contribute an exact 0 there. The RoPE table must cover the new
+    /// position. Returns `out_proj`'s output for that row.
+    pub(crate) fn forward_step(
+        &self,
+        x: &[f32],
+        cache: &mut KvCache,
+        rope: &Rope,
+        kv_bits: u32,
+    ) -> Result<Vec<f32>, Error> {
+        let h = self.heads();
+        if x.len() != self.q_proj.cols {
+            return Err(Error::Input(format!(
+                "a decoder step of {} values, not one row of {}",
+                x.len(),
+                self.q_proj.cols
+            )));
+        }
+        if cache.positions >= rope.cos.len() / rope.half.max(1) {
+            return Err(Error::Input(format!(
+                "decoder position {} is past the cache's RoPE table",
+                cache.positions
+            )));
+        }
+        let new = self.projections(x);
+        let history = cache.history.q.len() / self.q_proj.rows.max(1);
+        let joined = Projections {
+            q: [cache.history.q.as_slice(), &new.q].concat(),
+            k: [cache.history.k.as_slice(), &new.k].concat(),
+            v: [cache.history.v.as_slice(), &new.v].concat(),
+            gate: [cache.history.gate.as_slice(), &new.gate].concat(),
+        };
+        let p = self.causal_taps(&joined, history, cache.positions)?;
+        let (q, k, v) = self.attention_heads(&p, rope, cache.positions, kv_bits);
+        // The taps reach back `n_taps − 1` positions; keep exactly that many raw rows.
+        let keep = self.taps.as_ref().map_or(0, |t| t.q.rows.saturating_sub(1));
+        let rows = (history + 1).min(keep);
+        let tail = |z: &[f32], width: usize| z[z.len() - rows * width..].to_vec();
+        cache.history = Projections {
+            q: tail(&joined.q, self.q_proj.rows),
+            k: tail(&joined.k, self.k_proj.rows),
+            v: tail(&joined.v, self.v_proj.rows),
+            gate: tail(&joined.gate, self.gate_proj.rows),
+        };
+        if cache.k.len() != h.kv_heads {
+            cache.k = vec![Vec::new(); h.kv_heads];
+            cache.v = vec![Vec::new(); h.kv_heads];
+        }
+        for g in 0..h.kv_heads {
+            cache.k[g].extend_from_slice(&k[g * h.qk_dim..(g + 1) * h.qk_dim]);
+            cache.v[g].extend_from_slice(&v[g * h.v_dim..(g + 1) * h.v_dim]);
+        }
+        cache.positions += 1;
+        let (keys, values) = (cache.k.concat(), cache.v.concat());
+        let out = attend(&q, &keys, &values, h, |_, _| true);
         Ok(self.gate_out(out, &p.gate))
     }
 

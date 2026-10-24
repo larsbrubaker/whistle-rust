@@ -42,32 +42,8 @@ impl<'w> DecoderContext<'w> {
         memory: &DecoderMemory,
     ) -> Result<DecoderContext<'w>, Error> {
         let g = &weights.geometry;
-        super::bind::check_kv_bits(g.kv_bits)?;
-        let max = g.max_seq_len as usize;
-        if tokens.is_empty() || tokens.len() > max {
-            return Err(Error::Input(format!(
-                "{} decoder tokens (1 to {max})",
-                tokens.len()
-            )));
-        }
-        let layers = weights.decoder.len();
-        if let Some(&site) = g.engram_sites.iter().find(|&&l| l as usize >= layers) {
-            return Err(Error::Archive(format!(
-                "Engram site at layer {site} of a {layers}-layer decoder"
-            )));
-        }
-        if g.engram_sites.len() != weights.engrams.len() {
-            return Err(Error::Archive(format!(
-                "{} Engram sites with {} bound",
-                g.engram_sites.len(),
-                weights.engrams.len()
-            )));
-        }
-        let cross = weights
-            .decoder
-            .iter()
-            .map(|l| l.cross_attn.memory_kv(memory, g.kv_bits))
-            .collect::<Result<Vec<_>, _>>()?;
+        check_tokens(weights, tokens.len())?;
+        let cross = cross_memories(weights, memory)?;
         let (mut engram_k, mut engram_v) = (Vec::new(), Vec::new());
         for e in &weights.engrams {
             let (k, v) = e.keys_values(tokens)?;
@@ -100,15 +76,75 @@ impl<'w> DecoderContext<'w> {
         }
         Ok(())
     }
+}
 
-    /// Layer `layer`'s Engram site flags (`LaneStack`): 1 for each site at this layer, else 0.
-    fn site_flags(&self, layer: usize) -> Vec<f32> {
-        let sites = &self.weights.geometry.engram_sites;
-        sites
-            .iter()
-            .map(|&l| if l as usize == layer { 1.0 } else { 0.0 })
-            .collect()
+/// The checks every decoder call makes before it runs: the KV width is supported, `positions`
+/// tokens fit `1..=max_seq_len` ([`Error::Input`] otherwise), and every Engram site is a layer
+/// of the decoder with weights bound for it ([`Error::Archive`] otherwise).
+pub(crate) fn check_tokens(weights: &Weights, positions: usize) -> Result<(), Error> {
+    let g = &weights.geometry;
+    super::bind::check_kv_bits(g.kv_bits)?;
+    let max = g.max_seq_len as usize;
+    if positions == 0 || positions > max {
+        return Err(Error::Input(format!(
+            "{positions} decoder tokens (1 to {max})"
+        )));
     }
+    let layers = weights.decoder.len();
+    if let Some(&site) = g.engram_sites.iter().find(|&&l| l as usize >= layers) {
+        return Err(Error::Archive(format!(
+            "Engram site at layer {site} of a {layers}-layer decoder"
+        )));
+    }
+    if g.engram_sites.len() != weights.engrams.len() {
+        return Err(Error::Archive(format!(
+            "{} Engram sites with {} bound",
+            g.engram_sites.len(),
+            weights.engrams.len()
+        )));
+    }
+    Ok(())
+}
+
+/// Every layer's cross-attention keys and values over `memory`, computed once per decode.
+pub(crate) fn cross_memories(
+    weights: &Weights,
+    memory: &DecoderMemory,
+) -> Result<Vec<CrossMemory>, Error> {
+    let kv_bits = weights.geometry.kv_bits;
+    weights
+        .decoder
+        .iter()
+        .map(|l| l.cross_attn.memory_kv(memory, kv_bits))
+        .collect()
+}
+
+/// Layer `layer`'s Engram site flags (`LaneStack`): 1 for each site at this layer, else 0.
+pub(crate) fn site_flags(weights: &Weights, layer: usize) -> Vec<f32> {
+    let sites = &weights.geometry.engram_sites;
+    sites
+        .iter()
+        .map(|&l| if l as usize == layer { 1.0 } else { 0.0 })
+        .collect()
+}
+
+/// The scaled embedding of `tokens` broadcast to every mHC lane: the decoder stack's input.
+pub(crate) fn input_lanes(weights: &Weights, tokens: &[u32]) -> Result<Lanes, Error> {
+    let x = weights.embed(tokens)?;
+    let n = weights.decoder_mhc.lanes;
+    let mut data = Vec::with_capacity(x.data.len() * n);
+    for row in x.data.chunks_exact(x.cols) {
+        for _ in 0..n {
+            data.extend_from_slice(row);
+        }
+    }
+    Ok(Lanes {
+        data,
+        frames: x.rows,
+        lanes: n,
+        width: x.cols,
+        valid_frames: x.rows,
+    })
 }
 
 impl DecoderLayer {
@@ -148,28 +184,53 @@ impl DecoderLayer {
         ctx: &DecoderContext<'_>,
     ) -> Result<Vec<f32>, Error> {
         ctx.check(x, "the block input")?;
-        let flags = ctx.site_flags(layer);
+        let mem = ctx
+            .cross
+            .get(layer)
+            .ok_or_else(|| Error::Input(format!("layer {layer} of {}", ctx.cross.len())))?;
+        let engram = BlockEngram {
+            keys: &ctx.engram_k,
+            values: &ctx.engram_v,
+            flags: site_flags(ctx.weights, layer),
+        };
+        self.block_with(x, ctx.weights, &engram, mem, |normed| {
+            self.self_attention(normed, ctx)
+        })
+    }
+
+    /// The block's arithmetic on rows `x` whatever produced its self-attention: the Engram add
+    /// (`engram`, its keys and values for exactly these rows), `self_attn` on `norm_in(x)`
+    /// (the whole causal sequence, or one cached step), cross-attention against `mem`, and the
+    /// Hadamard MLP. [`DecoderLayer::block`] and the cached step share it.
+    pub(crate) fn block_with(
+        &self,
+        x: &[f32],
+        weights: &Weights,
+        engram: &BlockEngram<'_>,
+        mem: &CrossMemory,
+        self_attn: impl FnOnce(&[f32]) -> Result<Vec<f32>, Error>,
+    ) -> Result<Vec<f32>, Error> {
         // A layer with no site adds `0` in the reference, which leaves `x` as it is.
-        let x = if flags.contains(&1.0) {
-            let d = ctx.weights.embedding.cols;
-            engram_add(x, &ctx.engram_k, &ctx.engram_v, &flags, d)?
+        let x = if engram.flags.contains(&1.0) {
+            let d = weights.embedding.cols;
+            engram_add(x, engram.keys, engram.values, &engram.flags, d)?
         } else {
             x.to_vec()
         };
 
-        let attn = self.self_attention(&self.norm_in.forward(&x), ctx)?;
+        let attn = self_attn(&self.norm_in.forward(&x))?;
         let h = self.post_attn_norm.forward(&attn);
         let gate = sigmoid(self.attn_gate);
         let x: Vec<f32> = x.iter().zip(&h).map(|(x, h)| x + gate * h).collect();
 
-        let cross = self.cross_attention(&self.cross_norm.forward(&x), layer, ctx)?;
+        let cross = self.cross_attn.forward(&self.cross_norm.forward(&x), mem)?;
         let h = self.post_cross_norm.forward(&cross);
         let gate = sigmoid(self.cross_gate);
         let x: Vec<f32> = x.iter().zip(&h).map(|(x, h)| x + gate * h).collect();
 
         let m = self
             .hadamard_mlp
-            .forward(&self.pre_hada_norm.forward(&x), &ctx.weights.hada_perms);
+            .forward(&self.pre_hada_norm.forward(&x), &weights.hada_perms);
         Ok(x.iter().zip(&m).map(|(x, m)| x + m).collect())
     }
 
@@ -191,6 +252,14 @@ impl DecoderLayer {
             .decoder_mhc
             .step(layer, lanes, |u| self.block(u, layer, ctx))
     }
+}
+
+/// The Engram inputs of one block call: every site's keys and values for the block's rows
+/// (`[sites, rows, d_model]`) and this layer's site flags.
+pub(crate) struct BlockEngram<'a> {
+    pub(crate) keys: &'a [f32],
+    pub(crate) values: &'a [f32],
+    pub(crate) flags: Vec<f32>,
 }
 
 /// Next-token scores: `[positions, vocab]` row-major f32, row `t` scoring the token after
@@ -244,21 +313,7 @@ impl<'w> Decoder<'w> {
     pub fn hidden(&self, tokens: &[u32], memory: &DecoderMemory) -> Result<Matrix, Error> {
         let w = self.weights;
         let ctx = DecoderContext::new(w, tokens, memory)?;
-        let x = w.embed(tokens)?;
-        let n = w.decoder_mhc.lanes;
-        let mut data = Vec::with_capacity(x.data.len() * n);
-        for row in x.data.chunks_exact(x.cols) {
-            for _ in 0..n {
-                data.extend_from_slice(row);
-            }
-        }
-        let mut lanes = Lanes {
-            data,
-            frames: x.rows,
-            lanes: n,
-            width: x.cols,
-            valid_frames: x.rows,
-        };
+        let mut lanes = input_lanes(w, tokens)?;
         for (l, layer) in w.decoder.iter().enumerate() {
             lanes = layer.forward(&lanes, l, &ctx)?;
         }
