@@ -7,13 +7,19 @@ verification bar for every stage: CLAUDE.md "Tolerance policy".
 
 ## 4. Decoder
 
-A caller can score a token sequence against encoded audio.
+A caller can score a token sequence against encoded audio. Token embedding, Engram keys, values
+and the gated add, and the decoder memory are in (`model::engram`, `model::decoder_input`);
+what is left:
 
-- Embedding scale, Engram hashing (wrapping u32), tables, key/value projections and taps,
-  causal self-attention with QKV conv taps, cross-attention, gated sinusoidal memory, tied head;
-  an incremental KV cache whose per-step logits equal the full recompute.
-- Tests: `decoder/embedded`, `decoder/memory`, `decoder/engram_k`/`_v`; each decoder layer
-  from the previous `lanes`; `decoder/logits` (en_samantha, de_anna).
+- Causal self-attention with the 3-tap QKV convs, cross-attention to the memory (8 KV heads,
+  v width 512, keys-only mask over valid frames), the decoder block, the decoder mHC stack with
+  the Engram add at its sites, the final norm, and the tied A8 output head; an incremental KV
+  cache whose per-step logits equal the full recompute.
+- Bound the header's n-gram orders (e.g. ≤ `max_seq_len`), so a hostile archive cannot make the
+  hash loop arbitrarily slow.
+- Tests: the block's sub-modules from en_samantha's committed decoder layer 0 and 3 internals;
+  each decoder layer from the previous `lanes`; `decoder/out` and `decoder/logits`
+  (en_samantha, de_anna), bound set by measurement.
 
 ## 5. Greedy transcription (first milestone)
 

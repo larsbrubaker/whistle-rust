@@ -13,6 +13,8 @@
 //! [`vad`] finds the parts of the audio that contain speech. [`model::Weights::from_archive`]
 //! binds the archive's tensors by role, and [`model::Encoder::forward`] turns features into the
 //! speech embedding (the stem, eight encoder blocks in their mHC lane stack, the final norm).
+//! The decoder's inputs are ported too: [`model::Weights::embed`], the Engram keys and values
+//! ([`model::Engram::keys_values`], [`model::engram_add`]) and [`model::Weights::decoder_memory`].
 
 pub mod audio;
 pub mod cact;

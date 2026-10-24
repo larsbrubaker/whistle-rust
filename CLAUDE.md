@@ -150,6 +150,7 @@ oracle/.venv/bin/python -I oracle/cact_params.py      # check the archive rebuil
 oracle/.venv/bin/python -I oracle/dump.py             # stage fixtures (regenerate only when REFERENCE changes)
 oracle/.venv/bin/python -I oracle/dump_mel.py         # the mel matrix fixture (test-data/fixtures/mel.npy)
 oracle/.venv/bin/python -I oracle/dump_archive.py     # the archive and tokenizer fixture (test-data/fixtures/archive/)
+oracle/.venv/bin/python -I oracle/dump_engram.py      # the Engram hash fixture (test-data/fixtures/engram_indices.json)
 oracle/.venv/bin/python -I oracle/engine_transcripts.py   # regenerate the engine transcripts
 ```
 

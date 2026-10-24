@@ -188,6 +188,21 @@ pub struct Engram {
     pub value_proj: Matrix,
     /// The value convolution taps, `[conv_taps, d_model]`.
     pub taps: Matrix,
+    /// The n-gram hashing geometry, checked against `Whistle.decode` when bound.
+    pub hash: EngramHash,
+}
+
+/// How an Engram site hashes and convolves (`Whistle.decode`), from the archive header.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EngramHash {
+    /// The n-gram orders, one group of `heads` tables each (2 and 3).
+    pub orders: Vec<u32>,
+    /// Hash heads per order: `tables / orders`.
+    pub heads: usize,
+    /// Slots per table.
+    pub slots: u32,
+    /// The value convolution's dilation: `max(orders)`, as `Whistle` builds its Engrams.
+    pub dilation: usize,
 }
 
 /// One stem stage after the first: a depthwise 3×3 conv then a pointwise dense.

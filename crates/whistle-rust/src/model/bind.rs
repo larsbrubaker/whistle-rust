@@ -215,12 +215,15 @@ pub(crate) fn bind(archive: &Archive<'_>) -> Result<Weights, Error> {
     let table_width = mul(tables, sub_dim, "engram tables · sub_dim")?;
     let mut engrams = Vec::new();
     for s in 0..g.engram_sites.len() {
+        // Checked per site so an archive without Engram sites needs no hashing geometry.
+        let hash = super::engram::hash_geometry(&g)?;
         let p = format!("engram{s}");
         engrams.push(Engram {
             tables: r.cq_rows(format!("{p}.tables"), table_rows, sub_dim)?,
             key_proj: r.matrix(format!("{p}.key_proj"), d, table_width)?,
             value_proj: r.matrix(format!("{p}.value_proj"), d, table_width)?,
             taps: r.fp16_matrix(format!("{p}.taps"), g.engram_conv_taps as usize, d)?,
+            hash,
         });
     }
     let final_norm = r.norm("final_norm".into(), d)?;
