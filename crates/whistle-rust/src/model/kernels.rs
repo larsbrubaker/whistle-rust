@@ -6,7 +6,9 @@
 //! `iter().map(|(a, b)| a * b).sum()` computes, so every stage bound and the token contract are
 //! unchanged by speed. It vectorizes *across outputs* instead of within a sum: a panel of
 //! [`PANEL`] weight rows is transposed once into `[n, PANEL]` scratch, then each input row
-//! broadcasts `x[i]` against row `i` of the panel, one SIMD lane per output. The portable scalar
+//! broadcasts `x[i]` against row `i` of the panel, one SIMD lane per output. Fewer rows than
+//! [`ROWS`] (a decoder step's one) cannot amortize that transpose, so they transpose 4×4 blocks
+//! of weights in registers instead (`small`), in the same order. The portable scalar
 //! path, NEON (aarch64), AVX2 (x86_64, detected at run time) and wasm `simd128` therefore agree
 //! bit for bit, and threads only choose which outputs a worker owns, never how one is summed,
 //! so results do not depend on the thread count either.
@@ -262,6 +264,16 @@ pub(crate) fn linear_into(path: Path, x: &[f32], w: &[f32], n: usize, out: &mut 
         out.fill(0.0);
         return;
     }
+    if x.len() / n < ROWS {
+        // Too few rows to amortize the scratch transpose: transpose in registers instead.
+        small::linear_rows_into(path, x, w, n, out);
+    } else {
+        linear_panels_into(path, x, w, n, out);
+    }
+}
+
+/// [`linear_into`] by transposed panels, for any row count; `n > 0`.
+fn linear_panels_into(path: Path, x: &[f32], w: &[f32], n: usize, out: &mut [f32]) {
     let (rows, outputs) = (x.len() / n, w.len() / n);
     let xr = |r: usize| &x[r * n..(r + 1) * n];
     let mut wt = vec![0.0f32; n * PANEL];
@@ -329,6 +341,8 @@ pub(crate) fn linear_with(
     });
     out
 }
+
+mod small;
 
 #[cfg(test)]
 mod tests;

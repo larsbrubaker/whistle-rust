@@ -73,6 +73,25 @@ fn every_path_reproduces_the_sequential_sum_bit_for_bit() {
 }
 
 #[test]
+fn the_few_row_path_reproduces_the_sequential_sum_on_every_tail_shape() {
+    // 1–3 rows take the in-register transpose (`small`): inputs past a multiple of 4 and
+    // outputs past the last group of 4 finish by the scalar sum, in the same order.
+    for rows in 1..=3 {
+        for n in [1, 2, 3, 4, 5, 7, 8, 17, 64, 130] {
+            for outputs in [1, 3, 4, 5, 15, 16, 17, 20, 33, 66] {
+                let (x, w) = (values(rows * n, 13), values(outputs * n, 14));
+                let want = bits(&sequential(&x, &w, n));
+                for path in [Path::Scalar, best_path()] {
+                    let mut out = vec![f32::NAN; rows * outputs];
+                    linear_into(path, &x, &w, n, &mut out);
+                    assert_eq!(bits(&out), want, "{rows}x{n}x{outputs} on {path:?}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn an_all_negative_zero_product_keeps_its_sign_as_the_sequential_sum_does() {
     let (x, w) = (vec![-0.0f32, 0.0, -1.0], vec![1.0f32, -2.0, 0.0]);
     let want = bits(&sequential(&x, &w, 3));
@@ -104,6 +123,48 @@ fn every_thread_count_gives_bit_identical_projections() {
 }
 
 #[test]
+fn signed_zero_products_through_the_vector_part_keep_the_sequential_sums_sign() {
+    // Every product is a signed zero, over 8+ inputs and 4+ outputs, so the vector parts (not
+    // only the scalar tails) decide each sign: an output whose products are all -0.0 must stay
+    // -0.0, as the sequential sum from -0.0 does, and one +0.0 product turns it to +0.0. Inputs
+    // alternate +0.0 and -0.0 against weights alternating -1.5 and 2.0 (all -0.0 products when
+    // the parities line up, +0.0 ones when an odd width shifts them); output 1 starts with a
+    // +0.0 product. Both signs are asserted present.
+    for &(rows, n, outputs) in &[(1, 8, 4), (2, 9, 5), (3, 16, 17), (4, 12, 16), (5, 33, 20)] {
+        let x: Vec<f32> = (0..rows * n)
+            .map(|i| if i % 2 == 0 { 0.0 } else { -0.0 })
+            .collect();
+        let mut w: Vec<f32> = (0..outputs * n)
+            .map(|i| if i % 2 == 0 { -1.5 } else { 2.0 })
+            .collect();
+        // Output 1's first weight makes its first product +0.0 · +1.0 = +0.0.
+        w[n] = 1.0;
+        let want = bits(&sequential(&x, &w, n));
+        assert!(want.contains(&(-0.0f32).to_bits()) && want.contains(&0.0f32.to_bits()));
+        for path in [Path::Scalar, best_path()] {
+            let mut out = vec![f32::NAN; rows * outputs];
+            linear_into(path, &x, &w, n, &mut out);
+            assert_eq!(bits(&out), want, "{rows}x{n}x{outputs} on {path:?}");
+        }
+    }
+}
+
+#[test]
+fn zero_outputs_project_to_nothing_on_every_row_count_and_width() {
+    for rows in [0, 1, 3, 4, 9] {
+        for n in [0, 1, 5] {
+            let x = values(rows * n, 19);
+            for path in [Path::Scalar, best_path()] {
+                let mut out: Vec<f32> = Vec::new();
+                linear_into(path, &x, &[], n, &mut out);
+                assert!(out.is_empty(), "{rows}x{n}x0 on {path:?}");
+                assert!(linear_with(path, 1, &x, &[], n, 0).is_empty());
+            }
+        }
+    }
+}
+
+#[test]
 fn an_empty_input_width_projects_to_zeros() {
     assert_eq!(
         linear_with(Path::Scalar, 1, &[], &[], 0, 3),
@@ -122,6 +183,49 @@ fn a_huge_thread_setting_is_capped_and_projects_without_overflow() {
         linear_with(best_path(), usize::MAX, &x, &w, 64, 64),
         linear_with(best_path(), 1, &x, &w, 64, 64)
     );
+}
+
+/// The measurement behind the few-row path: best of 50 single-row projections of the decoder
+/// step's shapes, by transposed panels and by the in-register transpose. Run in release:
+/// `cargo test --release -p whistle-rust --lib few_row_timing -- --ignored --nocapture`.
+#[test]
+#[ignore = "release measurement for the few-row path"]
+fn few_row_timing() {
+    for (n, outputs) in [(512, 8199), (512, 512), (512, 1024), (1024, 512)] {
+        let (x, w) = (values(n, 15), values(outputs * n, 16));
+        let mut out = vec![0.0f32; outputs];
+        let mut best = |f: &mut dyn FnMut(&mut [f32])| {
+            (0..50)
+                .map(|_| {
+                    let start = std::time::Instant::now();
+                    f(&mut out);
+                    start.elapsed().as_secs_f64() * 1e6
+                })
+                .fold(f64::INFINITY, f64::min)
+        };
+        let panels = best(&mut |o| linear_panels_into(best_path(), &x, &w, n, o));
+        let small = best(&mut |o| small::linear_rows_into(best_path(), &x, &w, n, o));
+        println!("1x{n}x{outputs}: panels {panels:.0} us, in-register {small:.0} us");
+    }
+    // A decoder step streams about 72 MB of weights per token, more than the caches hold:
+    // 64 distinct 512x512 matrices in turn, best of 10 passes.
+    let (n, outputs, count) = (512, 512, 64);
+    let (x, w) = (values(n, 17), values(count * outputs * n, 18));
+    let mut out = vec![0.0f32; outputs];
+    let mut best = |f: &mut dyn FnMut(&[f32], &mut [f32])| {
+        (0..10)
+            .map(|_| {
+                let start = std::time::Instant::now();
+                for m in w.chunks_exact(outputs * n) {
+                    f(m, &mut out);
+                }
+                start.elapsed().as_secs_f64() * 1e6
+            })
+            .fold(f64::INFINITY, f64::min)
+    };
+    let panels = best(&mut |m, o| linear_panels_into(best_path(), &x, m, n, o));
+    let small = best(&mut |m, o| small::linear_rows_into(best_path(), &x, m, n, o));
+    println!("{count} x 1x{n}x{outputs} (64 MB): panels {panels:.0} us, in-register {small:.0} us");
 }
 
 /// The measurement behind `PARALLEL_MIN_MACS`: best of 30 runs of a projection on 1 and 4
