@@ -110,6 +110,15 @@
     512
    ]
   },
+  "encoder/layer00/block_in": {
+   "file": "encoder.layer00.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
   "encoder/layer00/0/0": {
    "file": "encoder.layer00.0.0.npy",
    "tier": "local",
@@ -300,6 +309,15 @@
    "shape": [
     34,
     4,
+    512
+   ]
+  },
+  "encoder/layer01/block_in": {
+   "file": "encoder.layer01.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
     512
    ]
   },
@@ -496,6 +514,15 @@
     512
    ]
   },
+  "encoder/layer02/block_in": {
+   "file": "encoder.layer02.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
   "encoder/layer02/0/0": {
    "file": "encoder.layer02.0.0.npy",
    "tier": "local",
@@ -686,6 +713,15 @@
    "shape": [
     34,
     4,
+    512
+   ]
+  },
+  "encoder/layer03/block_in": {
+   "file": "encoder.layer03.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
     512
    ]
   },
@@ -882,6 +918,15 @@
     512
    ]
   },
+  "encoder/layer04/block_in": {
+   "file": "encoder.layer04.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
   "encoder/layer04/0/0": {
    "file": "encoder.layer04.0.0.npy",
    "tier": "local",
@@ -1072,6 +1117,15 @@
    "shape": [
     34,
     4,
+    512
+   ]
+  },
+  "encoder/layer05/block_in": {
+   "file": "encoder.layer05.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
     512
    ]
   },
@@ -1268,6 +1322,15 @@
     512
    ]
   },
+  "encoder/layer06/block_in": {
+   "file": "encoder.layer06.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
+    512
+   ]
+  },
   "encoder/layer06/0/0": {
    "file": "encoder.layer06.0.0.npy",
    "tier": "local",
@@ -1458,6 +1521,15 @@
    "shape": [
     34,
     4,
+    512
+   ]
+  },
+  "encoder/layer07/block_in": {
+   "file": "encoder.layer07.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    34,
     512
    ]
   },
@@ -1728,6 +1800,15 @@
     512
    ]
   },
+  "decoder/layer00/block_in": {
+   "file": "decoder.layer00.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
   "decoder/layer00/0/0": {
    "file": "decoder.layer00.0.0.npy",
    "tier": "local",
@@ -1956,6 +2037,15 @@
    "shape": [
     22,
     4,
+    512
+   ]
+  },
+  "decoder/layer01/block_in": {
+   "file": "decoder.layer01.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
     512
    ]
   },
@@ -2190,6 +2280,15 @@
     512
    ]
   },
+  "decoder/layer02/block_in": {
+   "file": "decoder.layer02.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
   "decoder/layer02/0/0": {
    "file": "decoder.layer02.0.0.npy",
    "tier": "local",
@@ -2418,6 +2517,15 @@
    "shape": [
     22,
     4,
+    512
+   ]
+  },
+  "decoder/layer03/block_in": {
+   "file": "decoder.layer03.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
     512
    ]
   },
@@ -2652,6 +2760,15 @@
     512
    ]
   },
+  "decoder/layer04/block_in": {
+   "file": "decoder.layer04.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
   "decoder/layer04/0/0": {
    "file": "decoder.layer04.0.0.npy",
    "tier": "local",
@@ -2880,6 +2997,15 @@
    "shape": [
     22,
     4,
+    512
+   ]
+  },
+  "decoder/layer05/block_in": {
+   "file": "decoder.layer05.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
     512
    ]
   },
@@ -3114,6 +3240,15 @@
     512
    ]
   },
+  "decoder/layer06/block_in": {
+   "file": "decoder.layer06.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
+    512
+   ]
+  },
   "decoder/layer06/0/0": {
    "file": "decoder.layer06.0.0.npy",
    "tier": "local",
@@ -3342,6 +3477,15 @@
    "shape": [
     22,
     4,
+    512
+   ]
+  },
+  "decoder/layer07/block_in": {
+   "file": "decoder.layer07.block_in.npy",
+   "tier": "local",
+   "dtype": "float32",
+   "shape": [
+    22,
     512
    ]
   },
