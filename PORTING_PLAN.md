@@ -15,12 +15,16 @@ at one beam, ~2.2 ms per decoder token); what is left.
 slower computers on the web are where transcription is slowest, so performance work is chosen
 and measured for one thread on wasm first; native threads are a bonus.
 
-- A wasm benchmark: the `bench` example built for wasm32-wasip1 with simd128, run under Node
-  (V8, the engine Chrome uses) and wasmtime, single-threaded, with a profile (`node --cpu-prof`)
-  of where the time goes; then the browser itself once the Web Worker host exists (item 8).
-- Optimise the single-thread hot paths that profile shows, in wasm terms: simd128 is 4-wide with
-  no per-lane variable shift and no FMA we may use; `exp`/`ln` come from software libm on wasm;
-  the encoder decodes ~19M packed weights per call on one thread.
+- Check the token contract on wasm: the wasm builds gave native's text on only 8 of 9
+  benchmark clips (`docs/design/performance.md` "Single-threaded wasm"); `exp`/`ln`/`cos` come
+  from a different libm there. Run the test suite on wasm32-wasip1 under wasmtime and find out.
+- Optimise for one wasm thread, by the Node (V8) profile (`scripts/wasm-bench.sh profile`): the
+  decoder's packed kernel is 33% of a 3 s clip at one beam and 56% at three (each weight is
+  index-decoded for one multiply-add; batching helps at 3+ beams, a wasm-friendly index layout
+  prepared at bind time is the next lever); the encoder's dense panel kernel ~20%; the Hadamard
+  MLP ~9%; the f64 mel front end ~9% (most of the mel matrix is zeros). Re-measure on a quiet
+  machine with interleaved rounds; the first table was taken at load 15-28. Then the browser
+  itself once the Web Worker host exists (item 8).
 - Run the AVX2 paths' bit-identity tests on x86_64 hardware (dense, few-row and packed kernels
   are checked by construction and asm only); simd128 ran under wasmtime.
 - The 3 s encoder alone is 5-12% slower than the dense build (it decodes ~19M packed weights per

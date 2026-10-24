@@ -392,6 +392,133 @@ multiply-adds and the per-hypothesis attention, rather than the weight decode, a
 a step's cost; a profile of the batched step decides it. The engine comparison rows were not
 rerun.
 
+## Single-threaded wasm
+
+The browser build has no threads, so one wasm thread is the performance floor. Measured with:
+
+```bash
+scripts/wasm-bench.sh            # simd128 and scalar wasm under Node and wasmtime, plus native, 1 thread
+scripts/wasm-bench.sh profile    # node --cpu-prof on simd128, summarized by scripts/wasm_profile.py
+```
+
+`wasm-bench.sh` builds the `bench` example for `wasm32-wasip1` (it needs no cfg changes: std
+time and file I/O work under WASI, and the library already runs one thread on wasm32) with
+`-C target-feature=+simd128` and without, runs it under Node (V8, the engine Chrome uses, via
+`scripts/wasm-bench.mjs` and `node:wasi`) and under `wasmtime run`, and the native release
+build at `--threads 1`, at beams 1 and 3 on the 8 speech clips and the 26.6 s `long` clip.
+Each cell is the median of RUNS timed calls after one warm-up; the number in brackets is the
+example's encoder-only time (features + encoder).
+
+One round, RUNS=3, 2026-10-24 on the M5 (above), commit 507e07b, Node 26.8.2, wasmtime 49.0.1.
+**The machine was heavily loaded (load average 15-17 at the start, 22-28 during, other builds and
+benchmarks running), so these numbers are noise-dominated:** native is slower than wasm on
+several clips, which cannot be the real ordering. Read them as orders of magnitude only and
+rerun on an idle machine, with rounds interleaved across runtimes, before quoting a ratio.
+
+| clip | sec | b1 native | b1 Node simd128 | b1 Node scalar | b1 wasmtime simd128 | b1 wasmtime scalar | b3 native | b3 Node simd128 | b3 Node scalar | b3 wasmtime simd128 | b3 wasmtime scalar |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| de_anna | 2.6 | 180 (69) | 178 (78) | 832 (223) | 552 (280) | 1513 (338) | 292 (60) | 541 (116) | 5149 (363) | 617 (76) | 1393 (147) |
+| en_daniel | 3.4 | 359 (202) | 191 (87) | 1529 (454) | 289 (97) | 1146 (379) | 616 (122) | 455 (104) | 1739 (240) | 543 (84) | 1056 (175) |
+| en_samantha | 3.1 | 345 (154) | 184 (100) | 1160 (354) | 256 (100) | 936 (325) | 319 (114) | 332 (80) | 1257 (267) | 394 (82) | 1131 (215) |
+| es_monica | 2.6 | 647 (278) | 188 (67) | 887 (318) | 467 (98) | 1038 (298) | 581 (86) | 1163 (91) | 1444 (185) | 474 (80) | 1210 (144) |
+| fr_thomas | 3.0 | 537 (154) | 182 (69) | 1402 (536) | 332 (88) | 761 (192) | 376 (72) | 659 (98) | 1596 (167) | 532 (69) | 1336 (159) |
+| it_alice | 2.3 | 292 (100) | 128 (56) | 1327 (538) | 210 (76) | 509 (151) | 221 (54) | 307 (62) | 813 (132) | 382 (65) | 981 (133) |
+| nl_xander | 2.1 | 137 (61) | 122 (57) | 1285 (356) | 220 (68) | 459 (144) | 238 (56) | 297 (70) | 915 (158) | 326 (58) | 1122 (265) |
+| pl_zosia | 2.5 | 120 (56) | 149 (66) | 482 (174) | 201 (80) | 469 (161) | 363 (70) | 463 (77) | 1007 (146) | 389 (62) | 2201 (346) |
+| long | 26.6 | 1132 (533) | 2654 (874) | 10793 (3860) | 2199 (1132) | 4499 (1798) | 3769 (748) | 5824 (1510) | 36294 (4387) | 3322 (484) | 10549 (1326) |
+
+What holds despite the noise: simd128 is several times faster than scalar wasm everywhere
+(Node 3-10x at beams 1, wasmtime 2-4x), so the simd128 build is the one to ship; scalar wasm is
+5-36 s on the long clip. The quietest cells put simd128 wasm at roughly 1-2.5x native
+single-thread (the long clip at beams 1: 2.2-2.7 s against 1.1 s). Every wasm build gave the
+same text as native on 8 of the 9 clips at both beam counts; which clip differs was not kept
+(the run's temp dir is deleted) and needs a rerun to identify, since the kernels are meant to
+be bit-identical across paths.
+
+### Where the time goes (Node, simd128)
+
+`node --cpu-prof` at a 200 µs interval on a simd128 build with debug info (V8 shows wasm
+function names from the name section). Only samples under the timed
+`Whistle::transcribe_wav` calls count (the example's separate encoder timing and the load are
+left out). The stage is taken from the call stack (`Encoder`/`Stem` → encoder, `DecoderState::step`
+and the search → decoder step, `cross_memories` → decoder setup, `features`/FFT/VAD → front
+end), the kind from the innermost recognisable frame. Self time includes everything inlined
+into a function: the simd128 dot product, index decode and table lookup are all inside
+`PackedMatrix::rows_into`, and the panel kernel inside `linear_panels_into`.
+
+en_samantha (3.09 s, 18 tokens) at beams 1 (602 ms sampled) and 3 (1130 ms), and the 26.6 s
+long clip at beams 1 (5080 ms), load average 15–17:
+
+| Bucket | 3 s, beams 1 | 3 s, beams 3 | 26.6 s, beams 1 |
+|---|---|---|---|
+| **Decoder step** | **40.4%** | **67.6%** | **44.6%** |
+| rotated packed kernel (`rows_into`) | 33.0% | 56.1% | 33.7% |
+| dense kernel (head, small projections) | 1.4% | 2.4% | 2.6% |
+| Hadamard MLP | 1.5% | 1.8% | 1.6% |
+| mHC/sinkhorn | 1.0% | 1.1% | 1.1% |
+| fake quant A8 | 0.8% | 1.1% | 0.6% |
+| cross-attention | 0.5% | 0.6% | 2.6% |
+| self-attention, Engram, norms, libm, allocation, search | 1.7% | 4.5% | 2.6% |
+| **Encoder** | **43.5%** | **24.4%** | **42.7%** |
+| dense kernel (`linear_panels_into`) | 19.6% | 12.1% | 19.6% |
+| Hadamard MLP (`kron_apply`, `HadamardMlp::forward`) | 7.6% | 4.2% | 7.6% |
+| band decode (packed CQ, per call) | 6.1% | 2.8% | 0.5% |
+| exp/ln/libm | 2.5% | 1.2% | 2.8% |
+| stem (`conv3x3`) | 2.3% | 1.0% | 2.2% |
+| fake quant A8 | 1.4% | 0.9% | 1.6% |
+| self-attention | 0.9% | 0.5% | 6.2% |
+| norms, conv, mHC/sinkhorn, allocation, other | 3.0% | 1.7% | 2.0% |
+| **Decoder setup** (cross-attention memory) | **6.8%** | **3.7%** | **5.7%** |
+| **Front end + VAD** | **9.0%** | **4.2%** | **7.0%** |
+| mel/log (`mel::features`) | 5.6% | 2.6% | 4.6% |
+| FFT | 2.5% | 1.1% | 1.9% |
+| VAD | 0.6% | 0.3% | 0.3% |
+| Everything else | 0.3% | 0.1% | 0.1% |
+
+Top functions by self time on the 3 s clip at beams 1: `PackedMatrix::rows_into` 33.0%,
+`linear_panels_into` 24.4%, `PackedMatrix::band_into` 7.1%, `mel::features` 5.5%,
+`hadamard::kron_apply` 4.8%, `fake_quant_rows` 2.8%, `HadamardMlp::forward` 2.7%, `expf` 2.6%,
+`Fft::forward` 2.5%, `stem::conv3x3` 1.5%, a `Vec` collect inside `HadamardMlp::forward` 1.4%,
+`PackedMatrix::project` 1.3%, `Stem::forward` 0.8%; nothing else reaches 0.8%. `dlmalloc`,
+`dlfree` and `calloc` together are about 1%.
+
+### Opportunities for one wasm thread, ranked
+
+Shares are of the 3 s beams-1 / beams-3 / long beams-1 profiles above.
+
+1. **The decoder step's packed kernel, 33% / 56% / 34%.** At one row per call every weight is
+   index-decoded (`i8x16_swizzle` spreads, nibble masks, `v128_bitselect`) and looked up
+   (4 plane swizzles, 2 rounds of byte interleaves) to be used for one multiply-add, and at three
+   beams that is repeated per hypothesis. Batching the beams' steps into one `rows_into` call
+   (the `ROWS` path, in progress) amortizes the decode over 3 rows and should take most of the
+   beams-3 excess (56% of the beams-3 time is this kernel against 33% at beams 1). After that,
+   a cheaper wasm index decode (one swizzle per 16 codes into a pre-spread layout stored at bind
+   time) or an f32/bf16 decoder-only weight copy (a memory trade) are the levers.
+2. **The encoder's dense panel kernel, 20% / 12% / 20%.** `linear_panels_into` on simd128 is
+   4-wide with mul then add (no FMA allowed by the accumulation order); it is the one place
+   wider blocking (more input rows per broadcast, so each panel load feeds more accumulators)
+   could still help. Bound by the sequential-sum order the tests pin.
+3. **Hadamard MLP, 9% / 6% / 9%** across encoder and decoder (`kron_apply` plus
+   `HadamardMlp::forward` and a `Vec` collect inside it): check `kron_apply` vectorizes under
+   simd128 and that the per-call collects reuse scratch.
+4. **The front end, 9% / 4% / 7%.** `mel::features` runs in f64 (wasm has only `f64x2`) and
+   multiplies the power spectrum by the full dense mel matrix, most of which is zeros (each mel
+   filter covers a few bins). Skipping the zero entries adds only exact zeros to a non-negative
+   sum, so it keeps the bits; it should take most of the 5.6% mel share. The FFT (2.5%) is f64
+   too.
+5. **Per-call band decode of the packed encoder, 6% / 3% / 0.5%.** About 19M weights decoded
+   per call whatever the clip length, so it matters on short push-to-talk clips only.
+6. **Decoder setup (cross-attention memory), 7% / 4% / 6%**, mostly the dense kernel: shares
+   item 2's fix.
+7. **Encoder self-attention on long audio, 1% / 0.5% / 6%**: quadratic in frames; scalar
+   `attend` paths are the candidate.
+8. **Transcendentals, 3% / 2.5% / 3.5%** (`expf`, `logf`, `log` from wasi-libc's software
+   libm, mostly in softmax, sinkhorn and the activations). Smaller than expected; a vectorized
+   `exp` would have to stay bit-identical to `f32::exp` to keep the token stream, so it is worth
+   it only after the items above.
+9. **Allocation, about 1–2%** (`dlmalloc`, `dlfree`, `calloc`, `Vec` collects): reused
+   scratch in the decoder step and the Hadamard MLP.
+
 ## What is left
 
 - **The decoder step** (about 2.7 ms per token) runs on one thread and is now bound by how the

@@ -8,6 +8,10 @@
 #                                     clip with the wall time per invocation and its own timings
 #   bench_tools.py table RESULTS_DIR  read the *.jsonl files bench.sh collected and print the
 #                                     table, medians of the per-round medians
+#   bench_tools.py wasmtable RESULTS_DIR
+#                                     read the <runtime>.jsonl files scripts/wasm-bench.sh
+#                                     collected (native, node-*, wasmtime-*) and print one
+#                                     single-thread table per beam count
 import glob
 import json
 import os
@@ -135,6 +139,34 @@ def table(results):
         print(f"  beams {b}, threads {t}: {same}")
 
 
+def wasm_table(results):
+    order = ["native", "node-simd128", "node-scalar", "wasmtime-simd128", "wasmtime-scalar"]
+    runs = {}
+    for path in sorted(glob.glob(os.path.join(results, "*.jsonl"))):
+        with open(path, encoding="utf-8") as f:
+            runs[os.path.splitext(os.path.basename(path))[0]] = [
+                json.loads(line) for line in f if line.startswith('{"kind":"clip"')]
+    names = [n for n in order if n in runs] + sorted(set(runs) - set(order))
+    for beams in sorted({r["beams"] for rows in runs.values() for r in rows}):
+        print(f"\nbeams {beams}, 1 thread: median wall ms per transcription (encoder-only ms)")
+        print(" | ".join(["clip", "sec"] + names + ["node simd/native", "simd speedup (node)"]))
+        clips = [r for r in runs.get("native", next(iter(runs.values()))) if r["beams"] == beams]
+        for ref in clips:
+            cell = {n: next((r for r in runs[n] if r["beams"] == beams and r["clip"] == ref["clip"]),
+                            None) for n in names}
+            row = [ref["clip"], f"{ref['seconds']:.1f}"]
+            row += [f"{c['median_ms']:.0f} ({c['encoder_ms']:.0f})" if c else "-"
+                    for c in cell.values()]
+            ns, nat, sc = cell.get("node-simd128"), cell.get("native"), cell.get("node-scalar")
+            row.append(f"{ns['median_ms'] / nat['median_ms']:.1f}x" if ns and nat else "-")
+            row.append(f"{sc['median_ms'] / ns['median_ms']:.2f}x" if ns and sc else "-")
+            print(" | ".join(row))
+        for n in names[1:]:
+            same = sum(1 for ref in clips for r in runs[n] if r["beams"] == beams
+                       and r["clip"] == ref["clip"] and r["text"] == ref["text"])
+            print(f"  {n}: text identical to native on {same} of {len(clips)} clips")
+
+
 if __name__ == "__main__":
     cmd, args = sys.argv[1], sys.argv[2:]
-    {"clips": make_clips, "engine": engine, "table": table}[cmd](*args)
+    {"clips": make_clips, "engine": engine, "table": table, "wasmtable": wasm_table}[cmd](*args)
