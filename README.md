@@ -7,9 +7,9 @@ Windows, Linux and the browser (wasm32), with no native code and no runtime depe
 
 **Status: in progress.** Transcription of up to 30 s of audio works: greedy (`beams: 1`)
 reproduces the reference decode on every test clip, the default 3-beam search reproduces the
-engine's transcripts, and keyword biasing favours the names and jargon you list. Word
-timestamps, windowing past 30 s, streaming and packed (quantized in memory) weights are still
-to come (`PORTING_PLAN.md`).
+engine's transcripts, keyword biasing favours the names and jargon you list, and word
+timestamps give each word's start, end and probability. Windowing past 30 s, streaming and
+packed (quantized in memory) weights are still to come (`PORTING_PLAN.md`).
 
 ## Usage
 
@@ -34,6 +34,10 @@ that stops a transcription from another thread with `Error::Cancelled`, runs a b
 (`beams`: 3 by default, the smallest count that reproduced every engine transcript on the test
 clips, for about +195 ms on a 3.3 s clip; `beams: 1` is the greedy decode; up to 16), and favours names, places and jargon you list
 (`keywords: vec!["PETG".into()]`, strength `keyword_bonus`). See `docs/design/decoding.md`.
+`word_timestamps: true` fills `transcript.words` with each word's `start` and `end` in seconds
+from the start of the input and its `probability`, aligned from the decoder's cross-attention
+(within one 80 ms frame of the engine's on the test clips, for about +55 ms on a 3.4 s clip;
+`docs/design/timestamps.md`). `Transcript` is `PartialEq` but not `Eq` (the times are f32).
 
 ## How it is built
 

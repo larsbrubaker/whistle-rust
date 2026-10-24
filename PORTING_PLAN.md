@@ -20,15 +20,14 @@ at one beam, ~2.2 ms per decoder token); what is left:
 ## 7. Designed decode features
 
 The behaviours only the closed engine has, designed here and held to the engine transcripts.
-Beam search (default 3 beams) and keyword biasing are in (`docs/design/decoding.md`); what is
-left:
+Beam search (default 3 beams), keyword biasing and word timestamps are in
+(`docs/design/decoding.md`, `docs/design/timestamps.md`); what is left:
 
-- Word timestamps (start, end, probability per word) aligned from decoder cross-attention, held
-  to the engine's (`test-data/engine/*.json` `words`) within a frame or two.
 - Windowing past 30 s, and streaming that commits words two passes agree on.
 - Keyword biasing at 5+ beams finds fewer keywords than at 1 or 3 (partial keyword paths crowd
   the beam): per-beam-count tuning or a cap on hypotheses inside a keyword.
-- More clips (long audio, noise, real microphone recordings) via `oracle/clips.json`.
+- More clips (long audio, noise, real microphone recordings) via `oracle/clips.json`; the
+  alignment heads were fitted on the 8 contract clips and hold on 3 held-out clips so far.
 
 ## 8. Integration
 

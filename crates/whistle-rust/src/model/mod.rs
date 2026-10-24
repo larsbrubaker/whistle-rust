@@ -26,7 +26,7 @@ mod weights;
 pub use attention::Projections;
 pub use bind::MAX_SEQ_LEN;
 pub use cross_attention::CrossMemory;
-pub use decoder::{Decoder, DecoderContext, Logits};
+pub use decoder::{CrossAttentionWeights, Decoder, DecoderContext, HeadFilter, Logits};
 pub use decoder_input::DecoderMemory;
 pub use decoder_step::DecoderState;
 pub use encoder::{Encoder, EncoderContext, EncoderOutput};

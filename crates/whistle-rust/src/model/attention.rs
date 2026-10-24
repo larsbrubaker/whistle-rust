@@ -358,6 +358,30 @@ pub(crate) fn attend(
     h: Heads,
     allowed: impl Fn(usize, usize) -> bool,
 ) -> Vec<f32> {
+    attend_with(q, k, v, h, allowed, None)
+}
+
+/// Where [`attend_with`] copies the probabilities it mixes the values with: for each query head
+/// in `heads` (ascending, as `attend` visits them), every query row's first `keep` keys, appended
+/// to `data` as `[heads, Tq, keep]`. The word aligner reads the valid memory frames this way, so
+/// the weights it aligns from are exactly the ones the model used.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ProbSink {
+    pub heads: Vec<usize>,
+    pub keep: usize,
+    pub data: Vec<f32>,
+}
+
+/// [`attend`], optionally copying each wanted head's probabilities into `sink` right after the
+/// softmax. With `None` nothing else happens, so the output is bit-identical either way.
+pub(crate) fn attend_with(
+    q: &[f32],
+    k: &[f32],
+    v: &[f32],
+    h: Heads,
+    allowed: impl Fn(usize, usize) -> bool,
+    mut sink: Option<&mut ProbSink>,
+) -> Vec<f32> {
     let fused = h.qk_dim.max(h.v_dim);
     let q_scale = (fused as f64 / h.qk_dim as f64).sqrt() as f32;
     let scale = (1.0 / (fused as f64).sqrt()) as f32;
@@ -383,11 +407,15 @@ pub(crate) fn attend(
         // Every query's logit against every key at once: each is still one in-order dot
         // product (`ops::linear`), then the scale and the mask.
         let mut all = linear(&qs, keys, h.qk_dim, tk);
+        let mut capture = sink.as_deref_mut().filter(|s| s.heads.contains(&head));
         for (t, logits) in all.chunks_exact_mut(tk).enumerate() {
             for (s, l) in logits.iter_mut().enumerate() {
                 *l = if allowed(t, s) { *l * scale } else { MASKED };
             }
             softmax(logits, tk);
+            if let Some(c) = capture.as_deref_mut() {
+                c.data.extend_from_slice(&logits[..c.keep.min(tk)]);
+            }
             let o = &mut out[t * width + head * h.v_dim..t * width + (head + 1) * h.v_dim];
             for (&p, vr) in logits.iter().zip(values.chunks_exact(h.v_dim)) {
                 for (o, &x) in o.iter_mut().zip(vr) {

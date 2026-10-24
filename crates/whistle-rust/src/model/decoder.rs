@@ -211,6 +211,21 @@ impl DecoderLayer {
         mem: &CrossMemory,
         self_attn: impl FnOnce(&[f32]) -> Result<Vec<f32>, Error>,
     ) -> Result<Vec<f32>, Error> {
+        self.block_core(x, weights, engram, self_attn, |normed| {
+            self.cross_attn.forward(normed, mem)
+        })
+    }
+
+    /// [`DecoderLayer::block_with`] with the cross-attention module supplied too, so the word
+    /// aligner can run [`super::weights::CrossAttention::forward_with_weights`] in its place.
+    fn block_core(
+        &self,
+        x: &[f32],
+        weights: &Weights,
+        engram: &BlockEngram<'_>,
+        self_attn: impl FnOnce(&[f32]) -> Result<Vec<f32>, Error>,
+        cross_attn: impl FnOnce(&[f32]) -> Result<Vec<f32>, Error>,
+    ) -> Result<Vec<f32>, Error> {
         // A layer with no site adds `0` in the reference, which leaves `x` as it is.
         let x = if engram.flags.contains(&1.0) {
             let d = weights.embedding.cols;
@@ -224,7 +239,7 @@ impl DecoderLayer {
         let gate = sigmoid(self.attn_gate);
         let x: Vec<f32> = x.iter().zip(&h).map(|(x, h)| x + gate * h).collect();
 
-        let cross = self.cross_attn.forward(&self.cross_norm.forward(&x), mem)?;
+        let cross = cross_attn(&self.cross_norm.forward(&x))?;
         let h = self.post_cross_norm.forward(&cross);
         let gate = sigmoid(self.cross_gate);
         let x: Vec<f32> = x.iter().zip(&h).map(|(x, h)| x + gate * h).collect();
@@ -253,6 +268,41 @@ impl DecoderLayer {
             .decoder_mhc
             .step(layer, lanes, |u| self.block(u, layer, ctx))
     }
+}
+
+/// The captured cross-attention probabilities of one teacher-forced pass: for each captured
+/// (layer, head) in `heads` (sorted), `[positions, frames]`, `frames` the valid memory frames,
+/// each row the softmax the model mixed the values with (the word aligner's input,
+/// `transcribe::align`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CrossAttentionWeights {
+    pub heads: Vec<(usize, usize)>,
+    pub positions: usize,
+    pub frames: usize,
+    pub data: Vec<f32>,
+}
+
+impl CrossAttentionWeights {
+    /// Position `t`'s probabilities over the frames in `head` of `layer`, or None when that head
+    /// was not captured or `t` is out of range.
+    pub fn row(&self, layer: usize, head: usize, t: usize) -> Option<&[f32]> {
+        let i = self.heads.iter().position(|&p| p == (layer, head))?;
+        if t >= self.positions {
+            return None;
+        }
+        let at = (i * self.positions + t) * self.frames;
+        self.data.get(at..at + self.frames)
+    }
+}
+
+/// Which cross-attention heads [`Decoder::forward_with_cross_attention`] keeps.
+#[derive(Debug, Clone, Copy)]
+pub enum HeadFilter<'a> {
+    /// Every head of every layer (`layers × heads × positions × frames` floats: about 31 MB at
+    /// the longest decode over 30 s, for measurements).
+    All,
+    /// Only these (layer, head) pairs; pairs out of range are ignored.
+    Only(&'a [(usize, usize)]),
 }
 
 /// The Engram inputs of one block call: every site's keys and values for the block's rows
@@ -319,6 +369,67 @@ impl<'w> Decoder<'w> {
             lanes = layer.forward(&lanes, l, &ctx)?;
         }
         self.finish(&lanes)
+    }
+
+    /// [`Decoder::forward`] that also returns the cross-attention probabilities over the valid
+    /// memory frames of the heads `filter` keeps. The logits are computed by the same calls, so they are
+    /// bit-identical to `forward`'s. Errors are [`DecoderContext::new`]'s.
+    pub fn forward_with_cross_attention(
+        &self,
+        tokens: &[u32],
+        memory: &DecoderMemory,
+        filter: HeadFilter<'_>,
+    ) -> Result<(Logits, CrossAttentionWeights), Error> {
+        let w = self.weights;
+        let ctx = DecoderContext::new(w, tokens, memory)?;
+        let mut lanes = input_lanes(w, tokens)?;
+        let mut data = Vec::new();
+        let mut captured = Vec::new();
+        for (l, layer) in w.decoder.iter().enumerate() {
+            let mem = ctx
+                .cross
+                .get(l)
+                .ok_or_else(|| Error::Input(format!("layer {l} of {}", ctx.cross.len())))?;
+            let heads: Vec<usize> = (0..layer.cross_attn.head_count())
+                .filter(|&h| match filter {
+                    HeadFilter::All => true,
+                    HeadFilter::Only(pairs) => pairs.contains(&(l, h)),
+                })
+                .collect();
+            captured.extend(heads.iter().map(|&h| (l, h)));
+            let engram = BlockEngram {
+                keys: &ctx.engram_k,
+                values: &ctx.engram_v,
+                flags: site_flags(w, l),
+            };
+            let sink = &mut data;
+            lanes = w.decoder_mhc.step(l, &lanes, |u| {
+                ctx.check(u, "the block input")?;
+                layer.block_core(
+                    u,
+                    w,
+                    &engram,
+                    |normed| layer.self_attention(normed, &ctx),
+                    |normed| {
+                        let (out, probs) =
+                            layer.cross_attn.forward_with_weights(normed, mem, &heads)?;
+                        sink.extend_from_slice(&probs);
+                        Ok(out)
+                    },
+                )
+            })?;
+        }
+        let logits = self.logits(&self.finish(&lanes)?)?;
+        let frames = memory.valid_frames;
+        Ok((
+            logits,
+            CrossAttentionWeights {
+                heads: captured,
+                positions: tokens.len(),
+                frames,
+                data,
+            },
+        ))
     }
 
     /// The stack's end on the last layer's lanes: the mean over the lanes, then the decoder's

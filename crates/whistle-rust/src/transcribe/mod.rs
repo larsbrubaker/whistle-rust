@@ -16,12 +16,18 @@ use std::sync::Arc;
 use crate::audio::{features, read_wav, resample, SAMPLE_RATE};
 use crate::cact::Archive;
 use crate::error::Error;
-use crate::model::{DecoderState, Encoder, Weights};
+use crate::model::{
+    CrossAttentionWeights, Decoder, DecoderMemory, DecoderState, Encoder, HeadFilter, Logits,
+    Weights,
+};
 use crate::tokenizer::Tokenizer;
 use crate::vad;
 
+mod align;
 mod keywords;
 mod search;
+
+pub use align::{Word, FRAME_SECONDS};
 
 use keywords::KeywordTrie;
 pub use keywords::DEFAULT_KEYWORD_BONUS;
@@ -66,6 +72,8 @@ pub(crate) enum Stage {
     DecoderStep(usize),
     /// After the decode.
     Done,
+    /// Before the word-timestamp pass ([`Options::word_timestamps`]).
+    Align,
 }
 
 fn too_long(samples: u64, limit: usize) -> Error {
@@ -133,6 +141,10 @@ pub struct Options {
     /// The log-probability bonus per keyword token ([`DEFAULT_KEYWORD_BONUS`] by default);
     /// it must be finite and not negative.
     pub keyword_bonus: f32,
+    /// Fill [`Transcript::words`] with each word's start, end and probability, aligned from
+    /// the decoder's cross-attention (`docs/design/timestamps.md`); one extra decoder pass over
+    /// the final tokens. Off by default.
+    pub word_timestamps: bool,
 }
 
 impl Default for Options {
@@ -144,12 +156,13 @@ impl Default for Options {
             beams: DEFAULT_BEAMS,
             keywords: Vec::new(),
             keyword_bonus: DEFAULT_KEYWORD_BONUS,
+            word_timestamps: false,
         }
     }
 }
 
 /// The result of a transcription.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Transcript {
     /// The decoded text; empty when no speech was found or nothing was said.
     pub text: String,
@@ -158,6 +171,21 @@ pub struct Transcript {
     pub language: Option<String>,
     /// The decoded text token ids, without BOS, the language tag and EOS.
     pub tokens: Vec<u32>,
+    /// The words of `text` with their times in the input, when [`Options::word_timestamps`] is
+    /// set (empty otherwise, and for an empty transcript). Contiguous: each word ends where the
+    /// next one starts.
+    pub words: Vec<Word>,
+}
+
+/// The teacher-forced pass behind [`Transcript::words`], kept for the head-selection
+/// measurements (`align` tests).
+#[allow(dead_code)]
+pub(crate) struct AlignmentPass {
+    pub(crate) cross: CrossAttentionWeights,
+    pub(crate) logits: Logits,
+    pub(crate) tokens: Vec<u32>,
+    pub(crate) offset: f32,
+    pub(crate) duration: f32,
 }
 
 impl Transcript {
@@ -166,6 +194,7 @@ impl Transcript {
             text: String::new(),
             language: None,
             tokens: Vec::new(),
+            words: Vec::new(),
         }
     }
 }
@@ -286,6 +315,24 @@ impl Whistle {
         hook: &mut dyn FnMut(Stage),
         ranking: Ranking,
     ) -> Result<Transcript, Error> {
+        let heads = HeadFilter::Only(align::ALIGNMENT_HEADS);
+        Ok(self
+            .run_full(samples, rate, options, hook, ranking, heads)?
+            .0)
+    }
+
+    /// [`Whistle::run_ranked`] that also returns the alignment pass, capturing the heads
+    /// `heads` keeps, when [`Options::word_timestamps`] is set.
+    pub(crate) fn run_full(
+        &self,
+        samples: Cow<'_, [f32]>,
+        rate: u32,
+        options: &Options,
+        hook: &mut dyn FnMut(Stage),
+        ranking: Ranking,
+        heads: HeadFilter<'_>,
+    ) -> Result<(Transcript, Option<AlignmentPass>), Error> {
+        let empty = || Ok((Transcript::empty(), None));
         let forced = match options.language.as_deref() {
             None => None,
             Some(code) => Some(self.language_index(code)?),
@@ -339,17 +386,18 @@ impl Whistle {
             check(Stage::Resampled)?;
             Cow::Owned(resampled)
         };
-        let samples: &[f32] = match options.vad {
-            VadMode::Off => &samples,
+        // `trimmed`: samples cut from the front, so word times count from the input's start.
+        let (samples, trimmed): (&[f32], usize) = match options.vad {
+            VadMode::Off => (&samples, 0),
             mode => {
                 let segments = vad::speech_segments(&samples);
                 check(Stage::Vad)?;
                 match (segments.first(), segments.last()) {
                     (Some(first), Some(last)) if mode == VadMode::GateAndTrim => {
-                        &samples[first.start..last.end]
+                        (&samples[first.start..last.end], first.start)
                     }
-                    (Some(_), Some(_)) => &samples,
-                    _ => return Ok(Transcript::empty()),
+                    (Some(_), Some(_)) => (&samples, 0),
+                    _ => return empty(),
                 }
             }
         };
@@ -359,7 +407,7 @@ impl Whistle {
         let feats = features(samples);
         // Under one hop there is no valid frame: the decoder would attend to nothing.
         if feats.valid_frames == 0 {
-            return Ok(Transcript::empty());
+            return empty();
         }
         check(Stage::Features)?;
 
@@ -397,13 +445,71 @@ impl Whistle {
         })?;
         check(Stage::Done)?;
         if text_tokens.is_empty() {
-            return Ok(Transcript::empty());
+            return empty();
         }
-        Ok(Transcript {
+        let rate = SAMPLE_RATE as f32;
+        let (words, pass) = if options.word_timestamps {
+            check(Stage::Align)?;
+            let (words, pass) = self.align_words(
+                heads,
+                &memory,
+                self.tags[index],
+                text_tokens.clone(),
+                trimmed as f32 / rate,
+                samples.len() as f32 / rate,
+            )?;
+            (words, Some(pass))
+        } else {
+            (Vec::new(), None)
+        };
+        let transcript = Transcript {
             text: self.tokenizer.decode(&text_tokens),
             language: language.map(|i| LANGUAGES[i].to_string()),
             tokens: text_tokens,
-        })
+            words,
+        };
+        Ok((transcript, pass))
+    }
+
+    /// The teacher-forced pass over BOS, `tag`, `tokens` and EOS, and the words it aligns
+    /// (`align`). `offset` is the seconds trimmed before the decoded audio, `duration` its
+    /// length in seconds.
+    fn align_words(
+        &self,
+        heads: HeadFilter<'_>,
+        memory: &DecoderMemory,
+        tag: u32,
+        tokens: Vec<u32>,
+        offset: f32,
+        duration: f32,
+    ) -> Result<(Vec<Word>, AlignmentPass), Error> {
+        let mut sequence = vec![self.tokenizer.bos_id(), tag];
+        sequence.extend_from_slice(&tokens);
+        sequence.push(self.tokenizer.eos_id());
+        // A search that stopped at `max_seq_len` has no EOS: score without it.
+        sequence.truncate(self.weights.geometry.max_seq_len as usize);
+        let (logits, cross) =
+            Decoder::new(&self.weights).forward_with_cross_attention(&sequence, memory, heads)?;
+        let pass = AlignmentPass {
+            cross,
+            logits,
+            tokens,
+            offset,
+            duration,
+        };
+        let words = align::words(
+            &self.tokenizer,
+            &align::Alignment {
+                cross: &pass.cross,
+                logits: &pass.logits,
+                tokens: &pass.tokens,
+                text_ids: self.first_tag,
+                offset,
+                duration,
+            },
+            align::ALIGNMENT_HEADS,
+        );
+        Ok((words, pass))
     }
 
     /// The index in [`LANGUAGES`] of `code`, or [`Error::Input`] listing the supported codes.

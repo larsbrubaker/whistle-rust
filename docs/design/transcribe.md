@@ -5,8 +5,9 @@ tokenizer, and looks up the seven language tags (`en de fr es it nl pl`, ids 819
 everything, so one `Whistle` can be kept for the life of the program and shared across threads.
 `transcribe(samples, &Options)` takes 16 kHz mono `f32`; `transcribe_wav(bytes, &Options)` reads
 the WAV (`audio::read_wav`, downmixed to mono), resamples to 16 kHz when the file is at another
-rate, then transcribes. A `Transcript` is the text, the language code, and the text token ids
-(without BOS, the tag and EOS).
+rate, then transcribes. A `Transcript` is the text, the language code, the text token ids
+(without BOS, the tag and EOS), and the words with their times when asked for. It is
+`PartialEq` but not `Eq`, since the word times are f32.
 
 ## The call, in order
 
@@ -56,6 +57,12 @@ rate, then transcribes. A `Transcript` is the text, the language code, and the t
    transcript (language `None`); otherwise the language is the detected or forced tag's code.
    Forcing a language feeds its tag; it does not translate (English audio forced to `fr` still
    comes out in English, labelled `fr`).
+10. **Words.** With `Options::word_timestamps`, one more decoder pass over BOS, the tag, the
+    text ids and EOS captures the cross-attention (`Decoder::forward_with_cross_attention`,
+    bit-identical logits), and `transcribe::align` turns it into `Transcript::words`: start,
+    end and probability per word, times counted from the start of the input (the trimmed
+    lead-in added back). Off, `words` is empty and nothing else changes; `text`, `language`
+    and `tokens` are the same either way (`docs/design/timestamps.md`).
 
 `Cancel` is an `Arc<AtomicBool>` handle; clones share the flag, so a UI thread can keep one and
 call `cancel()` while the decode runs elsewhere. A fired handle makes the call return

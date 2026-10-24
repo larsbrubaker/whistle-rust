@@ -8,7 +8,7 @@
 
 use crate::error::Error;
 
-use super::attention::{attend, split_heads, Heads, Projections};
+use super::attention::{attend_with, gate_out, split_heads, Heads, ProbSink, Projections};
 use super::decoder_input::DecoderMemory;
 use super::ops::{a8, fake_quant_rows, zc_rms_norm};
 use super::weights::CrossAttention;
@@ -113,6 +113,36 @@ impl CrossAttention {
     /// memory frames (the mask covers keys only), `· σ(gate)`, A8, then `out_proj`. Each row
     /// depends only on its own input, so a cached step calls this on one row.
     pub fn forward(&self, x: &[f32], mem: &CrossMemory) -> Result<Vec<f32>, Error> {
+        let (out, gate) = self.attention(x, mem, None)?;
+        Ok(gate_out(&self.out_proj, out, &gate))
+    }
+
+    /// [`CrossAttention::forward`] that also returns the attention probabilities of the query
+    /// heads in `heads` (ascending) over the valid memory frames, `[heads, T, valid_frames]`,
+    /// copied from inside the same call, so the output is bit-identical to `forward`'s.
+    pub fn forward_with_weights(
+        &self,
+        x: &[f32],
+        mem: &CrossMemory,
+        heads: &[usize],
+    ) -> Result<(Vec<f32>, Vec<f32>), Error> {
+        let mut sink = ProbSink {
+            heads: heads.to_vec(),
+            keep: mem.valid_frames,
+            data: Vec::new(),
+        };
+        let (out, gate) = self.attention(x, mem, Some(&mut sink))?;
+        Ok((gate_out(&self.out_proj, out, &gate), sink.data))
+    }
+
+    /// The attention before the gate, `[T, heads · v_dim]`, and the gate projection, filling
+    /// `sink` (when given) with the probabilities it mixed the values with.
+    pub(crate) fn attention(
+        &self,
+        x: &[f32],
+        mem: &CrossMemory,
+        sink: Option<&mut ProbSink>,
+    ) -> Result<(Vec<f32>, Vec<f32>), Error> {
         let h = self.heads();
         if mem.k.len() != h.kv_heads * mem.frames * h.qk_dim
             || mem.v.len() != h.kv_heads * mem.frames * h.v_dim
@@ -131,7 +161,20 @@ impl CrossAttention {
         a8(&mut q, h.qk_dim);
         let gate = self.gate_proj.project(&xq);
         let valid = mem.valid_frames;
-        let out = attend(&q, &mem.k, &mem.v, h, |_, s| s < valid);
-        Ok(super::attention::gate_out(&self.out_proj, out, &gate))
+        let out = attend_with(&q, &mem.k, &mem.v, h, |_, s| s < valid, sink);
+        Ok((out, gate))
+    }
+
+    /// The query head count this layer attends with.
+    pub fn head_count(&self) -> usize {
+        self.heads().heads
+    }
+
+    /// The value width per head (the attention output is `[T, heads · v_dim]`).
+    pub fn value_dim(&self) -> usize {
+        self.heads().v_dim
     }
 }
+
+#[cfg(test)]
+mod tests;

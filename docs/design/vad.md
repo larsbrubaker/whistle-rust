@@ -89,3 +89,8 @@ and `min_modulation_db_sits_between_fan_noise_and_noisy_speech` pin parts of thi
 - Music and babble are not tested and will often read as speech, which is why a VAD or wake
   word is still recommended in front of an always-on microphone.
 - The test clips are clean TTS; real microphones and rooms are not covered yet.
+- The decode is chaotically sensitive to the lead-in the trim leaves: on a clip whose speech
+  starts at its first sample the trim is the whole clip, while the same clip after silence keeps
+  about 0.12 s of it (the pad plus frame rounding), and that can change the transcript
+  (pl_zosia flips with 160, 320 or 1280 leading zeros; `docs/design/timestamps.md`). Different,
+  not worse; word times stay exact relative to the trimmed audio.
