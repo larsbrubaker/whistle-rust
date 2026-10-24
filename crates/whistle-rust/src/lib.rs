@@ -6,3 +6,7 @@
 //! the same code runs natively and in the browser. The port follows upstream's Apache-2.0 JAX
 //! reference (`needle-reference/`, pinned in `REFERENCE`); `docs/design/` describes the model
 //! and `PORTING_PLAN.md` the open work.
+//!
+//! [`audio`] turns a WAV file or 16 kHz mono samples into the model's input features.
+
+pub mod audio;

@@ -19,14 +19,6 @@ A caller can load `whistle.cact` from bytes, see its geometry, and decode token 
   checksum and a few full tensors, added to `oracle/dump.py` in this step); every clip's
   reference token stream decodes to its manifest text.
 
-## 2. Audio front end
-
-A caller can turn 16 kHz mono samples (or a PCM16/float WAV) into Whistle's features.
-
-- WAV reader (PCM 8/16/24/32, float, any channel count downmixed) and a 16 kHz resampler for
-  other rates; mel features per `whistle.features` with an in-crate 512-point real FFT.
-- Tests: `samples` and `features` fixtures on every clip (exact-stage bound).
-
 ## 3. Encoder
 
 A caller can compute the speech embedding (one 512-vector per 80 ms frame).

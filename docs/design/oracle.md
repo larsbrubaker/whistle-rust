@@ -12,7 +12,8 @@ port loads. Nothing in the Rust build calls Python; the oracle only writes fixtu
 | `scripts/fetch-weights.sh` | Downloads `models/whistle.cact`, optionally `models/whistle.safetensors` (`--checkpoint`) and the engine CLI (`--engine`); checks `scripts/weights.sha256`. |
 | `oracle/setup.sh` | `oracle/.venv` (Python 3.12) from `requirements.lock` (jax 0.12.0.1, flax 0.12.10). |
 | `oracle/cact_params.py` | Rebuilds the Flax parameter tree from `whistle.cact` and checks it against the checkpoint. |
-| `oracle/dump.py` | Writes the fixtures. |
+| `oracle/dump.py` | Writes the per-clip stage fixtures. |
+| `oracle/dump_mel.py` | Writes `test-data/fixtures/mel.npy`, upstream's `mel_matrix` for the default config. |
 | `oracle/make_clips.py` | Synthesizes `test-data/clips/*.wav` with macOS `say` (16 kHz mono PCM16) from `oracle/clips.json`, plus one second of silence. |
 | `oracle/engine_transcripts.py` | Runs the engine CLI over the clips into `test-data/engine/*.json`. |
 
@@ -76,6 +77,15 @@ and between `scan_unroll` 1 and 8. Decoding from the jitted encoder output (eith
 gives greedy tokens identical to the fixtures on all nine clips. So the stage
 tests compare one layer at a time from the previous fixture, and the token stream is the
 end-to-end contract (CLAUDE.md "Tolerance policy").
+
+## The silence clip's features
+
+Every valid cell of the silence clip's `features` fixture is -0.16005333, where the exact answer
+is 0: every log-mel value is the same constant, XLA's f32 mean lands about 2e-6 away from it, and
+`/(std + 1e-5)` magnifies that. The port computes each bin's mean and variance relative to its
+first valid frame, so a constant bin gives exactly 0. The silence clip's later stage tests
+therefore start from the fixture's own features, never from the port's, and its end-to-end
+transcript is the silence gate's job (an empty transcript), not the reference's greedy tokens.
 
 ## What the references say about the clips
 

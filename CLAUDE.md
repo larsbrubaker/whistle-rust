@@ -35,8 +35,10 @@ needs (an empty transcript for silence, an error they can show) is decided for t
 4. **Never weaken a test to make it pass.** Every failure is a real bug, found by
    instrumentation and root-cause analysis. A tolerance or expected value changes only when the
    behaviour it pins is deliberately changed, and the commit says why with the measurement.
-5. **Fixtures are the contract.** `test-data/fixtures/` is regenerated only when `REFERENCE`
-   changes, by `oracle/dump.py`, in its own commit.
+5. **Fixtures are the contract.** `test-data/fixtures/` is written only by the oracle scripts
+   (`oracle/dump*.py`, listed in `docs/design/oracle.md`). Existing fixtures are regenerated only
+   when `REFERENCE` changes, all scripts together, in their own commit; a new fixture lands with
+   the script that writes it.
 
 ## Testing framework
 
@@ -145,7 +147,8 @@ scripts/fetch-weights.sh [--checkpoint] [--engine]   # models/whistle.cact (+ fp
 scripts/fetch-reference.sh                    # needle-reference/ at the pinned commit
 oracle/setup.sh                               # oracle/.venv (Python 3.12, JAX)
 oracle/.venv/bin/python -I oracle/cact_params.py      # check the archive rebuild against the checkpoint
-oracle/.venv/bin/python -I oracle/dump.py             # regenerate fixtures (only when REFERENCE changes)
+oracle/.venv/bin/python -I oracle/dump.py             # stage fixtures (regenerate only when REFERENCE changes)
+oracle/.venv/bin/python -I oracle/dump_mel.py         # the mel matrix fixture (test-data/fixtures/mel.npy)
 oracle/.venv/bin/python -I oracle/engine_transcripts.py   # regenerate the engine transcripts
 ```
 
