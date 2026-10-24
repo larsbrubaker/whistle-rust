@@ -85,10 +85,11 @@ modes and under 3e-7 input noise (`docs/design/oracle.md`). So:
   measurement; it is never raised afterwards without the orchestrator's sign-off.
 - **The contract is the token stream:** teacher-forced on the reference tokens, the port picks
   the reference token at every position of every clip, except listed near-ties
-  (`test-data/near_ties.json`): positions where the reference itself sat on a coin flip that a
-  last-bit difference in `exp` can move (the port and the reference use different `exp`
-  implementations). A near-tie is listed only with its measured margins on both sides and a
-  margin under 0.05; listing one is a deliberate change with its own commit.
+  (`test-data/near_ties.json`): positions where the port's own top-two margin is under 0.05, so
+  its encoder's documented ~2% distance from the reference, or a last-bit difference in `exp`
+  (the port and the reference use different `exp` implementations), can tip it. An entry
+  records the reference's own margin and the port's measured margins, and the port's |margin|
+  must stay under 0.05; adding one is a deliberate change, stated in its commit message.
 
 ### Test-first bug fixing
 
