@@ -189,9 +189,20 @@ pub(crate) fn check_kv_bits(kv_bits: u32) -> Result<(), Error> {
     }
 }
 
+/// The longest decoder input an archive may declare (`max_seq_len`; Whistle's is 320). The
+/// decoder's per-sequence buffers and RoPE table scale with it, so a hostile header cannot make
+/// them huge.
+pub const MAX_SEQ_LEN: u32 = 4096;
+
 pub(crate) fn bind(archive: &Archive<'_>) -> Result<Weights, Error> {
     let g = archive.geometry().clone();
     check_kv_bits(g.kv_bits)?;
+    if g.max_seq_len == 0 || g.max_seq_len > MAX_SEQ_LEN {
+        return Err(Error::Archive(format!(
+            "max_seq_len {} is outside 1 to {MAX_SEQ_LEN}",
+            g.max_seq_len
+        )));
+    }
     let dims = Dims::new(&g)?;
     let d = dims.d;
     let mut r = Reader {

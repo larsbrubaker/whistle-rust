@@ -1,8 +1,8 @@
 // Unit tests for `attention`'s RoPE step (`rotate`): the start position is explicit, so a
 // sequence rotated from position 0 matches the same rows rotated one at a time at their own
-// positions, as a decoder step rotating one cached position needs.
+// positions, as a decoder step rotating one cached position needs; and `attend` with no keys.
 
-use super::rotate;
+use super::{attend, rotate, Heads};
 use crate::model::ops::Rope;
 
 #[test]
@@ -29,4 +29,17 @@ fn rotating_a_sequence_from_zero_equals_rotating_each_row_at_its_position() {
     let mut row = x[dim..2 * dim].to_vec();
     rotate(&mut row, &rope, dim, 1, 4);
     assert_eq!(row, shifted[dim..2 * dim]);
+}
+
+#[test]
+fn attending_to_no_keys_gives_zeros_instead_of_panicking() {
+    let h = Heads {
+        heads: 2,
+        kv_heads: 1,
+        qk_dim: 4,
+        v_dim: 4,
+    };
+    let q = vec![1.0f32; 2 * 3 * 4];
+    let out = attend(&q, &[], &[], h, |_, _| true);
+    assert_eq!(out, vec![0.0f32; 3 * 2 * 4]);
 }

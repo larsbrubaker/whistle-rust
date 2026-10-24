@@ -5,29 +5,23 @@ needs. Delete an item when it lands; rewrite it to what is left when part of it 
 model, the archive and the oracle work: `docs/design/model.md`, `docs/design/oracle.md`. The
 verification bar for every stage: CLAUDE.md "Tolerance policy".
 
-## 4. Decoder
-
-A caller can score a token sequence against encoded audio. Token embedding, Engram keys, values
-and the gated add, and the decoder memory are in (`model::engram`, `model::decoder_input`);
-what is left:
-
-- Causal self-attention with the 3-tap QKV convs, cross-attention to the memory (8 KV heads,
-  v width 512, keys-only mask over valid frames), the decoder block, the decoder mHC stack with
-  the Engram add at its sites, the final norm, and the tied A8 output head; an incremental KV
-  cache whose per-step logits equal the full recompute.
-- Bound the header's n-gram orders (e.g. ≤ `max_seq_len`), so a hostile archive cannot make the
-  hash loop arbitrarily slow.
-- Tests: the block's sub-modules from en_samantha's committed decoder layer 0 and 3 internals;
-  each decoder layer from the previous `lanes`; `decoder/out` and `decoder/logits`
-  (en_samantha, de_anna), bound set by measurement.
-
 ## 5. Greedy transcription (first milestone)
 
-A caller can call `transcribe(samples)` and get text and language.
+A caller can call `transcribe(samples)` and get text and language. The decoder scores a full
+token sequence (`model::Decoder`), and its restricted argmax reproduces every clip's reference
+token at every position; what is left:
 
+- An incremental KV cache (self-attention k/v after norm, RoPE and KV quant; the raw q/k/v of
+  the last two positions for the taps, `causal_taps(.., min(pos, 2), pos)`; Engram rows per
+  step) whose per-step logits equal the full recompute.
 - Greedy decode with language detection (step 0 restricted to tag tokens) or a forced language;
-  `max_tokens` 320; cancellation checked between decoder steps.
-- Tests: token streams identical to every clip's manifest; decoded text equals the manifest.
+  at most `max_seq_len` tokens; cancellation checked between decoder steps.
+- The silence gate: `vad::speech_segments` first; no speech gives an empty transcript, and only
+  the speech span is decoded. The detector's known false positives (intermittent beeps,
+  typing, `docs/design/vad.md`) need a check on real microphone recordings before always-on
+  use.
+- Tests: token streams identical to every speech clip's manifest; decoded text equals the
+  manifest; `silence` gives an empty transcript.
 
 ## 6. Performance
 
@@ -42,11 +36,6 @@ Transcription is fast enough for push-to-talk on every target.
 
 The behaviours only the closed engine has, designed here and held to the engine transcripts.
 
-- Silence gate wiring: transcription runs `vad::speech_segments` first, returns an empty
-  transcript when there is no speech (the reference decode says "Thank you." on `silence`; the
-  engine returns ""), and decodes only the speech span. The detector's known false positives
-  (intermittent beeps, typing, `docs/design/vad.md`) need a check on real microphone recordings
-  before always-on use.
 - Beam search (5 beams), keyword biasing, word timestamps from cross-attention, windowing past
   30 s, streaming that commits words two passes agree on.
 - Tests: word error rate within noise of `test-data/engine/` per clip; timestamps against the

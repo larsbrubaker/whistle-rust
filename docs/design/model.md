@@ -70,8 +70,24 @@ its 64. The encoder's mask is over keys only (`seen[:, None, None, :]`): every q
 padded ones included, attends to the valid frames, and masked logits take a large finite
 negative, so the softmax runs in f32 over all keys. RoPE positions are `0..T` over all frames,
 padding included. Output times
-`σ(gate_proj(x))`, A8, then `out_proj`. Cross-attention keys and values come from the decoder
-memory (encoder output plus `σ(pe_gate)` × sinusoidal positions, A8), masked to valid frames.
+`σ(gate_proj(x))`, A8, then `out_proj`. The gate projects the A8 input.
+
+The decoder's taps act on the Dense outputs (the captured `q_proj`, `k_proj`, `v_proj` are
+before them), before the head split: `Σ_j taps[j] · shift_right(z, j) · tap_ok_j` per channel,
+`tap_ok_j` meaning position ≥ j, summed from 0 in tap order. Its mask is causal
+(`make_causal_mask`: query `t` sees keys `0..=t`), RoPE positions `0..T` from a table over the
+`T` positions (`precompute_rope_freqs(qk_dim, T)`; a position's angles do not depend on the
+table's length, so an incremental step can use one table over its longest sequence); 8 query
+heads over 2 KV heads as in the encoder. A step at absolute position `p` convolves against the
+raw projections of exactly the `min(p, 2)` positions before it (`causal_taps` checks the count).
+
+Cross-attention keys and values come from the decoder memory (encoder output plus `σ(pe_gate)` ×
+sinusoidal positions, A8) with no A8 of their own; q and the gate project `A8(x)`. 8 heads over
+8 KV heads (no grouping), qk 48 (`k_proj` 384 wide) and v 64 (`v_proj` 512); `q_norm`, `k_norm`
+per head and no RoPE; A8 on q, the KV path on k and v; the same fused padding to 64 with q
+scaled by `sqrt(64/48)`. The mask covers the valid memory frames only and does not depend on
+the query. The memory side depends only on the audio, so the port computes each layer's keys
+and values once per decode (`CrossAttention::memory_kv`).
 
 ## mHC lane stacks (`LaneStack`, `_LaneBody`)
 
@@ -96,8 +112,20 @@ last 2 and 3 tokens (two seeds per order: `acc = seed; acc = (acc ^ token) · 0x
 n-gram, wrapping u32, then `acc ^ (acc >> 15)`, modulo 18,432), gathers four 128-wide table rows
 (zeroed where the n-gram reaches before the sequence), projects them (A8) to keys and values,
 applies a 4-tap value conv at dilation 3, and adds `σ(⟨rms(x), rms(k)⟩ / sqrt(512)) · v` before the
-block. Each block: gated causal self-attention, gated cross-attention, Hadamard MLP. Logits are
-the A8 output times the tied embedding.
+block. The input lanes are the scaled embedding broadcast to all 4. Each block on its lane mix
+`u`: the Engram add at a site layer (`LaneStack` flags each layer's sites; elsewhere it adds 0),
+then `x + σ(attn_gate)·post_attn_norm(self_attn(norm_in(x)))`, then
+`x + σ(cross_gate)·post_cross_norm(cross_attn(cross_norm(x)))`, then
+`x + hadamard_mlp(pre_hada_norm(x))` (a full step, not the encoder's halves). The stack ends with
+the lane mean and `final_norm` (`decoder/out`). Logits are `A8(out) · embeddingᵀ` in f32 over
+all 8,199 ids (`Whistle.logits`); row `t` scores the token after position `t`. Every step is
+causal (self-attention, taps, Engram n-grams and value conv all look back only), so a
+position's logits do not depend on later tokens, which is why the reference's greedy loop can
+pad its input. Bind checks the header's `max_seq_len` against a supported ceiling,
+`1..=4096` (`MAX_SEQ_LEN`; Whistle's is 320), and each n-gram order against
+`1..=min(8, max_seq_len)` (`MAX_NGRAM_ORDER`), so a hostile header can make neither the
+per-sequence buffers nor the hash loop large. A memory with no frames is an input error (there
+is nothing to attend to).
 
 ## Archive (`.cact`)
 

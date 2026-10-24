@@ -12,6 +12,7 @@ use serde_json::Value;
 use whistle::cact::Archive;
 use whistle::model::{
     engram_add, engram_indices, ngram_in_sequence, tap_in_sequence, Engram, Weights,
+    MAX_NGRAM_ORDER, MAX_SEQ_LEN,
 };
 use whistle::Error;
 
@@ -233,6 +234,60 @@ fn a_header_whose_engram_hashing_is_not_whistles_is_rejected_at_bind() {
     let archive = Archive::parse(&bytes).unwrap();
     let w = Weights::from_archive(&archive).unwrap();
     assert_eq!(w.engrams[0].hash, weights().engrams[0].hash);
+}
+
+#[test]
+fn engram_orders_outside_one_to_the_ceiling_are_rejected_at_bind() {
+    // Header field 27 and 28 are the n-gram orders (2, 3), 24 the conv dilation, which must
+    // equal max(orders); each case keeps it equal so only the order bound can reject the header.
+    // The bound is min(MAX_NGRAM_ORDER, max_seq_len) = 8 here.
+    assert_eq!(weights().geometry.engram_orders, vec![2, 3]);
+    assert_eq!(MAX_NGRAM_ORDER, 8);
+    for fields in [
+        vec![(28, 9), (24, 9)],
+        vec![(28, 320), (24, 320)],
+        vec![(28, u32::MAX), (24, u32::MAX)],
+        vec![(27, 0)],
+        // max_seq_len (field 13) 2 is below order 3.
+        vec![(13, 2)],
+    ] {
+        let bytes = patched_header(&fields);
+        let archive = Archive::parse(&bytes).unwrap();
+        let err = Weights::from_archive(&archive).unwrap_err();
+        assert!(
+            matches!(&err, Error::Archive(m) if m.contains("order")),
+            "{fields:?}: {err}"
+        );
+    }
+    // An order of exactly the ceiling is within the bound.
+    let bytes = patched_header(&[(28, 8), (24, 8)]);
+    let archive = Archive::parse(&bytes).unwrap();
+    let w = Weights::from_archive(&archive).unwrap();
+    assert_eq!(w.engrams[0].hash.orders, vec![2, 8]);
+}
+
+#[test]
+fn max_seq_len_outside_one_to_the_ceiling_is_rejected_at_bind() {
+    // Header field 13 is max_seq_len (Whistle: 320).
+    assert_eq!(weights().geometry.max_seq_len, 320);
+    for len in [0, MAX_SEQ_LEN + 1, u32::MAX] {
+        let bytes = patched_header(&[(13, len)]);
+        let archive = Archive::parse(&bytes).unwrap();
+        let err = Weights::from_archive(&archive).unwrap_err();
+        assert!(
+            matches!(&err, Error::Archive(m) if m.contains("max_seq_len")),
+            "{len}: {err}"
+        );
+    }
+    let bytes = patched_header(&[(13, MAX_SEQ_LEN)]);
+    let archive = Archive::parse(&bytes).unwrap();
+    assert_eq!(
+        Weights::from_archive(&archive)
+            .unwrap()
+            .geometry
+            .max_seq_len,
+        MAX_SEQ_LEN
+    );
 }
 
 #[test]

@@ -1,11 +1,15 @@
 //! Gated multi-head self-attention (`architecture.MultiHeadAttention` with `flash=True`, quant on)
 //! as the encoder runs it: A8 on the input, the Q, K, V and gate projections, ZC-RMSNorm on q and
 //! k per head, RoPE, A8 on q and on the KV path, grouped-query attention, the sigmoid gate, A8,
-//! and `out_proj`. The pieces are separate so the decoder's tapped, causal variant can reuse
-//! them; the weights are the [`SelfAttention`] bound in `weights`, the arithmetic is `ops`.
+//! and `out_proj`. The pieces are separate so the decoder's tapped, causal variant
+//! ([`SelfAttention::causal_taps`], `forward_causal`) reuses them, and so does cross-attention
+//! (`cross_attention`); the weights are the [`SelfAttention`] bound in `weights`, the arithmetic
+//! is `ops`.
+
+use crate::error::Error;
 
 use super::ops::{a8, fake_quant_rows, sigmoid, softmax, zc_rms_norm, Rope};
-use super::weights::SelfAttention;
+use super::weights::{Matrix, SelfAttention};
 
 /// The four projections of one sequence from its A8 input, each `[T, width]` row-major.
 #[derive(Debug, Clone, PartialEq)]
@@ -33,8 +37,46 @@ pub(crate) struct Heads {
 /// finite, so a row with no allowed key still softmaxes to a uniform average as it does there.
 const MASKED: f32 = -0.7 * f32::MAX;
 
+/// The causal depthwise conv on one projection (`MultiHeadAttention` with `qkv_conv_taps`):
+/// `Σ_j taps[j] · shift_right(z, j) · tap_ok_j` per channel, `taps` `[n_taps, width]`. `z` holds
+/// `history` earlier rows (the raw projections of the positions just before, as a cached step
+/// keeps them) followed by the rows to convolve; the output covers only the latter. A tap that
+/// reads before row 0 contributes 0, which is `tap_ok_j` (position ≥ j) when the history starts
+/// at position 0 or holds at least `n_taps − 1` rows. The sum starts at 0 and adds the taps in
+/// order, as Python's `sum` does, so the f32 sums round the same way. Shapes that do not fit
+/// are [`Error::Archive`] (the taps) or [`Error::Input`] (the rows).
+pub(crate) fn causal_conv(z: &[f32], taps: &Matrix, history: usize) -> Result<Vec<f32>, Error> {
+    let width = taps.cols;
+    if width == 0 || !z.len().is_multiple_of(width) {
+        return Err(Error::Archive(format!(
+            "QKV taps of width {width} do not fit {} projected values",
+            z.len()
+        )));
+    }
+    let rows = z.len() / width;
+    if history > rows {
+        return Err(Error::Input(format!("{history} history rows of {rows}")));
+    }
+    let mut out = vec![0.0f32; (rows - history) * width];
+    for (i, o) in out.chunks_exact_mut(width).enumerate() {
+        let r = history + i;
+        for j in 0..taps.rows {
+            let tap = &taps.data[j * width..(j + 1) * width];
+            // Before row 0 the shifted row is padding times tap_ok: 0, which adds nothing.
+            let Some(src) = r.checked_sub(j) else {
+                continue;
+            };
+            let zs = &z[src * width..(src + 1) * width];
+            for ((o, &w), &v) in o.iter_mut().zip(tap).zip(zs) {
+                *o += w * v;
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// `[T, heads · dim]` to `[heads, T, dim]` (the reference's `reshape` then `transpose(0, 2, 1, 3)`).
-fn split_heads(x: &[f32], heads: usize, dim: usize) -> Vec<f32> {
+pub(crate) fn split_heads(x: &[f32], heads: usize, dim: usize) -> Vec<f32> {
     let frames = x.len() / (heads * dim).max(1);
     let mut out = vec![0.0f32; x.len()];
     for t in 0..frames {
@@ -113,14 +155,83 @@ impl SelfAttention {
         self.gate_out(out, &p.gate)
     }
 
-    /// `out · sigmoid(gate)`, A8, then `out_proj`.
-    pub(crate) fn gate_out(&self, mut out: Vec<f32>, gate: &[f32]) -> Vec<f32> {
-        for (o, &g) in out.iter_mut().zip(gate) {
-            *o *= sigmoid(g);
+    /// The decoder's causal taps on Q, K and V (`q_taps`, `k_taps`, `v_taps`) over projections
+    /// whose first `history` rows are earlier positions ([`causal_conv`]); the result covers the
+    /// rows after them, the gate (untapped) included, the first at absolute position `start`.
+    /// The history must be exactly the `min(start, n_taps − 1)` positions before `start`, so a
+    /// cached step cannot convolve against too few or misaligned rows: another count, or more
+    /// history than rows, is [`Error::Input`]. A whole sequence is `(p, 0, 0)`. Attention without
+    /// taps (the encoder's) is [`Error::Archive`].
+    pub fn causal_taps(
+        &self,
+        p: &Projections,
+        history: usize,
+        start: usize,
+    ) -> Result<Projections, Error> {
+        let taps = self
+            .taps
+            .as_ref()
+            .ok_or_else(|| Error::Archive("decoder self-attention without QKV taps".into()))?;
+        let needed = start.min(taps.q.rows.saturating_sub(1));
+        if history != needed {
+            return Err(Error::Input(format!(
+                "{history} history rows before position {start}; the QKV taps need {needed}"
+            )));
         }
-        a8(&mut out, self.out_proj.cols);
-        self.out_proj.project(&out)
+        let gate_width = self.gate_proj.rows;
+        let skip = history
+            .checked_mul(gate_width)
+            .filter(|&n| n <= p.gate.len());
+        let skip = skip.ok_or_else(|| Error::Input(format!("{history} history rows")))?;
+        Ok(Projections {
+            q: causal_conv(&p.q, &taps.q, history)?,
+            k: causal_conv(&p.k, &taps.k, history)?,
+            v: causal_conv(&p.v, &taps.v, history)?,
+            gate: p.gate[skip..].to_vec(),
+        })
     }
+
+    /// The decoder's causal self-attention over a whole sequence at positions `0..T` (`x`
+    /// `[T, d_model]`, already normed): projections, [`SelfAttention::causal_taps`], the head
+    /// split and norms, RoPE, A8 on q and the KV path at `kv_bits`, and attention where query `t`
+    /// sees keys `0..=t` (`make_causal_mask`). The RoPE table must cover `T` positions. Returns
+    /// `out_proj`'s output, `[T, d_model]`.
+    pub(crate) fn forward_causal(
+        &self,
+        x: &[f32],
+        rope: &Rope,
+        kv_bits: u32,
+    ) -> Result<Vec<f32>, Error> {
+        let h = self.heads();
+        let p = self.causal_taps(&self.projections(x), 0, 0)?;
+        let frames = x.len() / self.q_proj.cols.max(1);
+        let mut q = self.query_heads(&p.q);
+        let mut k = self.key_heads(&p.k);
+        let mut v = split_heads(&p.v, h.kv_heads, h.v_dim);
+        rotate(&mut q, rope, h.qk_dim, frames, 0);
+        rotate(&mut k, rope, h.qk_dim, frames, 0);
+        a8(&mut q, h.qk_dim);
+        if kv_bits > 0 {
+            fake_quant_rows(&mut k, h.qk_dim, kv_bits);
+            fake_quant_rows(&mut v, h.v_dim, kv_bits);
+        }
+        let out = attend(&q, &k, &v, h, |t, s| s <= t);
+        Ok(self.gate_out(out, &p.gate))
+    }
+
+    /// `out · sigmoid(gate)`, A8, then `out_proj`.
+    pub(crate) fn gate_out(&self, out: Vec<f32>, gate: &[f32]) -> Vec<f32> {
+        gate_out(&self.out_proj, out, gate)
+    }
+}
+
+/// `out · sigmoid(gate)`, A8, then `out_proj`: how self- and cross-attention both end.
+pub(crate) fn gate_out(out_proj: &Matrix, mut out: Vec<f32>, gate: &[f32]) -> Vec<f32> {
+    for (o, &g) in out.iter_mut().zip(gate) {
+        *o *= sigmoid(g);
+    }
+    a8(&mut out, out_proj.cols);
+    out_proj.project(&out)
 }
 
 /// RoPE on every head vector of `[heads, frames, dim]`: row `t` of each head at position
@@ -140,7 +251,8 @@ pub(crate) fn rotate(x: &mut [f32], rope: &Rope, dim: usize, frames: usize, star
 /// `[kv_heads, group]`). q is scaled by `sqrt(fused / qk_dim)` with `fused = max(qk_dim,
 /// v_dim)`, the logits by `1 / sqrt(fused)` (the zero padding to `fused` adds nothing to a dot
 /// product), keys where `allowed(t, s)` is false take [`MASKED`], and each row softmaxes in f32.
-/// Returns `[Tq, heads · v_dim]`.
+/// Returns `[Tq, heads · v_dim]`; with no keys (`Tk = 0`) there is nothing to average, so every
+/// output is 0 (callers reject an empty memory before this).
 pub(crate) fn attend(
     q: &[f32],
     k: &[f32],
@@ -156,6 +268,9 @@ pub(crate) fn attend(
     let group = (h.heads / h.kv_heads.max(1)).max(1);
     let width = h.heads * h.v_dim;
     let mut out = vec![0.0f32; tq * width];
+    if tk == 0 {
+        return out;
+    }
     let mut logits = vec![0.0f32; tk];
     let mut qs = vec![0.0f32; h.qk_dim];
     for head in 0..h.heads {

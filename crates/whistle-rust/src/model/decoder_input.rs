@@ -66,7 +66,7 @@ impl Weights {
 
     /// The decoder's memory from the encoder output (`encoder_out`, `[frames, d_model]`
     /// row-major, the first `valid` frames real): `A8(enc + σ(pe_gate) · sinusoids)`. An output
-    /// whose length is not `frames · d_model`, or more valid frames than frames, is
+    /// whose length is not `frames · d_model`, no frames, or more valid frames than frames, is
     /// [`Error::Input`].
     pub fn decoder_memory(
         &self,
@@ -85,6 +85,11 @@ impl Weights {
             return Err(Error::Input(format!(
                 "the encoder output claims {valid} valid frames of {frames}"
             )));
+        }
+        if frames == 0 {
+            return Err(Error::Input(
+                "the encoder output has no frames (no encoded audio to attend to)".into(),
+            ));
         }
         let gate = sigmoid(self.pe_gate);
         let pe = sinusoids(frames, d);

@@ -11,6 +11,10 @@ use crate::error::Error;
 use super::ops::{a8, rms_unit, sigmoid};
 use super::weights::{Engram, EngramHash, Matrix};
 
+/// The longest n-gram an archive may hash: Whistle uses orders 2 and 3, and the ceiling keeps
+/// the per-position hash loop short whatever the header says.
+pub const MAX_NGRAM_ORDER: u32 = 8;
+
 /// `_ENGRAM_SEED`, the golden-ratio constant the per-table seeds are multiples of.
 const SEED: u32 = 0x9E37_79B9;
 /// `_ENGRAM_PRIME`, the 32-bit FNV prime.
@@ -76,8 +80,9 @@ pub fn engram_indices(
 /// The hashing geometry from the archive header, checked against what `Whistle.decode` uses:
 /// it builds every Engram with `conv_dilation = max(orders)` and hashes with `seed_heads = 0`,
 /// which `engram_indices` reads as `seed_heads or heads`, so a header recording 0 or `heads`
-/// hashes identically and any other value would not be Whistle. Called by `bind`; a header
-/// that does not fit is [`Error::Archive`].
+/// hashes identically and any other value would not be Whistle. Each n-gram order must lie in
+/// `1..=min(MAX_NGRAM_ORDER, max_seq_len)`. Called by `bind`; a header that does not fit is
+/// [`Error::Archive`].
 pub(crate) fn hash_geometry(g: &Geometry) -> Result<EngramHash, Error> {
     let orders = g.engram_orders.clone();
     let tables = g.num_engram_tables as usize;
@@ -87,6 +92,17 @@ pub(crate) fn hash_geometry(g: &Geometry) -> Result<EngramHash, Error> {
     if tables == 0 || !tables.is_multiple_of(orders.len()) {
         return Err(Error::Archive(format!(
             "{tables} Engram tables do not split over orders {orders:?}"
+        )));
+    }
+    // The hash folds `order` tokens per position and table, so an order is bounded by the
+    // longest decoder input and by an absolute ceiling: a hostile header cannot make the loop
+    // arbitrarily slow.
+    let ceiling = MAX_NGRAM_ORDER.min(g.max_seq_len);
+    if let Some(&order) = orders.iter().find(|&&o| o == 0 || o > ceiling) {
+        return Err(Error::Archive(format!(
+            "Engram n-gram order {order} is outside 1 to {ceiling} (the ceiling \
+             {MAX_NGRAM_ORDER}, and max_seq_len {})",
+            g.max_seq_len
         )));
     }
     let heads = tables / orders.len();

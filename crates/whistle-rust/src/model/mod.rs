@@ -4,10 +4,13 @@
 //! (`hadamard`), gated self-attention (`attention`), the mHC lane stack step (`mhc`), and the
 //! encoder (`encoder`). Each follows upstream's `whistle.py` and `architecture.py`.
 //! The decoder's inputs (`decoder_input`: embedding, memory) and its Engram sites (`engram`)
-//! feed the decoder stack.
+//! feed the decoder (`decoder`: causal self-attention, `cross_attention`, the stack and the
+//! output head).
 
 mod attention;
 mod bind;
+mod cross_attention;
+mod decoder;
 mod decoder_input;
 mod encoder;
 mod engram;
@@ -18,9 +21,12 @@ mod stem;
 mod weights;
 
 pub use attention::Projections;
+pub use bind::MAX_SEQ_LEN;
+pub use cross_attention::CrossMemory;
+pub use decoder::{Decoder, DecoderContext, Logits};
 pub use decoder_input::DecoderMemory;
 pub use encoder::{Encoder, EncoderContext, EncoderOutput};
-pub use engram::{engram_add, engram_indices, ngram_in_sequence, tap_in_sequence};
+pub use engram::{engram_add, engram_indices, ngram_in_sequence, tap_in_sequence, MAX_NGRAM_ORDER};
 pub use stem::{Lanes, StemOutput};
 pub use weights::{
     AudioManifest, CrossAttention, DecoderLayer, EncoderLayer, Engram, EngramHash, HadaPerms,

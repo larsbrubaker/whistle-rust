@@ -91,8 +91,11 @@ pub(crate) fn glu(x: &[f32], half: usize) -> Vec<f32> {
 }
 
 /// `jax.nn.softmax` in place over each `row`-wide row: subtract the max, exponentiate,
-/// divide by the sum.
+/// divide by the sum. Zero-wide rows have nothing to normalise, so that is a no-op.
 pub(crate) fn softmax(x: &mut [f32], row: usize) {
+    if row == 0 {
+        return;
+    }
     for r in x.chunks_exact_mut(row) {
         let max = r.iter().fold(f32::NEG_INFINITY, |m, &v| m.max(v));
         for v in r.iter_mut() {

@@ -21,6 +21,19 @@ pub struct Matrix {
 }
 
 impl Matrix {
+    /// A `[rows, cols]` matrix over row-major `data`; a length other than `rows · cols` is
+    /// [`Error::Input`]. (How a caller builds a [`super::DecoderMemory`] from an encoder output
+    /// it already holds.)
+    pub fn new(rows: usize, cols: usize, data: Vec<f32>) -> Result<Matrix, Error> {
+        if rows.checked_mul(cols) != Some(data.len()) {
+            return Err(Error::Input(format!(
+                "{} values are not a [{rows}, {cols}] matrix",
+                data.len()
+            )));
+        }
+        Ok(Matrix { rows, cols, data })
+    }
+
     pub fn rows(&self) -> usize {
         self.rows
     }

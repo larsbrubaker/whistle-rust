@@ -1,6 +1,6 @@
 // Unit tests for the model primitives in `ops`: A8 on hand-computed rows (ties, clamping, an
 // all-zero row), Sinkhorn's doubly stochastic output, RoPE's tables and rotation against
-// hand-evaluated values, and the small activations.
+// hand-evaluated values, the small activations, and softmax over zero-wide rows.
 
 use super::*;
 
@@ -124,4 +124,11 @@ fn activations_and_norms_match_their_definitions() {
         linear(&[1.0, 2.0], &[3.0, 4.0, 5.0, 6.0, 7.0, 8.0], 2, 3),
         vec![11.0, 17.0, 23.0]
     );
+}
+
+#[test]
+fn softmax_over_zero_wide_rows_is_a_no_op() {
+    let mut empty: Vec<f32> = Vec::new();
+    softmax(&mut empty, 0);
+    assert!(empty.is_empty());
 }
