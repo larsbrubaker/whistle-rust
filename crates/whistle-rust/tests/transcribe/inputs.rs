@@ -2,8 +2,7 @@
 // before the detector runs, in every VAD mode; audio shorter than one 10 ms feature hop (no
 // valid frame for the decoder to attend to) is an empty transcript in every mode, while one hop
 // or more still decodes; a WAV file that cannot be read is `Error::Audio`; audio over the
-// limits is rejected before it is resampled (30 s with the gate off or gate only, 10 minutes
-// before trimming).
+// limit (10 minutes, in every mode) is rejected before it is resampled.
 
 use std::error::Error as _;
 
@@ -94,12 +93,12 @@ fn an_unreadable_wav_file_is_an_audio_error() {
 }
 
 #[test]
-fn a_wav_over_thirty_seconds_at_44_1_khz_is_rejected_with_the_gate_off() {
-    let bytes = wav_bytes(&vec![0.0; 31 * 44_100], 44_100);
+fn a_wav_over_ten_minutes_at_44_1_khz_is_rejected_with_the_gate_off() {
+    let bytes = wav_bytes(&vec![0.0; 601 * 44_100], 44_100);
     for vad in [VadMode::Off, VadMode::Gate] {
         let err = whistle().transcribe_wav(&bytes, &options(vad)).unwrap_err();
         assert!(
-            matches!(&err, Error::Input(m) if m.contains("30 s")),
+            matches!(&err, Error::Input(m) if m.contains("600 s")),
             "{err}"
         );
     }

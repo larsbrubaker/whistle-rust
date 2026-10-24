@@ -3,7 +3,7 @@
 //! `(codebook[idx] * norm) @ H`, `H` the orthonormal Walsh–Hadamard matrix of the group size
 //! (Sylvester order); `H` is symmetric, so each group is one fast Walsh–Hadamard transform.
 //! Reads the validated [`Tensor`] records `cact` produces. [`CqRows`] keeps a CQ record packed
-//! and dequantizes single rows on demand (the model's Engram tables); [`CqRows::parts`] hands
+//! and dequantizes single rows on demand (the model's Engram tables); `CqRows::parts` hands
 //! the packed fields to the packed-weight projection kernel (`model::kernels::packed`).
 
 use crate::cact::{packed_row_bytes, Archive, DType, Tensor, TERNARY_RECORD_BITS};

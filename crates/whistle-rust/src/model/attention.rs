@@ -204,7 +204,7 @@ impl SelfAttention {
     }
 
     /// The decoder's causal taps on Q, K and V (`q_taps`, `k_taps`, `v_taps`) over projections
-    /// whose first `history` rows are earlier positions ([`causal_conv`]); the result covers the
+    /// whose first `history` rows are earlier positions (`causal_conv`); the result covers the
     /// rows after them, the gate (untapped) included, the first at absolute position `start`.
     /// The history must be exactly the `min(start, n_taps − 1)` positions before `start`, so a
     /// cached step cannot convolve against too few or misaligned rows: another count, or more

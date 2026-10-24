@@ -19,7 +19,7 @@ use super::kernels::Order;
 use super::kernels::PackedMatrix;
 
 /// A matrix, `[rows, cols]` as the archive stores it (`[out, in]` for a Dense kernel, so a
-/// projection is [`Matrix::project`]): row-major f32, or a CQ record kept packed, whose
+/// projection is `Matrix::project`): row-major f32, or a CQ record kept packed, whose
 /// [`Matrix::data`] dequantizes on every call and keeps nothing.
 #[derive(Debug, Clone)]
 pub struct Matrix {

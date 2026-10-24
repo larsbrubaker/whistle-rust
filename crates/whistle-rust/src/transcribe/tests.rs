@@ -1,8 +1,9 @@
 // Unit tests for the transcription call's cancellation checks and early limits, which need the
 // private per-stage hook (`Whistle::run`, `Stage`): a `Cancel` fired at any stage (after
-// resampling, the detector, the features, before an encoder layer, before a decoder step, from
-// another thread) stops the call at that check with `Error::Cancelled` and runs nothing after
-// it; and 10 minutes of 44.1 kHz audio is rejected before it is resampled. Also the ignored
+// resampling, the detector, the features, before an encoder layer, before a decoder step,
+// between the windows of a long input, from another thread) stops the call at that check with
+// `Error::Cancelled` and runs nothing after it; and over 10 minutes of 44.1 kHz audio is
+// rejected before it is resampled. Also the ignored
 // measurement of the beam search's final ranking (mean against sum, which needs the private
 // `Whistle::run_ranked`). Uses models/whistle.cact and test-data/ from the workspace root.
 
@@ -90,6 +91,23 @@ fn a_cancel_during_the_encoder_stops_before_the_next_layer() {
 }
 
 #[test]
+fn a_cancel_between_windows_stops_before_the_next_window() {
+    // en_samantha with half a second of silence after it, repeated past 30 s: two windows.
+    let clip = samples();
+    let mut long = Vec::new();
+    while long.len() <= 40 * 16000 {
+        long.extend_from_slice(&clip);
+        long.resize(long.len() + 8000, 0.0);
+    }
+    let (result, seen) = cancel_at(long, 16000, Stage::Window(1));
+    assert_eq!(result, Err(Error::Cancelled));
+    assert_eq!(seen.last(), Some(&Stage::Window(1)), "{seen:?}");
+    let first = seen.iter().position(|s| *s == Stage::Window(0));
+    let done = seen.iter().position(|s| *s == Stage::Done);
+    assert!(first < done, "the first window was decoded: {seen:?}");
+}
+
+#[test]
 fn a_cancel_after_each_early_stage_stops_there() {
     for at in [Stage::Start, Stage::Vad, Stage::Features] {
         let (result, seen) = cancel_at(samples(), 16000, at);
@@ -103,8 +121,8 @@ fn a_cancel_after_each_early_stage_stops_there() {
 }
 
 #[test]
-fn ten_minutes_at_44_1_khz_with_vad_off_is_rejected_before_resampling() {
-    let long = vec![0.0f32; 600 * 44_100];
+fn over_ten_minutes_at_44_1_khz_with_vad_off_is_rejected_before_resampling() {
+    let long = vec![0.0f32; 601 * 44_100];
     let options = Options {
         vad: VadMode::Off,
         ..Options::default()
@@ -115,7 +133,7 @@ fn ten_minutes_at_44_1_khz_with_vad_off_is_rejected_before_resampling() {
     let result = whistle.run(Cow::Owned(long), 44_100, &options, &mut |s| seen.push(s));
     let elapsed = start.elapsed();
     assert!(
-        matches!(&result, Err(Error::Input(m)) if m.contains("30 s")),
+        matches!(&result, Err(Error::Input(m)) if m.contains("600 s")),
         "{result:?}"
     );
     assert!(seen.is_empty(), "{seen:?}");

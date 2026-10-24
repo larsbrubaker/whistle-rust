@@ -1,13 +1,16 @@
 //! Transcription, the library's front door: [`Whistle`] owns the bound weights and the tokenizer
 //! of one archive and turns 16 kHz mono audio (or a WAV file, through `audio`) into a
-//! [`Transcript`]. It runs the voice-activity detector (`vad`) as [`Options::vad`] asks, the
-//! front end and the encoder once, then the decode over the decoder's KV cache
+//! [`Transcript`]. It runs the voice-activity detector (`vad`) as [`Options::vad`] asks, plans
+//! the windows (`window`: one up to 30 s, more beyond, stitched by `long`), and for each window
+//! (`Whistle::decode_window`) the front end and the encoder once, then the decode over the
+//! decoder's KV cache
 //! (`model::DecoderState`): step 0 picks a language tag (or feeds the forced one), then
 //! `search` picks text tokens, greedily as `whistle_finetune._score_quantised` defines with one
 //! beam or by beam search with more, optionally biased towards [`Options::keywords`]
 //! (`keywords`), until EOS or `max_seq_len` tokens. A [`Cancel`] handle is checked between the
-//! stages, between encoder layers and between decoder steps. `docs/design/transcribe.md`
-//! describes the call and `docs/design/decoding.md` the search.
+//! stages, between windows, between encoder layers and between decoder steps.
+//! `docs/design/transcribe.md` describes the call, `docs/design/windowing.md` the windows and
+//! `docs/design/decoding.md` the search.
 
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,9 +28,12 @@ use crate::vad;
 
 mod align;
 mod keywords;
+mod long;
 mod search;
+mod window;
 
 pub use align::{Word, FRAME_SECONDS};
+pub use window::{plan_windows, Window, OVERLAP_SAMPLES};
 
 use keywords::KeywordTrie;
 pub use keywords::DEFAULT_KEYWORD_BONUS;
@@ -43,16 +49,15 @@ pub const DEFAULT_BEAMS: usize = 3;
 /// The language codes Whistle transcribes, in tag order.
 pub const LANGUAGES: [&str; 7] = ["en", "de", "fr", "es", "it", "nl", "pl"];
 
-/// The longest audio one call decodes, in 16 kHz samples (30 s, the encoder's training window),
-/// after trimming.
-/// Longer audio needs windowing, which is not ported yet.
+/// The longest audio one decoder pass sees, in 16 kHz samples (30 s, the encoder's training
+/// window): longer audio is split into windows of at most this ([`plan_windows`],
+/// `docs/design/windowing.md`).
 pub const MAX_SAMPLES: usize = 30 * SAMPLE_RATE as usize;
 
-/// The most audio [`VadMode::GateAndTrim`] accepts before trimming, in 16 kHz samples
-/// (10 minutes): trimming can bring a long recording with a short utterance under
-/// [`MAX_SAMPLES`], but the detector and the resampler cost time in proportion to the input,
-/// so a sanity ceiling keeps a mistaken hour-long input from running for seconds before it
-/// fails.
+/// The most audio one call accepts, in 16 kHz samples (10 minutes), checked before resampling
+/// or detection: the detector, the resampler and the windowed decode cost time in proportion to
+/// the input, so a sanity ceiling keeps a mistaken hour-long input from running for minutes
+/// before it fails.
 pub const MAX_INPUT_SAMPLES: usize = 600 * SAMPLE_RATE as usize;
 
 /// Where a transcription is when it checks for cancellation (the tests' hook sees each).
@@ -72,6 +77,8 @@ pub(crate) enum Stage {
     DecoderStep(usize),
     /// After the decode.
     Done,
+    /// Before each window of a long input ([`plan_windows`]), by index.
+    Window(usize),
     /// Before the word-timestamp pass ([`Options::word_timestamps`]).
     Align,
 }
@@ -122,12 +129,18 @@ impl Cancel {
 /// What one transcription does beyond the defaults.
 #[derive(Debug, Clone)]
 pub struct Options {
-    /// Force the language (one of [`LANGUAGES`]); `None` lets the model detect it.
+    /// Force the language (one of [`LANGUAGES`]); `None` lets the model detect it. Audio over
+    /// 30 s is decoded in windows, and a long recording is labelled with and decoded in one
+    /// language: the one detected on the first window that keeps at least 3 words, forced on
+    /// every window after it (a recording that switches language part way comes out in the
+    /// first one, read as that language). To choose it, set this; to get each part in its own
+    /// language, decode the windows [`plan_windows`] returns one call each.
     pub language: Option<String>,
     /// How the voice-activity detector gates the audio; [`VadMode::GateAndTrim`] by default.
     pub vad: VadMode,
-    /// Checked between the stages (resampling, detection, features), before each encoder layer
-    /// and before every decoder step (each beam's step at each position).
+    /// Checked between the stages (resampling, detection, features), before each window of a
+    /// long input, before each encoder layer and before every decoder step (each beam's step at
+    /// each position).
     pub cancel: Option<Cancel>,
     /// Hypotheses the decode keeps, 1 to [`MAX_BEAMS`]. The default, [`DEFAULT_BEAMS`] (3), is
     /// the smallest count that reproduced every engine transcript on the test clips, with the
@@ -172,8 +185,9 @@ pub struct Transcript {
     /// The decoded text token ids, without BOS, the language tag and EOS.
     pub tokens: Vec<u32>,
     /// The words of `text` with their times in the input, when [`Options::word_timestamps`] is
-    /// set (empty otherwise, and for an empty transcript). Contiguous: each word ends where the
-    /// next one starts.
+    /// set (empty otherwise, and for an empty transcript). In order and non-overlapping; within
+    /// one window of a long input each word ends where the next one starts, and the pauses
+    /// between windows hold no words.
     pub words: Vec<Word>,
 }
 
@@ -186,6 +200,14 @@ pub(crate) struct AlignmentPass {
     pub(crate) tokens: Vec<u32>,
     pub(crate) offset: f32,
     pub(crate) duration: f32,
+}
+
+/// One window's pass ([`Whistle::decode_window`]): its transcript (times in the input), the
+/// alignment pass when words were aligned, and the language index it decoded in.
+pub(crate) struct Decoded {
+    pub(crate) transcript: Transcript,
+    pub(crate) pass: Option<AlignmentPass>,
+    pub(crate) language: usize,
 }
 
 impl Transcript {
@@ -282,9 +304,9 @@ impl Whistle {
         )
     }
 
-    /// Transcribes 16 kHz mono `samples`. A non-finite sample, an unsupported
-    /// [`Options::language`], or audio longer than [`MAX_SAMPLES`] (after trimming; with
-    /// [`VadMode::GateAndTrim`], any input over [`MAX_INPUT_SAMPLES`] before it) is
+    /// Transcribes 16 kHz mono `samples`, in one pass up to 30 s ([`MAX_SAMPLES`]) and in
+    /// windows ([`plan_windows`]) beyond that. A non-finite sample, an unsupported
+    /// [`Options::language`], or audio longer than [`MAX_INPUT_SAMPLES`] (10 minutes) is
     /// [`Error::Input`]; a fired [`Options::cancel`] is [`Error::Cancelled`]. Empty audio,
     /// audio shorter than one 10 ms feature hop, or no speech with the gate on is an empty
     /// transcript.
@@ -360,12 +382,8 @@ impl Whistle {
         let at_16k = (samples.len() as u64 * u64::from(SAMPLE_RATE))
             .checked_div(u64::from(rate))
             .unwrap_or(0);
-        let ceiling = match options.vad {
-            VadMode::GateAndTrim => MAX_INPUT_SAMPLES,
-            VadMode::Off | VadMode::Gate => MAX_SAMPLES,
-        };
-        if at_16k > ceiling as u64 {
-            return Err(too_long(at_16k, ceiling));
+        if at_16k > MAX_INPUT_SAMPLES as u64 {
+            return Err(too_long(at_16k, MAX_INPUT_SAMPLES));
         }
         let cancelled = || options.cancel.as_ref().is_some_and(Cancel::is_cancelled);
         let mut check = |stage: Stage| {
@@ -386,28 +404,65 @@ impl Whistle {
             check(Stage::Resampled)?;
             Cow::Owned(resampled)
         };
-        // `trimmed`: samples cut from the front, so word times count from the input's start.
-        let (samples, trimmed): (&[f32], usize) = match options.vad {
-            VadMode::Off => (&samples, 0),
-            mode => {
+        let segments = match options.vad {
+            VadMode::Off => None,
+            _ => {
                 let segments = vad::speech_segments(&samples);
                 check(Stage::Vad)?;
-                match (segments.first(), segments.last()) {
-                    (Some(first), Some(last)) if mode == VadMode::GateAndTrim => {
-                        (&samples[first.start..last.end], first.start)
-                    }
-                    (Some(_), Some(_)) => (&samples, 0),
-                    _ => return empty(),
+                if segments.is_empty() {
+                    return empty();
                 }
+                Some(segments)
             }
         };
+        let trim = options.vad == VadMode::GateAndTrim;
+        let windows = window::plan(&samples, segments.as_deref(), trim);
+        match windows.as_slice() {
+            [] => empty(),
+            // One window is exactly the single pass: the speech span with `GateAndTrim`, the
+            // whole clip otherwise.
+            [one] => {
+                let decoded = self.decode_window(
+                    &samples[one.decode.clone()],
+                    one.decode.start,
+                    forced,
+                    options,
+                    options.word_timestamps,
+                    ranking,
+                    heads,
+                    &mut check,
+                )?;
+                Ok(decoded.map_or_else(|| (Transcript::empty(), None), |d| (d.transcript, d.pass)))
+            }
+            many => Ok((
+                self.run_windows(&samples, many, forced, options, ranking, &mut check)?,
+                None,
+            )),
+        }
+    }
+
+    /// One pass over at most [`MAX_SAMPLES`] of `samples` that start `offset` samples into the
+    /// input: features, encoder, the decode with the language `forced` (or detected), and, when
+    /// `align` is set, the words with their times in the input. `None` when it yields no text.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn decode_window(
+        &self,
+        samples: &[f32],
+        offset: usize,
+        forced: Option<usize>,
+        options: &Options,
+        align: bool,
+        ranking: Ranking,
+        heads: HeadFilter<'_>,
+        check: &mut dyn FnMut(Stage) -> Result<(), Error>,
+    ) -> Result<Option<Decoded>, Error> {
         if samples.len() > MAX_SAMPLES {
             return Err(too_long(samples.len() as u64, MAX_SAMPLES));
         }
         let feats = features(samples);
         // Under one hop there is no valid frame: the decoder would attend to nothing.
         if feats.valid_frames == 0 {
-            return empty();
+            return Ok(None);
         }
         check(Stage::Features)?;
 
@@ -425,7 +480,6 @@ impl Whistle {
             Some(i) => i,
             None => self.detect_language(&scores),
         };
-        let language = Some(index);
         let trie = KeywordTrie::new(
             &self.tokenizer,
             &options.keywords,
@@ -445,17 +499,17 @@ impl Whistle {
         })?;
         check(Stage::Done)?;
         if text_tokens.is_empty() {
-            return empty();
+            return Ok(None);
         }
         let rate = SAMPLE_RATE as f32;
-        let (words, pass) = if options.word_timestamps {
+        let (words, pass) = if align {
             check(Stage::Align)?;
             let (words, pass) = self.align_words(
                 heads,
                 &memory,
                 self.tags[index],
                 text_tokens.clone(),
-                trimmed as f32 / rate,
+                offset as f32 / rate,
                 samples.len() as f32 / rate,
             )?;
             (words, Some(pass))
@@ -464,11 +518,15 @@ impl Whistle {
         };
         let transcript = Transcript {
             text: self.tokenizer.decode(&text_tokens),
-            language: language.map(|i| LANGUAGES[i].to_string()),
+            language: Some(LANGUAGES[index].to_string()),
             tokens: text_tokens,
             words,
         };
-        Ok((transcript, pass))
+        Ok(Some(Decoded {
+            transcript,
+            pass,
+            language: index,
+        }))
     }
 
     /// The teacher-forced pass over BOS, `tag`, `tokens` and EOS, and the words it aligns

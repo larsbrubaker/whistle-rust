@@ -16,10 +16,9 @@ rate, then transcribes. A `Transcript` is the text, the language code, the text 
 2. **Finite samples.** Any NaN or ±∞ sample is `Error::Input` naming its index, before anything
    else runs: one NaN would otherwise poison the features and the decoder would write 318
    tokens of nonsense.
-3. **Early length limits**, on the length at 16 kHz (`len · 16000 / rate`) before resampling or
-   detection, so an oversized input costs nothing: with `Off` or `Gate`, over 480,000 samples
-   (30 s) is `Error::Input` naming the limit; with `GateAndTrim`, which may trim a long
-   recording down to a short utterance, over `MAX_INPUT_SAMPLES` (10 minutes) is.
+3. **Early length limit**, on the length at 16 kHz (`len · 16000 / rate`) before resampling or
+   detection, so an oversized input costs nothing: over `MAX_INPUT_SAMPLES` (10 minutes) is
+   `Error::Input` naming the limit, in every VAD mode.
 4. **Resampling** to 16 kHz when the WAV is at another rate; the original buffer is dropped.
 5. **Voice-activity gate** (`docs/design/vad.md`), per `VadMode`:
    - `Off`: decode the samples as given.
@@ -27,12 +26,17 @@ rate, then transcribes. A `Transcript` is the text, the language code, the text 
    - `GateAndTrim` (the default): no speech gives an empty transcript; otherwise decode only
      `first.start .. last.end`, the span from the first segment's start to the last segment's
      end (gaps between segments are kept, so the decoder sees the utterance whole).
-6. **Limits after trimming.** More than 480,000 samples (30 s) is `Error::Input`: windowing
-   past 30 s is not ported yet. Empty audio, or audio shorter than one 160-sample hop (no valid
-   feature frame, so the decoder would attend to a fully masked memory), is an empty transcript,
-   not an error.
+6. **Windows** (`docs/design/windowing.md`, `plan_windows`). When the span to decode (the
+   trimmed span with `GateAndTrim`, the whole clip otherwise) is at most 480,000 samples
+   (30 s), it is one window and steps 7–10 run once on it, exactly as a single pass. Longer
+   audio is split into windows of at most 30 s, cut inside the detector's pauses (fixed hard
+   cuts with `Off`), and steps 7–10 run on each window in turn, a cancel checked before each;
+   the results are stitched (texts joined with single spaces, tokens concatenated, word times
+   in the input). The language the first window with text decodes in is forced on the rest.
+   Empty audio, or audio shorter than one 160-sample hop (no valid feature frame, so the
+   decoder would attend to a fully masked memory), is an empty transcript, not an error.
 7. The front end (`audio::features`), the encoder (`Encoder::forward_with`), and the decoder
-   memory (`Weights::decoder_memory`), each once.
+   memory (`Weights::decoder_memory`), each once per window.
 8. **Decode** over the KV cache (below). By default (`Options::beams = 3`, `DEFAULT_BEAMS`)
    it is a 3-beam search: the smallest count that reproduced every engine transcript on the
    test clips, with the best word error rate against the true texts, for about +195 ms on a
@@ -67,9 +71,9 @@ rate, then transcribes. A `Transcript` is the text, the language code, the text 
 `Cancel` is an `Arc<AtomicBool>` handle; clones share the flag, so a UI thread can keep one and
 call `cancel()` while the decode runs elsewhere. A fired handle makes the call return
 `Error::Cancelled` at the next check: after the input checks, after resampling, after the
-detector, after the features, before each encoder layer (`Encoder::forward_with` takes the check
-as a closure, so the encoder does not depend on this module), before each decoder step, and
-after the decode. The worst-case latency is the longest gap between two checks: on 30 s of
+detector, before each window of a long input, after the features, before each encoder layer
+(`Encoder::forward_with` takes the check as a closure, so the encoder does not depend on this
+module), before each decoder step, and after the decode. The worst-case latency is the longest gap between two checks: on 30 s of
 audio (release build, Apple Silicon, measured 2026-10-24 after the kernel work in
 `performance.md`, on a loaded machine) the features take about 50 ms and the detector 13 ms,
 the stem before the first layer check 28–46 ms, and the encoder layers 40–55 ms each, so a

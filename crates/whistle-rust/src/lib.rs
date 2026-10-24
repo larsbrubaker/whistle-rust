@@ -34,6 +34,7 @@ pub mod vad;
 pub use error::Error;
 pub use model::{set_threads, threads, MAX_THREADS};
 pub use transcribe::{
-    Cancel, Options, Transcript, VadMode, Whistle, Word, DEFAULT_BEAMS, DEFAULT_KEYWORD_BONUS,
-    FRAME_SECONDS, LANGUAGES, MAX_BEAMS, MAX_INPUT_SAMPLES, MAX_SAMPLES,
+    plan_windows, Cancel, Options, Transcript, VadMode, Whistle, Window, Word, DEFAULT_BEAMS,
+    DEFAULT_KEYWORD_BONUS, FRAME_SECONDS, LANGUAGES, MAX_BEAMS, MAX_INPUT_SAMPLES, MAX_SAMPLES,
+    OVERLAP_SAMPLES,
 };

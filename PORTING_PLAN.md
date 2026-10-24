@@ -39,10 +39,11 @@ and measured for one thread on wasm first; native threads are a bonus.
 ## 7. Designed decode features
 
 The behaviours only the closed engine has, designed here and held to the engine transcripts.
-Beam search (default 3 beams), keyword biasing and word timestamps are in
+Beam search (default 3 beams), keyword biasing, word timestamps and windowing are in
 (`docs/design/decoding.md`, `docs/design/timestamps.md`); what is left:
 
-- Windowing past 30 s, and streaming that commits words two passes agree on.
+- Streaming that commits words two passes agree on (windowing past 30 s is in,
+  `docs/design/windowing.md`; its `Whistle::decode_window` is the per-window building block).
 - Keyword biasing at 5+ beams finds fewer keywords than at 1 or 3 (partial keyword paths crowd
   the beam): per-beam-count tuning or a cap on hypotheses inside a keyword.
 - More clips (long audio, noise, real microphone recordings) via `oracle/clips.json`; the

@@ -1,5 +1,5 @@
 // The errors a caller can see from `Whistle::transcribe`: an unsupported language code (the
-// message lists the supported ones), audio over the 30 s limit (the message says it), and
+// message lists the supported ones), audio over the 10-minute limit (the message says it), and
 // cancellation fired before the call. Cancellation part way through (between stages, encoder
 // layers and decoder steps) is pinned deterministically by the unit tests in
 // `src/transcribe/tests.rs`; the inputs rejected before decoding are in `inputs`.
@@ -24,15 +24,15 @@ fn an_unknown_language_is_an_input_error_listing_the_supported_codes() {
 }
 
 #[test]
-fn audio_over_thirty_seconds_is_an_input_error_naming_the_limit() {
-    let samples = vec![0.0f32; 480_001];
+fn audio_over_ten_minutes_is_an_input_error_naming_the_limit() {
+    let samples = vec![0.0f32; whistle::MAX_INPUT_SAMPLES + 1];
     let options = Options {
         vad: VadMode::Off,
         ..Options::default()
     };
     let err = whistle().transcribe(&samples, &options).unwrap_err();
     assert!(
-        matches!(&err, Error::Input(m) if m.contains("30 s")),
+        matches!(&err, Error::Input(m) if m.contains("600 s")),
         "{err}"
     );
 }
