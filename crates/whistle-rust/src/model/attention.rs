@@ -10,7 +10,7 @@
 
 use crate::error::Error;
 
-use super::ops::{a8, fake_quant_rows, linear, sigmoid, softmax, zc_rms_norm, Rope};
+use super::ops::{a8, fake_quant_rows, linear, sigmoid_in_place, softmax, zc_rms_norm, Rope};
 use super::weights::{Matrix, SelfAttention};
 
 /// The four projections of one sequence from its A8 input, each `[T, width]` row-major.
@@ -387,8 +387,15 @@ impl SelfAttention {
 
 /// `out · sigmoid(gate)`, A8, then `out_proj`: how self- and cross-attention both end.
 pub(crate) fn gate_out(out_proj: &Matrix, mut out: Vec<f32>, gate: &[f32]) -> Vec<f32> {
-    for (o, &g) in out.iter_mut().zip(gate) {
-        *o *= sigmoid(g);
+    // The gate's sigmoid a block at a time through a stack buffer: no allocation.
+    let mut s = [0.0f32; 64];
+    for (o, g) in out.chunks_mut(s.len()).zip(gate.chunks(s.len())) {
+        let s = &mut s[..g.len()];
+        s.copy_from_slice(g);
+        sigmoid_in_place(s);
+        for (o, &s) in o.iter_mut().zip(s.iter()) {
+            *o *= s;
+        }
     }
     a8(&mut out, out_proj.cols);
     out_proj.project(&out)

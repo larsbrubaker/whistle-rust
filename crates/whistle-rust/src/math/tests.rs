@@ -4,6 +4,8 @@
 
 use super::*;
 
+mod double_double;
+
 /// Distance in units in the last place between two finite f32 values of the same sign class.
 fn ulps_f32(a: f32, b: f32) -> u64 {
     let key = |x: f32| {
@@ -98,17 +100,23 @@ fn f32_functions_are_within_one_ulp_of_the_f64_reference() {
     assert!(worst <= 1, "powf {worst}");
 }
 
+/// The f64 functions against the truth, not against the platform libm: glibc, Apple's libm and
+/// this port can each be up to about an ulp from the true value, on opposite sides, so two
+/// correct implementations may differ by 2 ulps and std is no oracle. `exp`, `ln`, `log10` and
+/// `pow` are measured against double-double references (`double_double.rs`), rounded to f64:
+/// the port is within 1 ulp of the correctly rounded value. `sin` and `cos` have no such
+/// reference here, so they are compared with std within 2 ulps (each side within 1 of the truth).
 #[test]
-fn f64_functions_are_within_one_ulp_of_std() {
-    type Pair = (fn(f64) -> f64, fn(f64) -> f64, &'static str);
+fn f64_functions_are_within_one_ulp_of_the_true_value() {
+    type Pair = (fn(f64) -> f64, fn(f64) -> f64, &'static str, u64);
     let pairs: [Pair; 5] = [
-        (exp, f64::exp, "exp"),
-        (ln, f64::ln, "log"),
-        (log10, f64::log10, "log10"),
-        (sin, f64::sin, "sin"),
-        (cos, f64::cos, "cos"),
+        (exp, |x| double_double::exp(x).hi, "exp", 1),
+        (ln, |x| double_double::ln(x).hi, "log", 1),
+        (log10, |x| double_double::log10(x).hi, "log10", 1),
+        (sin, f64::sin, "sin", 2),
+        (cos, f64::cos, "cos", 2),
     ];
-    for (f, reference, name) in pairs {
+    for (f, reference, name, budget) in pairs {
         let hi = if name == "exp" { 709.0 } else { 1e300 };
         let lo = if name == "exp" {
             1e-300
@@ -122,19 +130,23 @@ fn f64_functions_are_within_one_ulp_of_std() {
         for x in inputs {
             let (got, want) = (f(x), reference(x));
             assert!(
-                ulps_f64(got, want) <= 1,
-                "{name}({x:e}) = {got:e}, std {want:e}"
+                ulps_f64(got, want) <= budget,
+                "{name}({x:e}) = {got:e}, reference {want:e}"
             );
         }
     }
+    let pow_ref = |x: f64, y: f64| double_double::pow(x, y).hi;
     for x in sweep_f64(1e-3, 1e4, 2000) {
         for y in [-3.7, -1.0, -0.5, 0.25, 1.0 / 3.0, 2.0, 7.5] {
-            assert!(ulps_f64(pow(x, y), x.powf(y)) <= 1, "pow({x:e}, {y})");
+            assert!(ulps_f64(pow(x, y), pow_ref(x, y)) <= 1, "pow({x:e}, {y})");
         }
     }
     for db in -120..=40 {
         let y = f64::from(db) / 10.0;
-        assert!(ulps_f64(pow(10.0, y), 10f64.powf(y)) <= 1, "pow(10, {y})");
+        assert!(
+            ulps_f64(pow(10.0, y), pow_ref(10.0, y)) <= 1,
+            "pow(10, {y})"
+        );
     }
 }
 

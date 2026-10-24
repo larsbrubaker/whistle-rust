@@ -15,10 +15,10 @@ at one beam, ~2.2 ms per decoder token); what is left.
 slower computers on the web are where transcription is slowest, so performance work is chosen
 and measured for one thread on wasm first; native threads are a bonus.
 
-- Win back the deterministic math's cost (+10% native, +8% Node on a 3 s clip): the ported
-  `expf` is ~4x slower per call than Apple's and is 13.7% of a call (stem silu 7.5%, Hadamard
-  MLP 3.4%, attention gates). A slice-level `expf`/`silu`/`sigmoid` that runs the same IEEE
-  operations lane by lane (NEON, SSE2, simd128) keeps every bit and vectorises them.
+- Re-measure on a quiet machine (beams 1 and 3, native and Node simd128): the vectorised
+  `expf`/`sigmoid`/`silu` (`math::expf_lanes`, NEON/SSE2/simd128, bit-identical to scalar on all
+  2^32 inputs) should win back the deterministic math's ~10% native / ~8% Node cost; the first
+  numbers were taken at load ~40. Confirm the SSE2 lanes on CI's x86_64 jobs.
 - Optimise for one wasm thread, by the Node (V8) profile (`scripts/wasm-bench.sh profile`): the
   decoder's packed kernel is 33% of a 3 s clip at one beam and 56% at three (each weight is
   index-decoded for one multiply-add; batching helps at 3+ beams, a wasm-friendly index layout

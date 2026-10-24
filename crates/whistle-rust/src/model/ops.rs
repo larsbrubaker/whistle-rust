@@ -77,17 +77,29 @@ pub(crate) fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + crate::math::expf(-x))
 }
 
-/// `jax.nn.silu`: `x * sigmoid(x)`.
-pub(crate) fn silu(x: f32) -> f32 {
-    x * sigmoid(x)
+/// [`sigmoid`] of every element, in place, four lanes at a time with the same bits.
+pub(crate) fn sigmoid_in_place(x: &mut [f32]) {
+    crate::math::sigmoidf_slice(x);
+}
+
+/// `jax.nn.silu`, `x * sigmoid(x)`, of every element, in place, four lanes at a time with the
+/// bits of the scalar form.
+pub(crate) fn silu_in_place(x: &mut [f32]) {
+    crate::math::siluf_slice(x);
 }
 
 /// `jax.nn.glu` over rows of `2 * half`: the first half times the sigmoid of the second.
 pub(crate) fn glu(x: &[f32], half: usize) -> Vec<f32> {
     let mut out = Vec::with_capacity(x.len() / 2);
     for r in x.chunks_exact(2 * half) {
+        let start = out.len();
         let (a, b) = r.split_at(half);
-        out.extend(a.iter().zip(b).map(|(&a, &b)| a * sigmoid(b)));
+        out.extend_from_slice(b);
+        let gated = &mut out[start..];
+        sigmoid_in_place(gated);
+        for (g, &a) in gated.iter_mut().zip(a) {
+            *g *= a; // IEEE multiplication commutes, so this is `a * sigmoid(b)`
+        }
     }
     out
 }
@@ -101,8 +113,9 @@ pub(crate) fn softmax(x: &mut [f32], row: usize) {
     for r in x.chunks_exact_mut(row) {
         let max = r.iter().fold(f32::NEG_INFINITY, |m, &v| m.max(v));
         for v in r.iter_mut() {
-            *v = crate::math::expf(*v - max);
+            *v -= max;
         }
+        crate::math::expf_slice(r);
         let sum: f32 = r.iter().sum();
         for v in r.iter_mut() {
             *v /= sum;
@@ -137,9 +150,7 @@ pub(crate) fn sinkhorn(logits: &mut [f32], n: usize) {
                 }
             }
         }
-        for v in m.iter_mut() {
-            *v = crate::math::expf(*v);
-        }
+        crate::math::expf_slice(m);
     }
 }
 

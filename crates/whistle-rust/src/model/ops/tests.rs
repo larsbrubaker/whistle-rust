@@ -107,8 +107,10 @@ fn rope_rotates_the_two_halves_as_pairs() {
 #[test]
 fn activations_and_norms_match_their_definitions() {
     assert_eq!(sigmoid(0.0), 0.5);
-    assert_eq!(silu(0.0), 0.0);
-    assert!((silu(2.0) - 2.0 / (1.0 + (-2.0f32).exp())).abs() < 1e-7);
+    let mut s = [0.0f32, 2.0];
+    silu_in_place(&mut s);
+    assert_eq!(s[0], 0.0);
+    assert!((s[1] - 2.0 / (1.0 + (-2.0f32).exp())).abs() < 1e-7);
     let g = glu(&[1.0, 2.0, 0.0, 3.0], 2);
     assert_eq!(g, vec![0.5, 2.0 * sigmoid(3.0)]);
     let mut p = vec![1.0f32, 1.0, 1.0, 1.0];

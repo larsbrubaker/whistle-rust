@@ -8,7 +8,7 @@ use crate::audio::Features;
 use crate::error::Error;
 
 use super::mhc::lane_mean_norm;
-use super::ops::{a8, glu, silu, Rope};
+use super::ops::{a8, glu, silu_in_place, Rope};
 use super::stem::Lanes;
 use super::weights::{EncoderLayer, Weights};
 
@@ -134,7 +134,8 @@ impl EncoderLayer {
 
     /// The conv module's last step on `conv_out_norm`'s output: SiLU, A8, then `pw2`.
     pub fn conv_out(&self, normed: &[f32]) -> Vec<f32> {
-        let mut x: Vec<f32> = normed.iter().map(|&v| silu(v)).collect();
+        let mut x = normed.to_vec();
+        silu_in_place(&mut x);
         a8(&mut x, self.pw2.cols);
         self.pw2.project(&x)
     }

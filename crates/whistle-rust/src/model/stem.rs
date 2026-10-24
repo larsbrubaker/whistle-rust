@@ -6,7 +6,7 @@
 use crate::audio::Features;
 use crate::error::Error;
 
-use super::ops::{a8, silu};
+use super::ops::{a8, silu_in_place};
 use super::weights::{Matrix, Stem};
 
 /// The stem's output: `frames × width` row-major, with `valid_frames` real frames (later ones
@@ -129,7 +129,8 @@ impl Stem {
         let mut valid = halved(features.valid_frames);
         let mut plane = conv3x3(frames, mels, c, &self.w, valid, ConvInput::Mono(x));
         for stage in &self.stages {
-            let act: Vec<f32> = plane.data.iter().map(|&v| silu(v)).collect();
+            let mut act = plane.data;
+            silu_in_place(&mut act);
             valid = halved(valid);
             let mel = plane.mel;
             let down = conv3x3(
@@ -148,12 +149,12 @@ impl Stem {
         }
         // SiLU, then each frame flattened channel-major (`swapaxes(2, 3)`: index c · mel + f).
         let width = c * plane.mel;
+        silu_in_place(&mut plane.data);
         let mut flat = vec![0.0f32; plane.time * width];
         for t in 0..plane.time {
             for f in 0..plane.mel {
                 for ch in 0..c {
-                    flat[t * width + ch * plane.mel + f] =
-                        silu(plane.data[(t * plane.mel + f) * c + ch]);
+                    flat[t * width + ch * plane.mel + f] = plane.data[(t * plane.mel + f) * c + ch];
                 }
             }
         }

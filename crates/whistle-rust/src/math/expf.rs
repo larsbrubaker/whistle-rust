@@ -1,6 +1,7 @@
 //! `expf`, ported from the Rust `libm` crate (a port of musl libm, MIT; the algorithm is
 //! FreeBSD msun / Sun fdlibm, notice kept below). Part of `math`: plain f32/f64 arithmetic only,
-//! so it rounds identically on every target (see `math.rs`).
+//! so it rounds identically on every target (see `math.rs`). `expf_lanes` runs this same
+//! arithmetic four lanes at a time and shares these constants.
 
 /* origin: FreeBSD /usr/src/lib/msun/src/e_expf.c */
 /*
@@ -20,15 +21,15 @@
 use super::scalbnf;
 
 const HALF: [f32; 2] = [0.5, -0.5];
-const LN2_HI: f32 = 6.9314575195e-01; /* 0x3f317200 */
-const LN2_LO: f32 = 1.4286067653e-06; /* 0x35bfbe8e */
-const INV_LN2: f32 = 1.4426950216e+00; /* 0x3fb8aa3b */
+pub(super) const LN2_HI: f32 = 6.9314575195e-01; /* 0x3f317200 */
+pub(super) const LN2_LO: f32 = 1.4286067653e-06; /* 0x35bfbe8e */
+pub(super) const INV_LN2: f32 = 1.4426950216e+00; /* 0x3fb8aa3b */
 /*
  * Domain [-0.34568, 0.34568], range ~[-4.278e-9, 4.447e-9]:
  * |x*(exp(x)+1)/(exp(x)-1) - p(x)| < 2**-27.74
  */
-const P1: f32 = 1.6666625440e-1; /*  0xaaaa8f.0p-26 */
-const P2: f32 = -2.7667332906e-3; /* -0xb55215.0p-32 */
+pub(super) const P1: f32 = 1.6666625440e-1; /*  0xaaaa8f.0p-26 */
+pub(super) const P2: f32 = -2.7667332906e-3; /* -0xb55215.0p-32 */
 
 /// Exponential, base *e* (f32)
 ///

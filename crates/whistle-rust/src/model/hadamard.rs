@@ -5,7 +5,7 @@
 //! `P2` the archive's fixed permutations, and `cond = 1 + softmax(x · cond_v) · cond_u`. The
 //! weights are the [`HadamardMlp`] bound in `weights`.
 
-use super::ops::{silu, softmax, zc_rms_norm};
+use super::ops::{silu_in_place, softmax, zc_rms_norm};
 use super::weights::{HadaPerms, HadamardMlp, Matrix, Norm};
 
 impl Norm {
@@ -84,8 +84,9 @@ impl HadamardMlp {
             kron_apply(&z, a1, b1, &mut k);
             for (j, zj) in z.iter_mut().enumerate() {
                 let v = k[perms.p1[j]];
-                *zj = silu(self.d2[j] * cond[j] * v + self.b2[j]);
+                *zj = self.d2[j] * cond[j] * v + self.b2[j];
             }
+            silu_in_place(&mut z);
             kron_apply(&z, a2, b2, &mut k);
             for (j, zj) in z.iter_mut().enumerate() {
                 *zj = self.d3[j] * k[perms.p2[j]];
