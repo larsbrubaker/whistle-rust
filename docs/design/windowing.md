@@ -97,7 +97,9 @@ per-part languages can decode the windows `plan_windows` returns one by one.
 - **Text**: each window's text, trimmed, joined with single spaces, except before a window that
   starts with closing punctuation (`.,;:!?…)]}»%`: a hard cut can leave the "." that ends the
   previous window's sentence); empty windows add nothing.
-- **Tokens**: the windows' kept text tokens, concatenated.
+- **Tokens**: the windows' kept text tokens, concatenated. They may not decode exactly to the
+  text: a window's first token is decoded without the space the stitch adds before it
+  ("profile.Ask"), so `text` and `words` are authoritative (`Transcript::tokens`).
 - **Words**: each window's words are timed in the input (the window's start is the alignment's
   offset, as the trim offset is for one pass). Within a window they are contiguous, as for a
   single pass; across windows they are in order and never overlap: a word whose start falls

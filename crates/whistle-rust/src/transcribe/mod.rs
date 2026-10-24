@@ -10,7 +10,9 @@
 //! (`keywords`), until EOS or `max_seq_len` tokens. A [`Cancel`] handle is checked between the
 //! stages, between windows, between encoder layers and between decoder steps.
 //! `docs/design/transcribe.md` describes the call, `docs/design/windowing.md` the windows and
-//! `docs/design/decoding.md` the search.
+//! `docs/design/decoding.md` the search. Live audio goes through [`Whistle::stream`] (`stream`,
+//! `docs/design/streaming.md`), which decodes a growing buffer with `decode_window` and commits
+//! the words two passes agree on.
 
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -30,9 +32,11 @@ mod align;
 mod keywords;
 mod long;
 mod search;
+mod stream;
 mod window;
 
 pub use align::{Word, FRAME_SECONDS};
+pub use stream::{Stream, StreamUpdate, DEFAULT_STREAM_STEP};
 pub use window::{plan_windows, Window, OVERLAP_SAMPLES};
 
 use keywords::KeywordTrie;
@@ -158,6 +162,23 @@ pub struct Options {
     /// the decoder's cross-attention (`docs/design/timestamps.md`); one extra decoder pass over
     /// the final tokens. Off by default.
     pub word_timestamps: bool,
+    /// Seconds of new audio a [`Stream`] waits for before it decodes its buffer again
+    /// ([`DEFAULT_STREAM_STEP`], 1 s, by default; `docs/design/streaming.md`). Only streams use
+    /// it; it must be finite and 0.1 to 10 s.
+    pub stream_step: f32,
+}
+
+impl Options {
+    /// The setting for live input ([`Whistle::stream`]): the defaults with `beams: 1`. At the
+    /// default 3 beams a one-thread wasm update can take longer than the 1 s step (up to
+    /// 1.46 s measured on a 45 s stream) and fall behind the audio; one beam stays under it
+    /// (`docs/design/streaming.md`).
+    pub fn streaming() -> Options {
+        Options {
+            beams: 1,
+            ..Options::default()
+        }
+    }
 }
 
 impl Default for Options {
@@ -170,6 +191,7 @@ impl Default for Options {
             keywords: Vec::new(),
             keyword_bonus: DEFAULT_KEYWORD_BONUS,
             word_timestamps: false,
+            stream_step: DEFAULT_STREAM_STEP,
         }
     }
 }
@@ -182,7 +204,12 @@ pub struct Transcript {
     /// The language code the text is in (detected or forced); `None` when the transcript is
     /// empty.
     pub language: Option<String>,
-    /// The decoded text token ids, without BOS, the language tag and EOS.
+    /// The decoded text token ids, without BOS, the language tag and EOS. For one pass they
+    /// decode exactly to `text`. For a windowed input (over 30 s) and a stream
+    /// ([`Stream::transcript`]) they are each pass's kept or committed tokens concatenated, and
+    /// may not decode exactly to `text` (a window's first token can lack its leading space, a
+    /// streamed word continued inside a token repeats that token): `text` and `words` are
+    /// authoritative.
     pub tokens: Vec<u32>,
     /// The words of `text` with their times in the input, when [`Options::word_timestamps`] is
     /// set (empty otherwise, and for an empty transcript). In order and non-overlapping; within
@@ -355,28 +382,8 @@ impl Whistle {
         heads: HeadFilter<'_>,
     ) -> Result<(Transcript, Option<AlignmentPass>), Error> {
         let empty = || Ok((Transcript::empty(), None));
-        let forced = match options.language.as_deref() {
-            None => None,
-            Some(code) => Some(self.language_index(code)?),
-        };
-        if options.beams == 0 || options.beams > MAX_BEAMS {
-            return Err(Error::Input(format!(
-                "{} beams; the decode takes 1 to {MAX_BEAMS}",
-                options.beams
-            )));
-        }
-        if !options.keyword_bonus.is_finite() || options.keyword_bonus < 0.0 {
-            return Err(Error::Input(format!(
-                "keyword bonus {}; it must be finite and not negative",
-                options.keyword_bonus
-            )));
-        }
-        if let Some(i) = samples.iter().position(|v| !v.is_finite()) {
-            return Err(Error::Input(format!(
-                "sample {i} is {}; audio must be finite",
-                samples[i]
-            )));
-        }
+        let forced = self.check_options(options)?;
+        check_finite(&samples)?;
         // The length at 16 kHz, before paying for the resampler or the detector. A rate of 0
         // never reaches here from `read_wav`; it counts as no audio.
         let at_16k = (samples.len() as u64 * u64::from(SAMPLE_RATE))
@@ -570,6 +577,27 @@ impl Whistle {
         Ok((words, pass))
     }
 
+    /// Checks the decode options every call shares, and returns the forced language's index.
+    fn check_options(&self, options: &Options) -> Result<Option<usize>, Error> {
+        let forced = match options.language.as_deref() {
+            None => None,
+            Some(code) => Some(self.language_index(code)?),
+        };
+        if options.beams == 0 || options.beams > MAX_BEAMS {
+            return Err(Error::Input(format!(
+                "{} beams; the decode takes 1 to {MAX_BEAMS}",
+                options.beams
+            )));
+        }
+        if !options.keyword_bonus.is_finite() || options.keyword_bonus < 0.0 {
+            return Err(Error::Input(format!(
+                "keyword bonus {}; it must be finite and not negative",
+                options.keyword_bonus
+            )));
+        }
+        Ok(forced)
+    }
+
     /// The index in [`LANGUAGES`] of `code`, or [`Error::Input`] listing the supported codes.
     fn language_index(&self, code: &str) -> Result<usize, Error> {
         LANGUAGES.iter().position(|&c| c == code).ok_or_else(|| {
@@ -589,6 +617,17 @@ impl Whistle {
             .map(|&t| scores.get(t as usize).copied().unwrap_or(f32::NEG_INFINITY))
             .collect();
         argmax(&tag_scores)
+    }
+}
+
+/// [`Error::Input`] naming the first non-finite sample, if any.
+fn check_finite(samples: &[f32]) -> Result<(), Error> {
+    match samples.iter().position(|v| !v.is_finite()) {
+        Some(i) => Err(Error::Input(format!(
+            "sample {i} is {}; audio must be finite",
+            samples[i]
+        ))),
+        None => Ok(()),
     }
 }
 

@@ -118,7 +118,7 @@ impl Whistle {
 /// Appends one window's trimmed text to the transcript's, with a single space between them,
 /// except before closing punctuation (a hard cut can leave a window starting with the "." or
 /// "," that ends the previous window's sentence).
-fn join(text: &mut String, part: &str) {
+pub(crate) fn join(text: &mut String, part: &str) {
     if part.is_empty() {
         return;
     }
@@ -135,7 +135,7 @@ fn join(text: &mut String, part: &str) {
 /// Appends a window's `next` words after `words`, moving any start before the previous word's
 /// end up to it (two overlapping windows time the words near a hard cut independently), so the
 /// words stay in order and never overlap.
-fn append_in_order(words: &mut Vec<Word>, next: Vec<Word>) {
+pub(crate) fn append_in_order(words: &mut Vec<Word>, next: Vec<Word>) {
     for mut word in next {
         if let Some(prev) = words.last() {
             word.start = word.start.max(prev.end);

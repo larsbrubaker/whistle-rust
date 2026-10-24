@@ -23,7 +23,7 @@ fn root() -> &'static Path {
         .expect("crates/whistle-rust sits two levels below the workspace root")
 }
 
-fn whistle() -> &'static Whistle {
+pub(crate) fn whistle() -> &'static Whistle {
     static WHISTLE: OnceLock<Whistle> = OnceLock::new();
     WHISTLE.get_or_init(|| {
         let bytes = std::fs::read(root().join("models/whistle.cact")).expect("whistle.cact");

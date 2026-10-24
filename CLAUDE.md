@@ -168,6 +168,7 @@ oracle/.venv/bin/python -I oracle/dump_engram.py      # the Engram hash fixture 
 oracle/.venv/bin/python -I oracle/engine_transcripts.py   # regenerate the engine transcripts
 python3 -I oracle/make_extra_clips.py                     # the extra keyword clips (macOS say)
 python3 -I oracle/engine_extra_transcripts.py             # the engine on them, with and without keywords
+python3 -I oracle/engine_stream_transcripts.py            # the engine's --audio-stream updates on the contract clips
 ```
 
 The toolchain (with clippy, rustfmt and the wasm32 target) is pinned in `rust-toolchain.toml`.

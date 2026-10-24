@@ -1,0 +1,96 @@
+{
+ "updates": [
+  {
+   "text": "Please export the",
+   "words": [
+    {
+     "word": "Please",
+     "start": 0.0,
+     "end": 0.32,
+     "probability": 0.97
+    },
+    {
+     "word": "export",
+     "start": 0.32,
+     "end": 0.8,
+     "probability": 0.998
+    },
+    {
+     "word": "the",
+     "start": 0.8,
+     "end": 1.04,
+     "probability": 0.999
+    }
+   ],
+   "pending": "bracket as an ST.",
+   "language": "en",
+   "received": 2.0
+  },
+  {
+   "text": "bracket as an",
+   "words": [
+    {
+     "word": "bracket",
+     "start": 1.04,
+     "end": 1.36,
+     "probability": 0.99
+    },
+    {
+     "word": "as",
+     "start": 1.36,
+     "end": 1.52,
+     "probability": 1.0
+    },
+    {
+     "word": "an",
+     "start": 1.52,
+     "end": 1.68,
+     "probability": 1.0
+    }
+   ],
+   "pending": "STL file for print.",
+   "language": "en",
+   "received": 3.0
+  },
+  {
+   "text": "STL file for",
+   "words": [
+    {
+     "word": "STL",
+     "start": 1.68,
+     "end": 2.32,
+     "probability": 0.926
+    },
+    {
+     "word": "file",
+     "start": 2.32,
+     "end": 2.56,
+     "probability": 0.983
+    },
+    {
+     "word": "for",
+     "start": 2.56,
+     "end": 2.8,
+     "probability": 0.963
+    }
+   ],
+   "pending": "printing.",
+   "language": "en",
+   "received": 3.36
+  },
+  {
+   "text": "printing.",
+   "words": [
+    {
+     "word": "printing.",
+     "start": 2.8,
+     "end": 3.28,
+     "probability": 0.825
+    }
+   ],
+   "pending": "",
+   "language": "en",
+   "received": 3.36
+  }
+ ]
+}

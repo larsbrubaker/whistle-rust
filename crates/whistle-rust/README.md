@@ -52,6 +52,32 @@ the language detected on the first window with at least 3 words is forced on the
 `language` to choose it), the texts join with spaces, and word times count from the start of
 the input; over 10 minutes is `Error::Input`.
 
+Live audio goes through `Whistle::stream`, best with the live preset `Options::streaming()`
+(one beam: a one-thread wasm update stays under the 1 s step, where 3 beams can fall behind):
+
+```rust,no_run
+use whistle::{Options, Whistle};
+
+fn live(whistle: &Whistle, chunks: impl Iterator<Item = Vec<f32>>) -> Result<(), whistle::Error> {
+    let mut stream = whistle.stream(&Options::streaming())?;
+    for chunk in chunks {
+        // 16 kHz mono, any size; small chunks (a step or less) keep each push short.
+        let update = stream.push(&chunk)?;
+        println!("{} [{}]", update.text, update.pending);
+    }
+    println!("{}", stream.finish()?.text);
+    Ok(())
+}
+```
+
+Each `StreamUpdate` holds the words newly committed (never retracted, times from the start of
+the stream), their text (`continues` when it begins with the rest of the word before: append
+it with no space), the unconfirmed `pending` tail, the language and any audio `dropped` at the
+30 s cap; `transcript()` returns everything committed so far. A word commits when two
+passes one `stream_step` (1 s) apart agree on it, about 1.3 s after it ends, or when a pause
+ends the utterance ([streaming.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/streaming.md)). The stream borrows the `Whistle`, so an app
+keeps the model alive beside it.
+
 ## Getting the model
 
 The weights are not in the crate. `whistle::model_file` names the exact file this crate version

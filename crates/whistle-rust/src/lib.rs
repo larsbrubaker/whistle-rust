@@ -4,6 +4,7 @@
 //!
 //! [`Whistle::from_cact`] loads the model, and [`Whistle::transcribe`] (or
 //! [`Whistle::transcribe_wav`]) turns audio into a [`Transcript`]: text, language and token ids.
+//! [`Whistle::stream`] transcribes live audio as it arrives ([`Stream`]).
 //!
 //! The library takes the model archive (`whistle.cact`) as bytes and never fetches anything, so
 //! the same code runs natively and in the browser. The port follows upstream's Apache-2.0 JAX
@@ -37,7 +38,7 @@ pub mod vad;
 pub use error::Error;
 pub use model::{set_threads, threads, MAX_THREADS};
 pub use transcribe::{
-    plan_windows, Cancel, Options, Transcript, VadMode, Whistle, Window, Word, DEFAULT_BEAMS,
-    DEFAULT_KEYWORD_BONUS, FRAME_SECONDS, LANGUAGES, MAX_BEAMS, MAX_INPUT_SAMPLES, MAX_SAMPLES,
-    OVERLAP_SAMPLES,
+    plan_windows, Cancel, Options, Stream, StreamUpdate, Transcript, VadMode, Whistle, Window,
+    Word, DEFAULT_BEAMS, DEFAULT_KEYWORD_BONUS, DEFAULT_STREAM_STEP, FRAME_SECONDS, LANGUAGES,
+    MAX_BEAMS, MAX_INPUT_SAMPLES, MAX_SAMPLES, OVERLAP_SAMPLES,
 };

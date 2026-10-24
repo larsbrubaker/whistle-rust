@@ -20,6 +20,7 @@ port loads. Nothing in the Rust build calls Python; the oracle only writes fixtu
 | `oracle/engine_transcripts.py` | Runs the engine CLI over the clips into `test-data/engine/*.json`. |
 | `oracle/make_extra_clips.py` | Synthesizes `test-data/clips-extra/*.wav` (names, places and jargon) with macOS `say` from `test-data/clips-extra/clips.json`, which also lists each clip's keywords. |
 | `oracle/engine_extra_transcripts.py` | Runs the engine CLI over the extra clips, plain and with `--audio-keywords`, into `test-data/engine-extra/<clip>.json` and `<clip>.keywords.json`. |
+| `oracle/engine_stream_transcripts.py` | Runs the engine CLI's `--audio-stream` mode (1 s chunks) over the contract clips into `test-data/engine-stream/<clip>.json`: its updates, `pass_ms` dropped. |
 
 ## Weights: the archive, not the checkpoint
 

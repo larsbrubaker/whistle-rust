@@ -33,7 +33,8 @@ let transcript = whistle.transcribe_wav(&std::fs::read("speech.wav")?, &Options:
 
 The package is `whistle-rust`; the library is imported as `whistle`. See the crate README for
 the options (language, voice-activity gating, beams, keywords, word timestamps, cancelling) and how
-audio over 30 s is windowed.
+audio over 30 s is windowed. Live audio streams through `Whistle::stream` with the
+`Options::streaming()` preset (the crate README and `docs/design/streaming.md`).
 
 ## Getting the model
 

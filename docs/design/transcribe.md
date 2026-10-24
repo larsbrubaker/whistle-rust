@@ -7,7 +7,8 @@ everything, so one `Whistle` can be kept for the life of the program and shared 
 the WAV (`audio::read_wav`, downmixed to mono), resamples to 16 kHz when the file is at another
 rate, then transcribes. A `Transcript` is the text, the language code, the text token ids
 (without BOS, the tag and EOS), and the words with their times when asked for. It is
-`PartialEq` but not `Eq`, since the word times are f32.
+`PartialEq` but not `Eq`, since the word times are f32. `stream(&Options)` opens a live
+transcription over the same per-window decode (`docs/design/streaming.md`).
 
 ## The call, in order
 

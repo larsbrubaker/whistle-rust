@@ -1,0 +1,82 @@
+{
+ "updates": [
+  {
+   "text": "Maat de muur van de",
+   "words": [
+    {
+     "word": "Maat",
+     "start": 0.08,
+     "end": 0.32,
+     "probability": 0.66
+    },
+    {
+     "word": "de",
+     "start": 0.32,
+     "end": 0.4,
+     "probability": 0.836
+    },
+    {
+     "word": "muur",
+     "start": 0.4,
+     "end": 0.56,
+     "probability": 0.997
+    },
+    {
+     "word": "van",
+     "start": 0.56,
+     "end": 0.8,
+     "probability": 1.0
+    },
+    {
+     "word": "de",
+     "start": 0.8,
+     "end": 0.88,
+     "probability": 0.994
+    }
+   ],
+   "pending": "dos 3 mm.",
+   "language": "nl",
+   "received": 2.0
+  },
+  {
+   "text": "dos 3",
+   "words": [
+    {
+     "word": "dos",
+     "start": 0.88,
+     "end": 1.12,
+     "probability": 0.72
+    },
+    {
+     "word": "3",
+     "start": 1.12,
+     "end": 1.36,
+     "probability": 0.637
+    }
+   ],
+   "pending": "mm dit.",
+   "language": "nl",
+   "received": 2.14
+  },
+  {
+   "text": "mm dit.",
+   "words": [
+    {
+     "word": "mm",
+     "start": 1.36,
+     "end": 1.92,
+     "probability": 0.794
+    },
+    {
+     "word": "dit.",
+     "start": 1.92,
+     "end": 2.08,
+     "probability": 0.44
+    }
+   ],
+   "pending": "",
+   "language": "nl",
+   "received": 2.14
+  }
+ ]
+}
