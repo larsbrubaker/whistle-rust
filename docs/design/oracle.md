@@ -48,7 +48,9 @@ steps never do), text until EOS.
 Per clip it records the input samples (`int16 / 32768`), the mel features, the stem output, the
 encoder input lanes and every encoder layer's lane state, the encoder output, the greedy tokens,
 the decoder's embedded input, memory (encoder output plus gated position encoding), Engram keys
-and values, every decoder layer's lane state, the decoder output and the logits.
+and values, every decoder layer's lane state, the decoder output and the logits. For the
+`--full` clips it also records each layer's block input (`layerNN/block_in`, the lanes'
+pre-mix, captured by intercepting the block call during the replay) and every internal.
 
 Flax does not capture inside the `nn.scan` that runs the layer stacks, so `dump.py` records each
 stack's real inputs at its call, then replays it layer by layer through upstream's `_LaneBody` on
@@ -59,8 +61,10 @@ must match the real stack's (checked, relative L2 ≤ 5e-2). Without quantizatio
 previous layer's fixture.
 
 Two tiers:
-- **Committed** (`test-data/fixtures/<clip>/`, ~16 MB): every clip's stage boundaries and tokens;
-  for `en_samantha` and `de_anna` also every layer's lanes and the logits.
+- **Committed** (`test-data/fixtures/<clip>/`, ~23 MB): every clip's stage boundaries and tokens;
+  for `en_samantha` and `de_anna` also every layer's lanes and the logits; for `en_samantha`
+  every internal of encoder layers 0 and 7 and decoder layers 0 and 3 (an Engram site), so each
+  building block has a committed input and output.
 - **Local** (`test-data/fixtures-local/<clip>/`, git-ignored, ~78 MB): block internals for the
   `--full` clips (every attention, projection, norm and MLP output per layer), and the per-layer
   lanes and logits of the other clips. Regenerate with `oracle/dump.py`.
