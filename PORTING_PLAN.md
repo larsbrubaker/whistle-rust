@@ -50,3 +50,23 @@ Beam search (default 3 beams), keyword biasing and word timestamps are in
   (`mattercad-ai` `AiTranscriptionProvider`; MatterCAD's recorders already record 16 kHz mono
   PCM16). The step lands in mattercad-rust, following its CLAUDE.md.
 - An agg-gui demo (microphone → live transcript), native and web.
+
+## 9. Release on crates.io
+
+A Rust developer can `cargo add whistle-rust`. The name is free on crates.io (checked
+2026-10-24); publishing runs from GitHub Actions with the `CARGO_REGISTRY_TOKEN` repository
+secret (a 90-day token the maintainer rotates; the first publish needs one with the publish-new
+scope), so the token never touches a development machine.
+
+- The packaged crate must build on its own: today `lib.rs` includes `../../../README.md`, which
+  is not in the package, so the published crate would fail to compile. Make the crate docs
+  build from the package, and check that in CI (`cargo package` plus a build of the unpacked
+  crate).
+- Package only what callers need (`src/`, README, LICENSE, the third-party notices Apache-2.0
+  requires); the repo-only tests, fixtures and oracle stay out. Document, and expose as
+  constants, the pinned `whistle.cact` download URL and its SHA-256, since the weights are not
+  in the crate.
+- CI (`ci.yml`): fmt, clippy and tests on macOS, Linux and Windows, fetching `whistle.cact`
+  (pinned, checksummed, cached); this also runs the AVX2 kernels on real x86_64 hardware.
+- `publish.yml` (`workflow_dispatch`, as tess2-rust does): tests, then `cargo publish`.
+
