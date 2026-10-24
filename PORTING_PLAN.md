@@ -9,8 +9,18 @@ verification bar for every stage: CLAUDE.md "Tolerance policy".
 
 Transcription is fast enough for push-to-talk on every target, and the weights stay packed
 (`docs/design/performance.md`: ~41 MB resident after binding, a 3 s clip in ~75-85 ms on an M5
-at one beam, ~2.2 ms per decoder token); what is left:
+at one beam, ~2.2 ms per decoder token); what is left.
 
+**Priority: single-threaded wasm32 (simd128).** The browser build has no threads, and phones and
+slower computers on the web are where transcription is slowest, so performance work is chosen
+and measured for one thread on wasm first; native threads are a bonus.
+
+- A wasm benchmark: the `bench` example built for wasm32-wasip1 with simd128, run under Node
+  (V8, the engine Chrome uses) and wasmtime, single-threaded, with a profile (`node --cpu-prof`)
+  of where the time goes; then the browser itself once the Web Worker host exists (item 8).
+- Optimise the single-thread hot paths that profile shows, in wasm terms: simd128 is 4-wide with
+  no per-lane variable shift and no FMA we may use; `exp`/`ln` come from software libm on wasm;
+  the encoder decodes ~19M packed weights per call on one thread.
 - Run the AVX2 paths' bit-identity tests on x86_64 hardware (dense, few-row and packed kernels
   are checked by construction and asm only); simd128 ran under wasmtime.
 - The 3 s encoder alone is 5-12% slower than the dense build (it decodes ~19M packed weights per
