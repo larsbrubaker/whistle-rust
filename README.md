@@ -14,37 +14,37 @@ the names and jargon you list, and word timestamps give each word's start, end a
 probability. Streaming is still to come
 (`PORTING_PLAN.md`).
 
-## Usage
+The crate's own README, [`crates/whistle-rust/README.md`](crates/whistle-rust/README.md), is
+its crates.io page and its docs.rs front page (the crate docs include it, so its examples
+compile as doctests). The full usage guide and options are there; this file covers the
+repository.
 
-```rust,no_run
-use whistle::{Options, Whistle};
+## Install
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // The library never fetches anything: the caller reads, bundles or downloads the archive.
-    let model = std::fs::read("models/whistle.cact")?;
-    let whistle = Whistle::from_cact(&model)?;
-    let wav = std::fs::read("speech.wav")?;
-    let transcript = whistle.transcribe_wav(&wav, &Options::default())?;
-    println!("{:?}: {}", transcript.language, transcript.text);
-    Ok(())
-}
+```bash
+cargo add whistle-rust
 ```
 
-`Whistle::transcribe` takes 16 kHz mono `f32` samples instead. `Options` forces a language
-(`language: Some("de".into())`), sets how the voice-activity detector gates the audio (`vad`:
-`GateAndTrim` by default, so silence gives an empty transcript), takes a `Cancel` handle
-that stops a transcription from another thread with `Error::Cancelled`, runs a beam search
-(`beams`: 3 by default, the smallest count that reproduced every engine transcript on the test
-clips, for about +195 ms on a 3.3 s clip; `beams: 1` is the greedy decode; up to 16), and favours names, places and jargon you list
-(`keywords: vec!["PETG".into()]`, strength `keyword_bonus`). See `docs/design/decoding.md`.
-`word_timestamps: true` fills `transcript.words` with each word's `start` and `end` in seconds
-from the start of the input and its `probability`, aligned from the decoder's cross-attention
-(within one 80 ms frame of the engine's on the test clips, for about +55 ms on a 3.4 s clip;
-`docs/design/timestamps.md`). `Transcript` is `PartialEq` but not `Eq` (the times are f32).
-Audio over 30 s is split into windows of at most 30 s (`whistle::plan_windows` shows the cuts):
-the language detected on the first window with at least 3 words is forced on the rest (set
-`language` to choose it), the texts join with spaces, and word times count from the start of
-the input; over 10 minutes is `Error::Input`.
+```rust,ignore
+use whistle::{Options, Whistle};
+let whistle = Whistle::from_cact(&std::fs::read("models/whistle.cact")?)?;
+let transcript = whistle.transcribe_wav(&std::fs::read("speech.wav")?, &Options::default())?;
+```
+
+The package is `whistle-rust`; the library is imported as `whistle`. See the crate README for
+the options (language, voice-activity gating, beams, keywords, word timestamps, cancelling) and how
+audio over 30 s is windowed.
+
+## Getting the model
+
+The weights are not in the crate and the library never fetches anything: `Whistle::from_cact`
+takes `whistle.cact` as bytes. `whistle::model_file` pins the file this crate version was tested
+against: `MODEL_URL` (Hugging Face `Cactus-Compute/whistle` at a fixed revision), `MODEL_SHA256`
+and `MODEL_BYTES`. Native apps bundle it or download it once on first use; web hosts download
+and cache it. Check the size and SHA-256 after a download. `whistle.cact` is Apache-2.0 by
+Cactus Compute, Inc.: an application that ships it includes the Apache-2.0 license and
+`THIRD_PARTY_NOTICES.md`. In this repository, `scripts/fetch-weights.sh` downloads it into
+`models/` and checks it.
 
 ## How it is built
 
@@ -55,8 +55,12 @@ described in `docs/design/model.md`.
 
 ```bash
 scripts/fetch-weights.sh        # models/whistle.cact (Apache-2.0, 16.9 MB)
-scripts/gates.sh                # fmt, clippy, tests, wasm32 build
+scripts/gates.sh                # fmt, clippy, tests, wasm32 build, package check
+scripts/check-package.sh        # the packaged crate builds and documents on its own
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same checks on Linux, macOS and Windows on every push
+and pull request, plus the wasm32 builds.
 
 Regenerating the oracle fixtures needs the reference code, the fp32 checkpoint and Python 3.12:
 
@@ -65,7 +69,22 @@ scripts/fetch-reference.sh && scripts/fetch-weights.sh --checkpoint && oracle/se
 oracle/.venv/bin/python -I oracle/dump.py
 ```
 
+## Releasing
+
+`.github/workflows/publish.yml` publishes to crates.io; it runs only when started by hand
+(Actions > publish > Run workflow). It fetches the model, runs the tests in release, runs
+`scripts/check-package.sh`, then `cargo publish -p whistle-rust`.
+
+1. Bump `version` in the root `Cargo.toml` (`[workspace.package]`) and push to `main`.
+2. Make sure the `CARGO_REGISTRY_TOKEN` repository secret is current: a 90-day crates.io token,
+   rotated with `gh secret set CARGO_REGISTRY_TOKEN --repo larsbrubaker/whistle-rust`. The first
+   publish needs the publish-new scope; later ones need publish-update for `whistle-rust`.
+3. Run the workflow.
+
+The token lives only in the repository secret, never on a development machine.
+
 ## License
 
-Apache-2.0 (`LICENSE`). The weights and the reference model code are Apache-2.0 by Cactus
+Apache-2.0 (`LICENSE`; the crate packages copies of it and of `THIRD_PARTY_NOTICES.md`, kept
+identical by the `package_files` test). The weights and the reference model code are Apache-2.0 by Cactus
 Compute, Inc. (`THIRD_PARTY_NOTICES.md`).

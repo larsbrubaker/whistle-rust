@@ -4,7 +4,8 @@
 # checkpoints/whistle.safetensors (220 MB, the oracle's cross-check). With --engine, also the
 # closed-source Needle 3 engine CLI for this host into oracle/.engine/ (REFERENCE
 # "needle3-engine"): a black-box transcript oracle only, never disassembled.
-# Every file is checked against scripts/weights.sha256.
+# Every file is checked against scripts/weights.sha256, with shasum or, where that is missing
+# (Windows git-bash, some Linux images), sha256sum.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 WEIGHTS=$(awk '$1 == "whistle-weights" { print $2 }' REFERENCE)
@@ -18,6 +19,14 @@ fetch() { # repo revision path dest
     mv "$4.part" "$4"
   fi
   echo "$4"
+}
+
+sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | cut -d' ' -f1
+  else
+    sha256sum "$1" | cut -d' ' -f1
+  fi
 }
 
 files=(models/whistle.cact)
@@ -43,7 +52,7 @@ done
 
 for f in "${files[@]}"; do
   want=$(awk -v f="$f" '$2 == f { print $1 }' scripts/weights.sha256 2>/dev/null || true)
-  have=$(shasum -a 256 "$f" | cut -d' ' -f1)
+  have=$(sha256 "$f")
   if [ -z "$want" ]; then
     echo "$have  $f" >> scripts/weights.sha256
     echo "recorded $f $have"

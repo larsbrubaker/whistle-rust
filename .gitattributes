@@ -1,0 +1,8 @@
+# Line endings: every text file is checked out with LF on every OS, so the scripts that parse
+# REFERENCE and scripts/weights.sha256 line by line, and the fixtures, read the same bytes on
+# Windows as on macOS and Linux. Audio, arrays, the model archive and packaged crates are binary.
+* text=auto eol=lf
+*.wav binary
+*.npy binary
+*.cact binary
+*.crate binary

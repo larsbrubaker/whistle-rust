@@ -19,14 +19,16 @@
 //! The decoder's inputs are ported too: [`model::Weights::embed`], the Engram keys and values
 //! ([`model::Engram::keys_values`], [`model::engram_add`]) and [`model::Weights::decoder_memory`].
 
-// The README follows as the rest of the crate docs, so its usage example compiles as a doctest.
-#![doc = include_str!("../../../README.md")]
+// The crate README (crates.io's page for the crate) follows as the rest of the crate docs, so its
+// usage examples compile as doctests. It sits beside Cargo.toml so it is inside the package.
+#![doc = include_str!("../README.md")]
 
 pub mod audio;
 pub mod cact;
 pub mod error;
 mod math;
 pub mod model;
+pub mod model_file;
 pub mod quant;
 pub mod tokenizer;
 mod transcribe;

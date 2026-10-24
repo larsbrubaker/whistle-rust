@@ -10,6 +10,8 @@
 #   doctests  cargo test --workspace --doc
 #   wasm      cargo build -p whistle-rust --target wasm32-unknown-unknown (the library must
 #             build for the browser; GATES_WASM=0 skips it)
+#   package   scripts/check-package.sh (the packaged crate builds, documents and compiles its
+#             doctests on its own, under 1 MB; a few seconds; GATES_PACKAGE=0 skips it)
 set -uo pipefail
 cd "$(dirname "$0")/.."
 failed=()
@@ -35,6 +37,9 @@ fi
 step doctests cargo test --workspace --doc
 if [ "${GATES_WASM:-1}" != 0 ]; then
   step wasm cargo build -p whistle-rust --target wasm32-unknown-unknown
+fi
+if [ "${GATES_PACKAGE:-1}" != 0 ]; then
+  step package scripts/check-package.sh
 fi
 if [ ${#failed[@]} -ne 0 ]; then
   echo "GATES FAILED: ${failed[*]}"

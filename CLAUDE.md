@@ -64,8 +64,8 @@ Three nets. A change is not done until all that apply are green.
 
 Plus the gates that run with net 1:
 - `file_compliance` (`crates/workspace-gates/tests/file_compliance.rs`): every `.rs`, `.wgsl`,
-  `.py`, `.sh`, `.ts` and `.js` file has at most **800 non-empty lines**, starts with a header
-  comment, and contains no merge-conflict markers. No exemptions, ever.
+  `.py`, `.sh`, `.ts`, `.js`, `.yml` and `.yaml` file has at most **800 non-empty lines**,
+  starts with a header comment, and contains no merge-conflict markers. No exemptions, ever.
 - `cargo clippy --workspace --all-targets -- -D warnings`.
 
 ### Tolerance policy
@@ -151,7 +151,8 @@ Design docs in `docs/design/` describe how the code and the model are now.
 ## Commands
 
 ```bash
-scripts/gates.sh                              # the full gate: fmt, clippy, nextest, doctests, wasm32
+scripts/gates.sh                              # the full gate: fmt, clippy, nextest, doctests, wasm32, package
+scripts/check-package.sh                      # cargo package, then build, doc and doctest the unpacked crate (< 1 MB)
 cargo nextest run --workspace --test <area>   # one area's tests
 cargo test --workspace --test file_compliance # file compliance
 cargo build -p whistle-rust --target wasm32-unknown-unknown

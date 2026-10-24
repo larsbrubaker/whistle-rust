@@ -1,0 +1,97 @@
+# whistle-rust
+
+A pure Rust port of [Whistle](https://huggingface.co/Cactus-Compute/whistle), Cactus Compute's
+16.9 MB on-device speech-to-text model: 16 kHz mono audio in; text, language and word timings
+out; English, German, French, Spanish, Italian, Dutch and Polish. One library for macOS,
+Windows, Linux and the browser (wasm32), with no native code and no runtime dependencies.
+
+Transcription of up to 10 minutes of audio works, in one pass up to 30 s and in windows beyond
+that, cut inside the voice-activity detector's pauses. Greedy (`beams: 1`) reproduces the
+reference decode on every test clip, the default 3-beam search reproduces the engine's
+transcripts, keyword biasing favours the names and jargon you list, and word timestamps give
+each word's start, end and probability. Streaming is still to come.
+
+## Install
+
+```bash
+cargo add whistle-rust
+```
+
+The package is `whistle-rust`; the library is imported as `whistle`:
+
+```rust,no_run
+use whistle::{Options, Whistle};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // The library never fetches anything: the caller reads, bundles or downloads the archive.
+    let model = std::fs::read("models/whistle.cact")?;
+    let whistle = Whistle::from_cact(&model)?;
+    let wav = std::fs::read("speech.wav")?;
+    let transcript = whistle.transcribe_wav(&wav, &Options::default())?;
+    println!("{:?}: {}", transcript.language, transcript.text);
+    Ok(())
+}
+```
+
+`Whistle::transcribe` takes 16 kHz mono `f32` samples instead. `Options` forces a language
+(`language: Some("de".into())`), sets how the voice-activity detector gates the audio (`vad`:
+`GateAndTrim` by default, so silence gives an empty transcript), takes a `Cancel` handle that
+stops a transcription from another thread with `Error::Cancelled`, runs a beam search (`beams`:
+3 by default, the smallest count that reproduced every engine transcript on the test clips, for
+about +195 ms on a 3.3 s clip; `beams: 1` is the greedy decode; up to 16), and favours names,
+places and jargon you list (`keywords: vec!["PETG".into()]`, strength `keyword_bonus`; see
+[decoding.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/decoding.md)).
+`word_timestamps: true` fills `transcript.words` with each word's `start` and `end` in seconds
+from the start of the input and its `probability`, aligned from the decoder's cross-attention
+(within one 80 ms frame of the engine's on the test clips, for about +55 ms on a 3.4 s clip;
+[timestamps.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/timestamps.md)).
+`Transcript` is `PartialEq` but not `Eq` (the times are f32).
+Audio over 30 s is split into windows of at most 30 s (`whistle::plan_windows` shows the cuts;
+[windowing.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/windowing.md)):
+the language detected on the first window with at least 3 words is forced on the rest (set
+`language` to choose it), the texts join with spaces, and word times count from the start of
+the input; over 10 minutes is `Error::Input`.
+
+## Getting the model
+
+The weights are not in the crate. `whistle::model_file` names the exact file this crate version
+was tested against:
+
+- `MODEL_URL`: `whistle.cact` from Hugging Face `Cactus-Compute/whistle` at a pinned revision
+- `MODEL_SHA256`: its SHA-256, as lowercase hex
+- `MODEL_BYTES`: its size, 16,919,407 bytes
+
+`Whistle::from_cact` takes the archive as bytes and does no I/O, so how the file arrives is the
+caller's choice. A native app bundles it with the app or downloads it once on first use into its
+data directory; a web host downloads it (from that URL or its own copy) and caches it, for
+example in the Cache API or IndexedDB. Check the length and SHA-256 after a download:
+
+```rust,no_run
+use whistle::model_file::{MODEL_BYTES, MODEL_SHA256};
+
+fn check(model: &[u8], sha256_hex: &str) -> Result<(), String> {
+    if model.len() as u64 != MODEL_BYTES || sha256_hex != MODEL_SHA256 {
+        return Err("whistle.cact is not the file this crate was tested against".into());
+    }
+    Ok(())
+}
+```
+
+**License note.** `whistle.cact` is Copyright Cactus Compute, Inc., under the Apache License
+2.0. An application that ships or downloads it must include the Apache-2.0 license text and the
+notice in `THIRD_PARTY_NOTICES.md` (packaged with this crate).
+
+## Tests
+
+The crate's tests compare every stage with fixtures computed by the reference model and run on
+the real model file, so they need the repository (`test-data/` and `models/`) and run there,
+not from the downloaded package: clone
+[github.com/larsbrubaker/whistle-rust](https://github.com/larsbrubaker/whistle-rust), run
+`scripts/fetch-weights.sh`, then `scripts/gates.sh`.
+
+## License
+
+Apache-2.0 (`LICENSE`). whistle-rust is a Rust translation of Cactus Compute's Apache-2.0 model
+code ([cactus-compute/needle](https://github.com/cactus-compute/needle)); the weights are
+Apache-2.0 by Cactus Compute, Inc. (`THIRD_PARTY_NOTICES.md`). Source, tests and the design
+docs: [github.com/larsbrubaker/whistle-rust](https://github.com/larsbrubaker/whistle-rust).

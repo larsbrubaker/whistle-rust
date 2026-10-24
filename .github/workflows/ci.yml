@@ -1,0 +1,93 @@
+# CI for whistle-rust: the same checks as scripts/gates.sh, on every push and pull request.
+#
+# The `test` job runs on Linux, macOS and Windows: fmt, clippy (-D warnings), nextest, doctests
+# and scripts/check-package.sh (the packaged crate builds on its own). Tests need the pinned
+# model, models/whistle.cact (16.9 MB, Apache-2.0): it is cached under its SHA-256 and fetched
+# by scripts/fetch-weights.sh, which checks it against scripts/weights.sha256. The Linux and
+# Windows runners are x86_64 with AVX2, so the kernel bit-identity tests (src/model/kernels/
+# tests.rs, packed_tests.rs: `best_path()` against scalar) run the AVX2 kernels there; macOS
+# runners are arm64 and run the NEON ones.
+#
+# The `wasm` job builds the library for wasm32-unknown-unknown with and without simd128, and
+# the bench example for wasm32-wasip1 (what the wasm benchmark runs).
+#
+# The toolchain is the one pinned in rust-toolchain.toml, read from that file. Checkouts are LF
+# on every OS (.gitattributes), so Windows needs no core.autocrlf override.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read the pinned toolchain and model checksum
+        id: pins
+        run: |
+          echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+          echo "model=$(awk '$2 == "models/whistle.cact" { print $1 }' scripts/weights.sha256)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.pins.outputs.channel }}
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - name: Cache the model
+        uses: actions/cache@v6
+        with:
+          path: models
+          key: whistle-cact-${{ runner.os }}-${{ steps.pins.outputs.model }}
+      - name: Fetch the model
+        run: scripts/fetch-weights.sh
+      - name: Check AVX2 (the x86_64 kernels must run, not fall back to scalar)
+        if: runner.os == 'Linux'
+        run: grep -qw avx2 /proc/cpuinfo
+      - name: fmt
+        run: cargo fmt --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: tests
+        run: cargo nextest run --workspace
+      - name: doctests
+        run: cargo test --workspace --doc
+      - name: package
+        run: scripts/check-package.sh
+
+  wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read the pinned toolchain
+        id: pins
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.pins.outputs.channel }}
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+      - uses: Swatinem/rust-cache@v2
+      - name: wasm32-unknown-unknown
+        run: cargo build -p whistle-rust --target wasm32-unknown-unknown
+      - name: wasm32-unknown-unknown with simd128
+        env:
+          RUSTFLAGS: -C target-feature=+simd128
+        run: cargo build -p whistle-rust --target wasm32-unknown-unknown
+      - name: bench example for wasm32-wasip1 with simd128
+        env:
+          RUSTFLAGS: -C target-feature=+simd128
+        run: cargo build -p whistle-rust --release --example bench --target wasm32-wasip1

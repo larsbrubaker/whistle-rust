@@ -1,9 +1,9 @@
 // Workspace-wide file compliance gate (CLAUDE.md, "Testing framework"). Walks the whole
 // repository from the workspace root and checks every source file:
 //
-//   (a) at most 800 non-empty (non-whitespace) lines — `.rs .wgsl .py .sh .ts .js`;
+//   (a) at most 800 non-empty (non-whitespace) lines — `.rs .wgsl .py .sh .ts .js .yml .yaml`;
 //   (b) starts with a header comment — `//` or `/*` for rs/wgsl/ts/js (covers `//!`), `#` for
-//       py/sh, where a `#!` shebang line must be followed by a `#` comment line;
+//       py/sh/yml/yaml, where a `#!` shebang line must be followed by a `#` comment line;
 //   (c) no merge-conflict markers — in every UTF-8 text file, Markdown included.
 //
 // No exemption list, ever: a file over the limit is split by responsibility (the
@@ -23,7 +23,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const MAX_NON_EMPTY_LINES: usize = 800;
-const SOURCE_EXTENSIONS: [&str; 6] = ["rs", "wgsl", "py", "sh", "ts", "js"];
+const SOURCE_EXTENSIONS: [&str; 8] = ["rs", "wgsl", "py", "sh", "ts", "js", "yml", "yaml"];
 const REFACTOR_HINT: &str =
     "Split each file by responsibility; see the `file-size-refactoring` skill. No exemptions.";
 
@@ -97,7 +97,7 @@ fn has_header_comment(ext: &str, text: &str) -> bool {
     let mut lines = text.lines();
     let first = lines.next().unwrap_or("");
     match ext {
-        "py" | "sh" => {
+        "py" | "sh" | "yml" | "yaml" => {
             if first.starts_with("#!") {
                 lines.next().is_some_and(|l| l.starts_with('#'))
             } else {
@@ -250,6 +250,8 @@ fn compliance_rules_classify_examples() {
     ));
     assert!(!has_header_comment("sh", "#!/usr/bin/env bash\nset -e\n"));
     assert!(has_header_comment("py", "# generator\nimport os\n"));
+    assert!(has_header_comment("yml", "# CI\nname: ci\n"));
+    assert!(!has_header_comment("yaml", "name: ci\n"));
     assert!(is_conflict_marker("<<<<<<< HEAD"));
     assert!(is_conflict_marker("======="));
     assert!(is_conflict_marker(">>>>>>> branch\r"));

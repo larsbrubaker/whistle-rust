@@ -9,6 +9,7 @@
 pub mod archive;
 pub mod forced;
 pub mod npy;
+pub mod sha256;
 
 use std::path::{Path, PathBuf};
 

@@ -1,0 +1,77 @@
+# Publishes whistle-rust to crates.io from GitHub's network, run by hand (Actions > publish >
+# Run workflow); publishing from CI keeps the token off development machines, as the suite's
+# other crates do.
+#
+# Before running it:
+#   - Bump `version` in the root Cargo.toml ([workspace.package]) and commit; crates.io never
+#     accepts the same version twice.
+#   - The repository secret CARGO_REGISTRY_TOKEN must hold a current crates.io API token. It is a
+#     90-day token the maintainer creates at crates.io/settings/tokens and rotates with
+#       gh secret set CARGO_REGISTRY_TOKEN --repo larsbrubaker/whistle-rust
+#     The first publish needs a token with the publish-new scope (the crate does not exist yet);
+#     later ones need publish-update, scoped to whistle-rust.
+#   - It runs only from main (the job's `if`), with read-only repository permissions.
+#
+# Further options the maintainer can add (not set up here):
+#   - A GitHub Environment (e.g. "crates-io") with a required reviewer, holding the secret
+#     there instead of in the repository, so every publish needs a click of approval.
+#   - After the first release, crates.io trusted publishing (OIDC) can replace the token: the
+#     crate trusts this repository's workflow and no long-lived secret is stored at all.
+#
+# Steps: fail fast if this version is already on crates.io, fetch the pinned model (tests need
+# it), run the whole test suite in release, check the packaged crate builds on its own
+# (scripts/check-package.sh), then `cargo publish`.
+name: publish
+
+on:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      # The crate inherits the workspace version (root Cargo.toml, [workspace.package]).
+      - name: Check the version is not on crates.io yet
+        run: |
+          grep -q '^version.workspace = true' crates/whistle-rust/Cargo.toml || {
+            echo "crates/whistle-rust/Cargo.toml no longer inherits the workspace version" >&2; exit 1; }
+          version=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          [ -n "$version" ] || { echo "no version in the root Cargo.toml" >&2; exit 1; }
+          url="https://crates.io/api/v1/crates/whistle-rust/$version"
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -A "whistle-rust publish workflow (github.com/larsbrubaker/whistle-rust)" "$url")
+          case "$status" in
+            404) echo "whistle-rust $version is not on crates.io yet: publishing" ;;
+            200) echo "whistle-rust $version is already on crates.io: bump version in Cargo.toml" >&2; exit 1 ;;
+            *) echo "unexpected HTTP $status from $url" >&2; exit 1 ;;
+          esac
+      - name: Read the pinned toolchain
+        id: pins
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.pins.outputs.channel }}
+      - uses: taiki-e/install-action@nextest
+      - name: Fetch the model
+        run: scripts/fetch-weights.sh
+      - name: tests
+        run: cargo nextest run --workspace --release
+      - name: package
+        run: scripts/check-package.sh
+      - name: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p whistle-rust

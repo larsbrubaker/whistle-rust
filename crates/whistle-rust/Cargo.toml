@@ -1,5 +1,6 @@
 # whistle-rust: the library. Std only, no runtime dependencies; builds for
-# wasm32-unknown-unknown. Imported as `whistle`.
+# wasm32-unknown-unknown. Imported as `whistle`. Published to crates.io by
+# .github/workflows/publish.yml; scripts/check-package.sh builds the packaged crate on its own.
 [package]
 name = "whistle-rust"
 description = "Pure Rust port of Whistle, an on-device speech-to-text model (English, German, French, Spanish, Italian, Dutch, Polish)"
@@ -9,9 +10,17 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+homepage = "https://github.com/larsbrubaker/whistle-rust"
+documentation = "https://docs.rs/whistle-rust"
 keywords = ["speech-recognition", "asr", "speech-to-text", "wasm", "transcription"]
-categories = ["multimedia::audio", "science"]
-readme = "../../README.md"
+categories = ["multimedia::audio", "science", "wasm"]
+# Crates.io's page and the crate docs (lib.rs includes it), so it lives beside this file.
+readme = "README.md"
+# Only what a caller builds needs. The tests and the bench example stay in the repository: they
+# read test-data/ and models/, which are not packaged. LICENSE and THIRD_PARTY_NOTICES.md are
+# copies of the root files (Apache-2.0 requires the notices to travel with the code;
+# workspace-gates' package_files test keeps the copies identical).
+include = ["/src/**", "/README.md", "/LICENSE", "/THIRD_PARTY_NOTICES.md", "/Cargo.toml"]
 
 [lib]
 name = "whistle"
