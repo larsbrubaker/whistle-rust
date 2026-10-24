@@ -49,8 +49,11 @@ Transcription is fast enough for push-to-talk on every target.
 
 The behaviours only the closed engine has, designed here and held to the engine transcripts.
 
-- Silence gate: silence and steady noise return an empty transcript (the reference decode
-  says "Thank you." on `silence`; the engine returns "").
+- Silence gate wiring: transcription runs `vad::speech_segments` first, returns an empty
+  transcript when there is no speech (the reference decode says "Thank you." on `silence`; the
+  engine returns ""), and decodes only the speech span. The detector's known false positives
+  (intermittent beeps, typing, `docs/design/vad.md`) need a check on real microphone recordings
+  before always-on use.
 - Beam search (5 beams), keyword biasing, word timestamps from cross-attention, windowing past
   30 s, streaming that commits words two passes agree on.
 - Tests: word error rate within noise of `test-data/engine/` per clip; timestamps against the

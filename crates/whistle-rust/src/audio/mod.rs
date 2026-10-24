@@ -2,7 +2,7 @@
 //! input features (`mel`, built on the in-crate real FFT in `fft`). Everything the encoder's stem
 //! consumes starts here; the model sees only the normalized log-mel `Features`.
 
-mod fft;
+pub(crate) mod fft;
 mod mel;
 mod resample;
 mod wav;
