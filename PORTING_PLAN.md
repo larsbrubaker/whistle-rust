@@ -5,20 +5,6 @@ needs. Delete an item when it lands; rewrite it to what is left when part of it 
 model, the archive and the oracle work: `docs/design/model.md`, `docs/design/oracle.md`. The
 verification bar for every stage: CLAUDE.md "Tolerance policy".
 
-## 1. Archive, dequantization and tokenizer
-
-A caller can load `whistle.cact` from bytes, see its geometry, and decode token ids to text.
-
-- `cact` module: header (tag `0x05E12A84`, geometry, `kv_bits`, codebooks), directory, blobs,
-  each record bounds-checked; a malformed or truncated archive is an `Err`, never a panic.
-- `quant` module: CQ unpack at 1, 2, 3, 4 bits and ternary (record bits 5), group norms,
-  128-point Walsh–Hadamard; fp16 → f32.
-- Tokenizer: decode (byte-fallback pieces, `▁` → space, control pieces dropped) and encode
-  (user-defined markers first, then score-greedy BPE, byte fallback), matching `RefTokenizer`.
-- Tests: every tensor equals the oracle's `read_export` value (new fixture: a per-tensor
-  checksum and a few full tensors, added to `oracle/dump.py` in this step); every clip's
-  reference token stream decodes to its manifest text.
-
 ## 3. Encoder
 
 A caller can compute the speech embedding (one 512-vector per 80 ms frame).

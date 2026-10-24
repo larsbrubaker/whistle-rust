@@ -7,6 +7,14 @@
 //! reference (`needle-reference/`, pinned in `REFERENCE`); `docs/design/` describes the model
 //! and `PORTING_PLAN.md` the open work.
 //!
-//! [`audio`] turns a WAV file or 16 kHz mono samples into the model's input features.
+//! [`cact::Archive::parse`] reads the archive's geometry and tensor directory,
+//! [`cact::Tensor::to_f32`] dequantizes any tensor, [`tokenizer::Tokenizer`] encodes and decodes
+//! text, and [`audio`] turns a WAV file or 16 kHz mono samples into the model's input features.
 
 pub mod audio;
+pub mod cact;
+pub mod error;
+pub mod quant;
+pub mod tokenizer;
+
+pub use error::Error;

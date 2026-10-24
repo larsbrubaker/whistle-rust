@@ -1,10 +1,12 @@
 // Shared test support for whistle-rust's test areas: the oracle fixtures (test-data/fixtures/,
 // written by oracle/dump.py), their .npy reader (`npy`) and the comparison every stage test uses
-// (`relative_l2`, CLAUDE.md "Tolerance policy"). Each area binary pulls it in with
+// (`relative_l2`, CLAUDE.md "Tolerance policy"); `archive` holds the archive fixture and a
+// synthetic-archive builder. Each area binary pulls it in with
 // `#[path = "support/mod.rs"] mod support;`.
 
 #![allow(dead_code)] // each area binary uses its own subset
 
+pub mod archive;
 pub mod npy;
 
 use std::path::{Path, PathBuf};
@@ -26,7 +28,7 @@ pub fn model_path() -> PathBuf {
     repo_root().join("models").join("whistle.cact")
 }
 
-fn read_json(path: &Path) -> Value {
+pub fn read_json(path: &Path) -> Value {
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }

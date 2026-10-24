@@ -149,6 +149,7 @@ oracle/setup.sh                               # oracle/.venv (Python 3.12, JAX)
 oracle/.venv/bin/python -I oracle/cact_params.py      # check the archive rebuild against the checkpoint
 oracle/.venv/bin/python -I oracle/dump.py             # stage fixtures (regenerate only when REFERENCE changes)
 oracle/.venv/bin/python -I oracle/dump_mel.py         # the mel matrix fixture (test-data/fixtures/mel.npy)
+oracle/.venv/bin/python -I oracle/dump_archive.py     # the archive and tokenizer fixture (test-data/fixtures/archive/)
 oracle/.venv/bin/python -I oracle/engine_transcripts.py   # regenerate the engine transcripts
 ```
 

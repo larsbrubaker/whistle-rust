@@ -13,6 +13,7 @@ port loads. Nothing in the Rust build calls Python; the oracle only writes fixtu
 | `oracle/setup.sh` | `oracle/.venv` (Python 3.12) from `requirements.lock` (jax 0.12.0.1, flax 0.12.10). |
 | `oracle/cact_params.py` | Rebuilds the Flax parameter tree from `whistle.cact` and checks it against the checkpoint. |
 | `oracle/dump.py` | Writes the per-clip stage fixtures. |
+| `oracle/dump_archive.py` | Writes `test-data/fixtures/archive/`: the geometry, codebooks, and per tensor (export order and name) its dtype, shape, width and checksums of upstream's `read_export` values with 64 sampled elements; full arrays for a few tensors; tokenizer encode and decode cases. |
 | `oracle/dump_mel.py` | Writes `test-data/fixtures/mel.npy`, upstream's `mel_matrix` for the default config. |
 | `oracle/make_clips.py` | Synthesizes `test-data/clips/*.wav` with macOS `say` (16 kHz mono PCM16) from `oracle/clips.json`, plus one second of silence. |
 | `oracle/engine_transcripts.py` | Runs the engine CLI over the clips into `test-data/engine/*.json`. |
