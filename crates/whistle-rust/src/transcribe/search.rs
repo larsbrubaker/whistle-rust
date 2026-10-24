@@ -131,9 +131,9 @@ fn log_sum_exp(scores: &[f32]) -> f64 {
     }
     let sum: f64 = scores
         .iter()
-        .map(|&s| (finite(f64::from(s)) - max).exp())
+        .map(|&s| crate::math::exp(finite(f64::from(s)) - max))
         .sum();
-    max + sum.ln()
+    max + crate::math::ln(sum)
 }
 
 /// The `k` best text ids of one row by raw score plus keyword adjustment, best first, ties to

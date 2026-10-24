@@ -58,7 +58,7 @@ impl Kernel {
                 let sinc = if arg == 0.0 {
                     1.0
                 } else {
-                    (std::f64::consts::PI * arg).sin() / (std::f64::consts::PI * arg)
+                    crate::math::sin(std::f64::consts::PI * arg) / (std::f64::consts::PI * arg)
                 };
                 sinc * bessel_i0(BETA * (1.0 - u * u).sqrt()) / self.i0_beta
             };

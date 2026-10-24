@@ -28,7 +28,7 @@ fn to_mel(f: f64) -> f64 {
     if f < 1000.0 {
         f * 3.0 / 200.0
     } else {
-        15.0 + (f.max(1e-9) / 1000.0).ln() * 27.0 / 6.4f64.ln()
+        15.0 + crate::math::ln(f.max(1e-9) / 1000.0) * 27.0 / crate::math::ln(6.4)
     }
 }
 
@@ -36,7 +36,7 @@ fn to_hz(m: f64) -> f64 {
     if m < 15.0 {
         m * 200.0 / 3.0
     } else {
-        1000.0 * ((m - 15.0) * 6.4f64.ln() / 27.0).exp()
+        1000.0 * crate::math::exp((m - 15.0) * crate::math::ln(6.4) / 27.0)
     }
 }
 
@@ -74,7 +74,9 @@ fn window() -> Vec<f64> {
     (0..WIN)
         .map(|k| {
             let n = 2.0 * k as f64 + 1.0 - WIN as f64;
-            f64::from((0.5 + 0.5 * (std::f64::consts::PI * n / (WIN - 1) as f64).cos()) as f32)
+            f64::from(
+                (0.5 + 0.5 * crate::math::cos(std::f64::consts::PI * n / (WIN - 1) as f64)) as f32,
+            )
         })
         .collect()
 }
@@ -123,7 +125,7 @@ pub fn features(samples: &[f32]) -> Features {
             let energy: f64 = (0..FFT_BINS)
                 .map(|b| power[b] * f64::from(mel[b * MELS + m]))
                 .sum();
-            *out = (energy + 2f64.powi(-24)).ln();
+            *out = crate::math::ln(energy + 2f64.powi(-24));
         }
     }
     let n = valid.max(1) as f64;

@@ -15,12 +15,10 @@ at one beam, ~2.2 ms per decoder token); what is left.
 slower computers on the web are where transcription is slowest, so performance work is chosen
 and measured for one thread on wasm first; native threads are a bonus.
 
-- Make native and wasm compute the same bits (`scripts/wasm-test.sh` runs the whole suite on
-  wasm32-wasip1 under wasmtime, simd128 and scalar, and every contract passes; but the 26.6 s
-  benchmark clip decodes differently, and `examples/stage_hashes.rs` shows the first difference
-  in the stem's `silu`: f32 `exp` from the platform libm). Port deterministic pure-Rust math
-  (musl, MIT) for every transcendental the model, front end, VAD and decoding use, so every
-  target computes identical bits; re-measure the token contract and the stage bounds on native.
+- Win back the deterministic math's cost (+10% native, +8% Node on a 3 s clip): the ported
+  `expf` is ~4x slower per call than Apple's and is 13.7% of a call (stem silu 7.5%, Hadamard
+  MLP 3.4%, attention gates). A slice-level `expf`/`silu`/`sigmoid` that runs the same IEEE
+  operations lane by lane (NEON, SSE2, simd128) keeps every bit and vectorises them.
 - Optimise for one wasm thread, by the Node (V8) profile (`scripts/wasm-bench.sh profile`): the
   decoder's packed kernel is 33% of a 3 s clip at one beam and 56% at three (each weight is
   index-decoded for one multiply-add; batching helps at 3+ beams, a wasm-friendly index layout

@@ -7,6 +7,7 @@
 #![allow(dead_code)] // each area binary uses its own subset
 
 pub mod archive;
+pub mod forced;
 pub mod npy;
 
 use std::path::{Path, PathBuf};

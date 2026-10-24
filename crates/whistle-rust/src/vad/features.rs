@@ -53,7 +53,7 @@ pub(crate) fn frames(samples: &[f32], low_cut_hz: f32) -> Vec<Frame> {
     let fft = Fft::new(FFT);
     // Periodic Hann window, scaled so a stationary signal's power reads the same as unwindowed.
     let window: Vec<f64> = (0..WIN)
-        .map(|n| 0.5 - 0.5 * (2.0 * std::f64::consts::PI * n as f64 / WIN as f64).cos())
+        .map(|n| 0.5 - 0.5 * crate::math::cos(2.0 * std::f64::consts::PI * n as f64 / WIN as f64))
         .collect();
     let window_power: f64 = window.iter().map(|w| w * w).sum::<f64>();
     let low = bin_of(low_cut_hz);
@@ -83,7 +83,7 @@ pub(crate) fn frames(samples: &[f32], low_cut_hz: f32) -> Vec<Frame> {
         // windowed mean power normalised back to the unwindowed signal's.
         let scale = FFT as f64 * window_power;
         out.push(Frame {
-            band_db: bands.map(|p| (10.0 * (p / scale + POWER_EPS).log10()) as f32),
+            band_db: bands.map(|p| (10.0 * crate::math::log10(p / scale + POWER_EPS)) as f32),
         });
     }
     out

@@ -25,6 +25,7 @@
 pub mod audio;
 pub mod cact;
 pub mod error;
+mod math;
 pub mod model;
 pub mod quant;
 pub mod tokenizer;

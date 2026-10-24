@@ -1,18 +1,24 @@
 // Keyword biasing: on the extra clips (names, places, product words) biasing finds at least the
 // measured number of keywords at one beam and at three, including every keyword the engine
 // finds with its own keyword option; on the eight contract clips, irrelevant keywords leave the
-// transcript exactly as it was (the contract text at one beam, the engine's at three). The bonus sweep and the counts without biasing are an ignored
-// measurement.
+// transcript exactly as it was (the port's greedy snapshot at one beam, test-data/snapshots/,
+// and the engine's text at three). The bonus sweep and the counts without biasing are an
+// ignored measurement.
 
 use whistle::Options;
 
 use crate::clips::{beams, contract_clips, extra_clips, transcribe};
-use crate::support::Fixture;
+use crate::support::forced::snapshot;
 use crate::wer::normalize;
 
 /// Keywords found with biasing at the default bonus, measured 2026-10-24 (of 13), for one beam
-/// and for three.
-const FOUND: [(usize, usize); 2] = [(1, 9), (3, 9)];
+/// and for three. Three beams re-pinned from 9 to 8 when the deterministic `exp` landed: the
+/// lost keyword is "Ultimaker" on en_cura ("the ultimate cura settings", which is also the
+/// engine's text with the keyword). Unbiased, "ultimaker" trails "ultimate" by 2.4 and 6.7
+/// logits over its two tokens, so the bonus barely carries it, and a last-bit change moves the
+/// beam onto another path: the name before it changed too ("Kneeov" to "Kniov", 6926 against
+/// 8095, teacher-forced margin +0.10).
+const FOUND: [(usize, usize); 2] = [(1, 9), (3, 8)];
 
 /// Whether the keyword's words appear, in order, in the normalized transcript (case and
 /// punctuation do not count: "cura" is Cura).
@@ -73,14 +79,25 @@ fn irrelevant() -> Vec<String> {
     vec!["Siobhan".to_string(), "PETG".to_string()]
 }
 
+/// One beam without keywords is the greedy snapshot (test-data/snapshots/greedy.json), so that
+/// is the text irrelevant keywords must leave. Re-pinned from the manifest text when the
+/// deterministic `exp` moved pl_zosia's listed near-tie (test-data/near_ties.json, margin
+/// +0.0668 under Apple's libm, -0.0143 deterministic): the greedy text there is now "Przez ten
+/// element do 10 ml." against the manifest's "Przez im ten element do 10 ml.".
 #[test]
-fn irrelevant_keywords_leave_one_beam_on_the_contract_text() {
+fn irrelevant_keywords_leave_one_beam_on_the_greedy_snapshot_text() {
+    let greedy = snapshot("greedy");
     for clip in contract_clips() {
         let got = transcribe(
             &clip,
             &with_keywords(1, &irrelevant(), whistle::DEFAULT_KEYWORD_BONUS),
         );
-        assert_eq!(got.text, Fixture::load(&clip.name).text(), "{}", clip.name);
+        assert_eq!(
+            got.text,
+            greedy[&clip.name]["text"].as_str().unwrap(),
+            "{}",
+            clip.name
+        );
     }
 }
 

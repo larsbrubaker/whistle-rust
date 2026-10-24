@@ -87,7 +87,7 @@ fn band_floor(frames: &[Frame], band: usize, config: &VadConfig) -> Vec<f32> {
     let half_smooth = frames_for(config.floor_smoothing_s, 1, n) / 2;
     let powers: Vec<f64> = frames
         .iter()
-        .map(|f| 10f64.powf(f64::from(f.band_db[band]) / 10.0))
+        .map(|f| crate::math::pow(10.0, f64::from(f.band_db[band]) / 10.0))
         .collect();
     let smoothed: Vec<f32> = (0..n)
         .map(|t| {
@@ -95,7 +95,7 @@ fn band_floor(frames: &[Frame], band: usize, config: &VadConfig) -> Vec<f32> {
             // Averaging in the power domain keeps one quiet frame from dragging the floor down
             // further than its share.
             let power = span.iter().sum::<f64>() / span.len() as f64;
-            (10.0 * power.log10()) as f32
+            (10.0 * crate::math::log10(power)) as f32
         })
         .collect();
     let reach = frames_for(config.floor_window_s, 1, n);
@@ -111,9 +111,9 @@ fn total_db(frame: &Frame) -> f32 {
     let total: f64 = frame
         .band_db
         .iter()
-        .map(|&db| 10f64.powf(f64::from(db) / 10.0))
+        .map(|&db| crate::math::pow(10.0, f64::from(db) / 10.0))
         .sum();
-    (10.0 * total.log10()) as f32
+    (10.0 * crate::math::log10(total)) as f32
 }
 
 /// Each frame's level above the background, in dB: the largest rise of any band over its own

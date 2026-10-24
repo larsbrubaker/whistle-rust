@@ -78,7 +78,10 @@ engine's transcripts used as data (`test-data/engine/`, `test-data/engine-extra/
 
 ### Per-beam WER per clip (mean ranking)
 
-Normalized against the true text (raw in brackets) / against the engine:
+Normalized against the true text (raw in brackets) / against the engine. Measured before the
+deterministic math (`src/math`, std's libm then): since then pl_zosia's one-beam greedy text is
+"Przez ten element do 10 ml." (it drops "im", a listed near-tie, `test-data/near_ties.json`), so
+its 1-beam row is stale; the other rows were not re-measured.
 
 | clip        | 1 beam                | 2 beams               | 3, 5, 8 beams         |
 |-------------|-----------------------|-----------------------|-----------------------|
@@ -162,7 +165,8 @@ pins the default's result.
   new one. Without keywords, one beam is the plain greedy
   argmax.
 - **Strength.** Swept on the extra clips (13 keywords) and on the contract clips with the
-  irrelevant keywords `["Siobhan", "PETG"]`:
+  irrelevant keywords `["Siobhan", "PETG"]`, before the deterministic math (at the default 3.0,
+  three beams now find 8, see below; the rest of the table was not re-measured):
 
   | bonus | found, 1 / 3 / 5 beams | contract clips changed, 1 / 3 / 5 beams |
   |------:|-----------------------:|----------------------------------------:|
@@ -181,9 +185,13 @@ pins the default's result.
 
 Keywords counted as found when their normalized words appear in order in the normalized text
 (case-insensitive). Without biasing ours finds 4 of 13 at one beam and 3 at three or five; the
-engine finds 3 without its keyword option and 7 with it; ours with biasing finds 9 at one, three
-and five beams, including all 7 the engine finds. Missed by both: Siobhan ("Shivan"), Niamh
-("Kneeov"), Pforzheim ("Fort Simps"), Grzegorza: the model's acoustic score for these is too
-far from the spelling for a bonus that leaves ordinary words alone. The gate pins 9 of 13 and
-every engine-found keyword at one beam and at three
+engine finds 3 without its keyword option and 7 with it; ours with biasing finds 9 at one beam
+and 8 at three, including all 7 the engine finds. Missed by both: Siobhan ("Shivan"), Niamh
+("Kneeov" at one beam, "Kniov" at three), Pforzheim ("Fort Simps"), Grzegorza: the model's
+acoustic score for these is too far from the spelling for a bonus that leaves ordinary words
+alone. Three beams also miss Ultimaker on en_cura ("the ultimate cura settings", the engine's
+text with its keyword option too): unbiased, "ultimaker" trails "ultimate" by 2.4 and 6.7 logits
+over its two tokens, so only the bonus carries it, and the deterministic math moved the beam
+onto the other path (it found 9 at three beams with std's libm). The gate pins 9 of 13 at one
+beam, 8 at three, and every engine-found keyword at both
 (`cargo test --release --test decoding sweep -- --ignored --nocapture` prints the sweep).

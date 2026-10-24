@@ -225,8 +225,11 @@ pub(crate) fn token_log_probs(logits: &Logits, tokens: &[u32], text_ids: usize) 
             };
             let row = &row[..text_ids.min(row.len())];
             let max = row.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-            let sum: f64 = row.iter().map(|&v| f64::from(v - max).exp()).sum();
-            let lse = max + sum.ln() as f32;
+            let sum: f64 = row
+                .iter()
+                .map(|&v| crate::math::exp(f64::from(v - max)))
+                .sum();
+            let lse = max + crate::math::ln(sum) as f32;
             row.get(t as usize).map_or(f32::NEG_INFINITY, |&v| v - lse)
         })
         .collect()
@@ -284,7 +287,7 @@ pub(crate) fn words(
                 word: tokenizer.decode(&a.tokens[s..e]).trim().to_string(),
                 start: starts[g],
                 end: end.max(starts[g]),
-                probability: mean.exp(),
+                probability: crate::math::expf(mean),
             }
         })
         .collect()

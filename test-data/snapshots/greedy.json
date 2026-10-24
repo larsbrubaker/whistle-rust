@@ -1,0 +1,182 @@
+{
+  "de_anna": {
+    "language": "de",
+    "text": "Bitte macht den Würfel 2 cm höher.",
+    "tokens": [
+      8146,
+      4661,
+      325,
+      1637,
+      2209,
+      590,
+      223,
+      216,
+      8098,
+      8112,
+      318,
+      512,
+      315,
+      8107,
+      347,
+      223,
+      210,
+      714,
+      8116
+    ]
+  },
+  "en_daniel": {
+    "language": "en",
+    "text": "Please export the bracket as an STL file for printing.",
+    "tokens": [
+      8143,
+      4575,
+      6542,
+      309,
+      4869,
+      684,
+      331,
+      467,
+      464,
+      6880,
+      8152,
+      2256,
+      394,
+      3496,
+      304,
+      8116
+    ]
+  },
+  "en_samantha": {
+    "language": "en",
+    "text": "Make the cube 20 mm wide and round the top edges.",
+    "tokens": [
+      7425,
+      309,
+      315,
+      4445,
+      1727,
+      325,
+      8107,
+      7125,
+      353,
+      7647,
+      309,
+      1593,
+      1510,
+      3008,
+      8116
+    ]
+  },
+  "es_monica": {
+    "language": "es",
+    "text": "Gira el cilindro 90 grados sobre el eje vertical.",
+    "tokens": [
+      8155,
+      5525,
+      928,
+      315,
+      357,
+      610,
+      322,
+      5387,
+      1358,
+      8102,
+      502,
+      308,
+      607,
+      294,
+      928,
+      337,
+      443,
+      442,
+      1804,
+      8116
+    ]
+  },
+  "fr_thomas": {
+    "language": "fr",
+    "text": "Ajoute un trop de 5000 mètres au centre de la plaque.",
+    "tokens": [
+      8131,
+      8123,
+      329,
+      449,
+      579,
+      286,
+      1984,
+      340,
+      942,
+      1496,
+      325,
+      8188,
+      8094,
+      687,
+      6947,
+      1803,
+      294,
+      340,
+      1167,
+      539,
+      8096,
+      4307,
+      8116
+    ]
+  },
+  "it_alice": {
+    "language": "it",
+    "text": "Unisce le due parti e salva il progetto.",
+    "tokens": [
+      1816,
+      320,
+      418,
+      481,
+      2268,
+      792,
+      292,
+      337,
+      2667,
+      6882,
+      4183,
+      452,
+      676,
+      630,
+      8116
+    ]
+  },
+  "nl_xander": {
+    "language": "nl",
+    "text": "Maat de muur van de dos 3 mm dit.",
+    "tokens": [
+      8140,
+      768,
+      340,
+      325,
+      872,
+      367,
+      340,
+      7385,
+      796,
+      325,
+      8107,
+      1606,
+      8116
+    ]
+  },
+  "pl_zosia": {
+    "language": "pl",
+    "text": "Przez ten element do 10 ml.",
+    "tokens": [
+      8143,
+      8098,
+      565,
+      8124,
+      2679,
+      5438,
+      571,
+      1198,
+      325,
+      8103,
+      8116
+    ]
+  }
+}

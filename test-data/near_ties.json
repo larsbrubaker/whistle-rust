@@ -1,0 +1,15 @@
+{
+  "about": "Teacher-forced positions where the port's own top-two margin is under 0.05, so the port's documented ~2% encoder distance from the reference plus the exp difference (the reference ran XLA's exp, the port runs src/math) bring its margin near zero and can tip it; the reference itself was not on a coin flip there (CLAUDE.md, tolerance policy). Positions are manifest token indices (0 = BOS). Margins are the reference token's score minus the best other allowed text score: margin_reference from the reference's own logits (test-data/fixtures-local/<clip>/decoder.logits.npy), margin_apple_libm from the port with std's f32 exp on macOS, margin_deterministic from the port as it runs now on every target. The contract test fails if the port's |margin| here reaches 0.05.",
+  "near_ties": [
+    {
+      "clip": "pl_zosia",
+      "vad": ["off", "gate_and_trim"],
+      "position": 6,
+      "reference": 673,
+      "port": 2679,
+      "margin_reference": 0.1236,
+      "margin_apple_libm": 0.0668,
+      "margin_deterministic": -0.0143
+    }
+  ]
+}

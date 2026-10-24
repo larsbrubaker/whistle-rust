@@ -16,7 +16,7 @@ impl Fft {
         let twiddles = (0..size / 2)
             .map(|k| {
                 let angle = -2.0 * std::f64::consts::PI * k as f64 / size as f64;
-                (angle.cos(), angle.sin())
+                (crate::math::cos(angle), crate::math::sin(angle))
             })
             .collect();
         Fft { size, twiddles }

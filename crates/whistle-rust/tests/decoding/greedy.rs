@@ -1,26 +1,60 @@
-// One beam is the greedy decode: on every contract speech clip `beams = 1` gives exactly the
-// manifest's token stream (the contract); the default is three beams, which gives the engine's
-// transcript on every clip; and the beam and keyword options reject values a caller could not
-// mean with `Error::Input`.
+// One beam is the greedy decode: on every contract speech clip `beams = 1` teacher-forces to the
+// manifest's tokens (the contract, `support::forced`, near-ties listed) and free-runs to the
+// committed snapshot of the port's own output (test-data/snapshots/greedy.json, identical on
+// every target); the default (three beams) free-runs to test-data/snapshots/default.json and
+// gives the engine's transcript on every clip; and the beam and keyword options reject values a
+// caller could not mean with `Error::Input`. `regenerate_snapshots` (ignored) rewrites both
+// snapshots when a change deliberately moves the port's output.
 
-use whistle::{Error, Options, MAX_BEAMS};
+use serde_json::Value;
+use whistle::{Error, Options, VadMode, MAX_BEAMS};
 
 use crate::clips::{beams, contract_clips, transcribe, whistle};
-use crate::support::Fixture;
+use crate::support::forced::{check_contract, free_running, snapshot};
+use crate::support::repo_root;
+
+fn clips() -> Vec<(String, Vec<u8>)> {
+    contract_clips()
+        .into_iter()
+        .map(|c| (c.name, c.wav))
+        .collect()
+}
+
+/// The pinned snapshot, entry by entry so a failure names the clip.
+fn assert_snapshot(name: &str, got: &Value) {
+    let want = snapshot(name);
+    for (clip, entry) in want.as_object().expect("a snapshot is an object") {
+        assert_eq!(&got[clip], entry, "{name}: {clip}");
+    }
+    assert_eq!(got, &want, "{name}: the clip list changed");
+}
 
 #[test]
 fn one_beam_gives_the_greedy_contract_tokens_on_every_clip() {
-    for clip in contract_clips() {
-        let f = Fixture::load(&clip.name);
-        let want = f.tokens();
-        let got = transcribe(&clip, &beams(1));
-        assert_eq!(
-            got.tokens,
-            want[2..want.len() - 1].to_vec(),
-            "{}",
-            clip.name
-        );
-        assert_eq!(got.text, f.text(), "{}", clip.name);
+    check_contract(whistle(), &clips(), VadMode::GateAndTrim);
+    assert_snapshot("greedy", &free_running(whistle(), &clips(), &beams(1)));
+}
+
+#[test]
+fn the_default_options_free_run_to_the_snapshot_on_every_clip() {
+    assert_snapshot(
+        "default",
+        &free_running(whistle(), &clips(), &Options::default()),
+    );
+}
+
+/// Rewrites test-data/snapshots/ from the port's current output. The snapshots record the port,
+/// not the reference: run this only with a change that deliberately moves the output, and say
+/// why in its commit.
+#[test]
+#[ignore]
+fn regenerate_snapshots() {
+    let dir = repo_root().join("test-data/snapshots");
+    std::fs::create_dir_all(&dir).unwrap();
+    for (name, options) in [("greedy", beams(1)), ("default", Options::default())] {
+        let v = free_running(whistle(), &clips(), &options);
+        let text = serde_json::to_string_pretty(&v).unwrap() + "\n";
+        std::fs::write(dir.join(format!("{name}.json")), text).unwrap();
     }
 }
 

@@ -36,6 +36,15 @@ piecewise mel scale (linear below 1 kHz, log above), then `log(x + 2⁻²⁴)`. 
 normalized over the valid frames: mean, and the sample standard deviation (n − 1), `(x − mean) /
 (std + 1e-5)`, then masked. The mel matrix is also stored in the archive (`mel`, fp32).
 
+Every transcendental in the port (the front end's `log`, `exp` and window `cos`, the FFT
+twiddles, `silu`/`sigmoid`, softmax, sinkhorn, the RoPE and position tables, the VAD and the
+decoding scores) comes from `src/math`, pure-Rust ports of musl's routines that round the same
+on every target. Features, stem, encoder and the first decoder steps hash to the same bits on
+aarch64 macOS and on wasm32 with and without simd128 (`tests/transcribe/identity.rs`, under
+`scripts/wasm-test.sh`); Linux and Windows x86_64 CI will run the same pinned hashes, which have
+not run on x86_64 yet. The reference used XLA's own `exp`, so the port matches
+it to rounding, not bit for bit.
+
 ## Stem
 
 Three stages of 3×3 depthwise 2-D convolution, stride 2, padding 1, treating (time, mel) as an

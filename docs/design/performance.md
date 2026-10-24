@@ -512,10 +512,10 @@ Shares are of the 3 s beams-1 / beams-3 / long beams-1 profiles above.
    item 2's fix.
 7. **Encoder self-attention on long audio, 1% / 0.5% / 6%**: quadratic in frames; scalar
    `attend` paths are the candidate.
-8. **Transcendentals, 3% / 2.5% / 3.5%** (`expf`, `logf`, `log` from wasi-libc's software
-   libm, mostly in softmax, sinkhorn and the activations). Smaller than expected; a vectorized
-   `exp` would have to stay bit-identical to `f32::exp` to keep the token stream, so it is worth
-   it only after the items above.
+8. **Transcendentals, 3% / 2.5% / 3.5%** (`expf`, `logf`, `log`, mostly in softmax, sinkhorn
+   and the activations; measured with wasi-libc's software libm). Every transcendental now
+   comes from `src/math` (deterministic, the same bits on every target), so a vectorized `exp`
+   would have to reproduce `math::expf` bit for bit; worth it only after the items above.
 9. **Allocation, about 1–2%** (`dlmalloc`, `dlfree`, `calloc`, `Vec` collects): reused
    scratch in the decoder step and the Hadamard MLP.
 

@@ -11,10 +11,12 @@ thresholds. It allocates only per-frame buffers, sized by the input. Any `VadCon
 and never panics: a NaN field acts as its default, negative durations as 0, durations longer
 than the input as the whole input, and ±∞ dB thresholds as "never blocks" / "never passes".
 
-Results are deterministic per platform, not bit-identical across platforms: the window, the
-band powers and the dB conversions use f64 `cos`, `powf` and `log10`, which come from each
-platform's libm. A case sitting right at a threshold can therefore come out differently on
-macOS, Linux and wasm32; the margins below are what keeps the tests away from that.
+Results are bit-identical on every platform: the window, the band powers and the dB
+conversions use f64 `cos`, `pow` and `log10` from the library's own deterministic math
+(`src/math`, ported from musl via the Rust `libm` crate), not the platform libm, so a case
+sitting right at a threshold comes out the same on macOS, Linux, Windows and wasm32. The
+margins below keep the tests away from the thresholds all the same, so a deliberate change to
+the features does not flip a clip unnoticed.
 
 ## Pipeline
 

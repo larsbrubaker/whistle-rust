@@ -74,7 +74,7 @@ fn mean_square(r: &[f32]) -> f32 {
 }
 
 pub(crate) fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    1.0 / (1.0 + crate::math::expf(-x))
 }
 
 /// `jax.nn.silu`: `x * sigmoid(x)`.
@@ -101,7 +101,7 @@ pub(crate) fn softmax(x: &mut [f32], row: usize) {
     for r in x.chunks_exact_mut(row) {
         let max = r.iter().fold(f32::NEG_INFINITY, |m, &v| m.max(v));
         for v in r.iter_mut() {
-            *v = (*v - max).exp();
+            *v = crate::math::expf(*v - max);
         }
         let sum: f32 = r.iter().sum();
         for v in r.iter_mut() {
@@ -116,7 +116,7 @@ fn logsumexp(values: impl Iterator<Item = f32> + Clone) -> f32 {
     if !max.is_finite() {
         return max;
     }
-    max + values.map(|v| (v - max).exp()).sum::<f32>().ln()
+    max + crate::math::lnf(values.map(|v| crate::math::expf(v - max)).sum::<f32>())
 }
 
 /// `_sinkhorn`: 20 rounds of row then column log-normalisation of each `n × n` matrix in
@@ -138,7 +138,7 @@ pub(crate) fn sinkhorn(logits: &mut [f32], n: usize) {
             }
         }
         for v in m.iter_mut() {
-            *v = v.exp();
+            *v = crate::math::expf(*v);
         }
     }
 }
@@ -156,14 +156,14 @@ impl Rope {
         let half = head_dim / 2;
         // freqs = 1 / theta ** (arange(0, head_dim, 2) / head_dim), all in f32.
         let freqs: Vec<f32> = (0..half)
-            .map(|i| 1.0 / theta.powf((2 * i) as f32 / head_dim as f32))
+            .map(|i| 1.0 / crate::math::powf(theta, (2 * i) as f32 / head_dim as f32))
             .collect();
         let (mut cos, mut sin) = (Vec::new(), Vec::new());
         for t in 0..seq_len {
             for &f in &freqs {
                 let angle = t as f32 * f;
-                cos.push(angle.cos());
-                sin.push(angle.sin());
+                cos.push(crate::math::cosf(angle));
+                sin.push(crate::math::sinf(angle));
             }
         }
         Rope { half, cos, sin }

@@ -75,6 +75,24 @@ Two tiers:
 Each `manifest.json` lists every array with its tier, shape and dtype, plus the tokens, decoded
 text, language and the replay errors. `index.json` lists the clips and the pinned reference.
 
+## Near-ties and the port's own snapshots
+
+Two committed files sit beside the fixtures and are **not** reference output:
+
+- `test-data/near_ties.json`: teacher-forced positions where the reference token wins by a
+  margin a last-bit difference in `exp` can flip (the reference ran XLA's `exp`, the port runs
+  `src/math`). Each entry gives the clip, VAD modes, manifest position, reference and port
+  tokens, and the margin under Apple's libm and under the deterministic math. The contract test
+  (`tests/support/forced.rs`) fails on any divergence not listed, and on a listed one whose
+  margin has grown to 0.05 or more. One entry today: `pl_zosia` position 6, 673 against 2679,
+  +0.0668 with Apple's libm, −0.0143 deterministic. The next-closest positions over all clips
+  are it_alice +0.31, es_monica +0.42 and pl_zosia +0.44.
+- `test-data/snapshots/greedy.json` and `default.json`: the port's own free-running output
+  (language, text, tokens) on every contract clip at one beam and with the default options. They
+  pin the port's behaviour bit for bit on every target, and are rewritten only by the ignored
+  `regenerate_snapshots` test (`tests/decoding/greedy.rs`) with a change that deliberately moves
+  the output.
+
 ## Why tolerances are relative L2
 
 A8 fake quantization rounds activations to int8 steps of a row's absmax, which is discontinuous.

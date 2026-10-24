@@ -22,13 +22,15 @@ pub struct DecoderMemory {
 /// casts to f32 before multiplying (its arrays are f32), and so is this.
 fn sinusoids(frames: usize, dim: usize) -> Vec<f32> {
     let half = dim / 2;
-    let step = (-(10000.0f64.ln()) / (half as f64 - 1.0)) as f32;
-    let inv: Vec<f32> = (0..half).map(|i| (step * i as f32).exp()).collect();
+    let step = (-crate::math::ln(10000.0) / (half as f64 - 1.0)) as f32;
+    let inv: Vec<f32> = (0..half)
+        .map(|i| crate::math::expf(step * i as f32))
+        .collect();
     let mut out = Vec::with_capacity(frames * dim);
     for t in 0..frames {
         let angles = inv.iter().map(|&f| t as f32 * f);
-        out.extend(angles.clone().map(f32::sin));
-        out.extend(angles.map(f32::cos));
+        out.extend(angles.clone().map(crate::math::sinf));
+        out.extend(angles.map(crate::math::cosf));
     }
     out
 }
