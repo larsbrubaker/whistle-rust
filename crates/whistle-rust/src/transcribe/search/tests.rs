@@ -304,3 +304,12 @@ fn at_the_length_limit_a_finished_hypothesis_beats_a_cut_one() {
     let got = decode(&s, script(loop_rows), TAG, &mut no_check).unwrap();
     assert_eq!(got, best_ended.tokens);
 }
+
+#[test]
+fn a_batch_with_fewer_tokens_than_states_is_an_input_error_before_any_step() {
+    let mut a = script(early_stop_rows);
+    let mut b = a.clone();
+    let err = Scorer::step_batch(&mut [&mut a, &mut b], &[TAG]).unwrap_err();
+    assert!(matches!(err, Error::Input(_)), "{err}");
+    assert!(a.log.borrow().is_empty());
+}

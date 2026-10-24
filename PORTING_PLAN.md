@@ -26,9 +26,11 @@ and measured for one thread on wasm first; native threads are a bonus.
 - The 3 s encoder alone is 5-12% slower than the dense build (it decodes ~19M packed weights per
   call); cut that if the encoder dominates a real workload.
 - Close the gap to the engine (`scripts/bench.sh`, `docs/design/performance.md` "Against the
-  engine"): about 2x slower at one beam and 3.5-7x at the default three. Batch the beams'
-  decoder steps into one multi-row projection per matrix (so the panel path and threads help),
-  then the encoder (~40 ms on a 3 s clip against the engine's 11-16 ms to first token).
+  engine"): about 2x slower at one beam and 3.5-7x at the default three before the beams'
+  decoder steps were batched (`DecoderState::step_batch`, bit-identical; 20-30% faster at 3-5
+  beams on one thread natively, wasm not yet measured cleanly). Next: what a batched step's cost
+  is made of, then the encoder (~40 ms on a 3 s clip against the engine's 11-16 ms to first
+  token).
 
 ## 7. Designed decode features
 

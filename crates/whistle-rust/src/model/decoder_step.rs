@@ -8,6 +8,10 @@
 //! so its logits equal [`super::Decoder::forward`]'s row for that position. A state is
 //! [`Clone`] so a beam search can fork a hypothesis: the RoPE table and the cross-attention
 //! memory are fixed for the decode and shared (`Arc`); only the growing caches are copied.
+//! [`DecoderState::step_batch`] advances several such forks by one token each in one pass: every
+//! projection runs on all their new rows together, so a beam search reads each weight matrix
+//! once per step rather than once per hypothesis, and each row's scores are bit-identical to
+//! stepping that state alone.
 
 use std::sync::Arc;
 
@@ -88,15 +92,9 @@ impl<'w> DecoderState<'w> {
     /// as it was. Any other error comes from inside the stack, part way through updating the
     /// caches, and leaves the state unusable: start a new one.
     pub fn step(&mut self, token: u32) -> Result<Vec<f32>, Error> {
+        self.check_feed(token)?;
         let w = self.weights;
         let pos = self.tokens.len();
-        if pos >= self.max_positions {
-            return Err(Error::Input(format!(
-                "decoder step {} past the decode's {} positions",
-                pos + 1,
-                self.max_positions
-            )));
-        }
         let mut lanes = input_lanes(w, &[token])?;
         self.tokens.push(token);
 
@@ -128,5 +126,115 @@ impl<'w> DecoderState<'w> {
         let decoder = Decoder::new(w);
         let logits = decoder.logits(&decoder.finish(&lanes)?)?;
         Ok(logits.data().to_vec())
+    }
+
+    /// The input checks of a step, made before anything changes: the next position fits the
+    /// decode's `max_positions` and `token` is in the vocabulary ([`Error::Input`] otherwise).
+    fn check_feed(&self, token: u32) -> Result<(), Error> {
+        if self.tokens.len() >= self.max_positions {
+            return Err(Error::Input(format!(
+                "decoder step {} past the decode's {} positions",
+                self.tokens.len() + 1,
+                self.max_positions
+            )));
+        }
+        let vocab = self.weights.embedding.rows;
+        if usize::try_from(token).map_or(true, |t| t >= vocab) {
+            return Err(Error::Input(format!(
+                "token {token} is outside the vocabulary of {vocab}"
+            )));
+        }
+        Ok(())
+    }
+
+    /// [`DecoderState::step`] on every state at once, `tokens[b]` fed to `states[b]`; returns
+    /// each state's scores in order, bit-identical to stepping each alone. The states may be at
+    /// different positions with different prefixes; they must be forks of one decode (sharing
+    /// its weights and cross-attention memory), as a beam search's are, else they are stepped
+    /// one at a time. The token embedding, the Engram projections, every attention and MLP
+    /// projection, the mHC mixing and the head run on all `B` new rows together, so each weight
+    /// matrix is read once; the Engram gather and value conv, the self-attention taps, cache and
+    /// attention stay per state. A count mismatch, a token outside the vocabulary or a state at
+    /// its `max_positions` is [`Error::Input`] and leaves every state as it was; any other error
+    /// leaves them all unusable, as for `step`.
+    pub fn step_batch(
+        states: &mut [&mut DecoderState<'w>],
+        tokens: &[u32],
+    ) -> Result<Vec<Vec<f32>>, Error> {
+        if states.len() != tokens.len() {
+            return Err(Error::Input(format!(
+                "{} tokens for {} decoder states",
+                tokens.len(),
+                states.len()
+            )));
+        }
+        let Some(first) = states.first() else {
+            return Ok(Vec::new());
+        };
+        let (w, rope, cross) = (first.weights, first.rope.clone(), first.cross.clone());
+        let shared = states.iter().all(|s| {
+            std::ptr::eq(s.weights, w)
+                && Arc::ptr_eq(&s.rope, &rope)
+                && Arc::ptr_eq(&s.cross, &cross)
+        });
+        // Every state's input checks before any state moves, on both paths below.
+        for (s, &t) in states.iter().zip(tokens) {
+            s.check_feed(t)?;
+        }
+        if states.len() == 1 || !shared {
+            return states
+                .iter_mut()
+                .zip(tokens)
+                .map(|(s, &t)| s.step(t))
+                .collect();
+        }
+        let mut lanes = input_lanes(w, tokens)?;
+        for (s, &t) in states.iter_mut().zip(tokens) {
+            s.tokens.push(t);
+        }
+
+        // Every state's Engram keys and convolved values at its new position, `[sites, B,
+        // d_model]`: the gather and the conv per state, the projections over all rows at once.
+        let (mut keys, mut values) = (Vec::new(), Vec::new());
+        for (i, e) in w.engrams.iter().enumerate() {
+            let mut gathered = Vec::new();
+            for s in states.iter() {
+                gathered.extend_from_slice(&e.gather_rows(&s.tokens, s.tokens.len() - 1)?);
+            }
+            let (k, v) = e.project_gathered(gathered);
+            keys.extend_from_slice(&k);
+            let d = e.value_proj.rows;
+            for (b, s) in states.iter_mut().enumerate() {
+                let cache = &mut s.engrams[i];
+                cache.values.extend_from_slice(&v[b * d..(b + 1) * d]);
+                values.extend_from_slice(&e.value_conv(&cache.values, s.tokens.len() - 1)?);
+            }
+        }
+
+        let kv_bits = w.geometry.kv_bits;
+        for (l, layer) in w.decoder.iter().enumerate() {
+            let mem = &cross[l];
+            let mut caches: Vec<&mut KvCache> =
+                states.iter_mut().map(|s| &mut s.layers[l]).collect();
+            let engram = BlockEngram {
+                keys: &keys,
+                values: &values,
+                flags: site_flags(w, l),
+            };
+            lanes = w.decoder_mhc.step(l, &lanes, |u| {
+                layer.block_with(u, w, &engram, mem, |normed| {
+                    layer
+                        .self_attn
+                        .forward_step_batch(normed, &mut caches, &rope, kv_bits)
+                })
+            })?;
+        }
+        let decoder = Decoder::new(w);
+        let logits = decoder.logits(&decoder.finish(&lanes)?)?;
+        Ok(logits
+            .data()
+            .chunks_exact(logits.vocab().max(1))
+            .map(<[f32]>::to_vec)
+            .collect())
     }
 }

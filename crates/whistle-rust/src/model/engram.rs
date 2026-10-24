@@ -207,6 +207,20 @@ impl Engram {
         tokens: &[u32],
         first: usize,
     ) -> Result<(Vec<f32>, Vec<f32>), Error> {
+        Ok(self.project_gathered(self.gather_rows(tokens, first)?))
+    }
+
+    /// A8 then `key_proj` and `value_proj` on gathered rows ([`Engram::gather_rows`], any number
+    /// of them, from one decode or several): each output row depends on its own row only, so a
+    /// batched decoder step projects every hypothesis's new row in one pass.
+    pub(crate) fn project_gathered(&self, mut e: Vec<f32>) -> (Vec<f32>, Vec<f32>) {
+        a8(&mut e, self.key_proj.cols);
+        (self.key_proj.project(&e), self.value_proj.project(&e))
+    }
+
+    /// The gathered table rows of positions `first..` of `tokens`, `[T − first, tables ·
+    /// sub_dim]`, before A8 ([`Engram::project_rows`]'s first half). Errors are its.
+    pub(crate) fn gather_rows(&self, tokens: &[u32], first: usize) -> Result<Vec<f32>, Error> {
         let (tables, sub_dim) = self.check_shapes()?;
         let EngramHash {
             orders,
@@ -241,8 +255,7 @@ impl Engram {
                 self.tables.row_into(row, out)?;
             }
         }
-        a8(&mut e, width);
-        Ok((self.key_proj.project(&e), self.value_proj.project(&e)))
+        Ok(e)
     }
 
     /// The causal value conv `Σ_j taps[j] · v[t − j · dilation]` for positions `first..` of

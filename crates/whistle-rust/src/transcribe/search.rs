@@ -13,11 +13,44 @@ use super::keywords::{KeywordTrie, Matcher};
 /// A decoder that can be forked: feed one token, get the next token's scores.
 pub(crate) trait Scorer: Clone {
     fn step(&mut self, token: u32) -> Result<Vec<f32>, Error>;
+
+    /// [`Scorer::step`] on each of `states` with its token, scores in order. The default steps
+    /// them one at a time; a model that can share work across them overrides it, and must give
+    /// each the scores its own `step` would. A count mismatch is [`Error::Input`] before any
+    /// step. The default cannot check the others' inputs first, so after an error part way the
+    /// earlier states have stepped; the search abandons the decode on any error, so it never
+    /// reuses them.
+    fn step_batch(states: &mut [&mut Self], tokens: &[u32]) -> Result<Vec<Vec<f32>>, Error> {
+        check_batch(states.len(), tokens.len())?;
+        states
+            .iter_mut()
+            .zip(tokens)
+            .map(|(s, &t)| s.step(t))
+            .collect()
+    }
 }
 
-impl Scorer for DecoderState<'_> {
+/// One token per state, and later one row of scores per state: anything else is
+/// [`Error::Input`], so a short batch can never be zipped silently against the hypotheses.
+fn check_batch(states: usize, rows: usize) -> Result<(), Error> {
+    if states != rows {
+        return Err(Error::Input(format!(
+            "a decoder batch of {states} states with {rows} tokens or score rows"
+        )));
+    }
+    Ok(())
+}
+
+impl<'w> Scorer for DecoderState<'w> {
     fn step(&mut self, token: u32) -> Result<Vec<f32>, Error> {
         DecoderState::step(self, token)
+    }
+
+    fn step_batch(
+        states: &mut [&mut DecoderState<'w>],
+        tokens: &[u32],
+    ) -> Result<Vec<Vec<f32>>, Error> {
+        DecoderState::step_batch(states, tokens)
     }
 }
 
@@ -188,9 +221,16 @@ pub(crate) fn beam_search<S: Scorer>(
     // Position 1 feeds the tag; the sequence `[BOS, tag, text..]` never exceeds `max_len`.
     for pos in 1..search.max_len.saturating_sub(1) {
         let mut candidates = Vec::new();
-        for (b, hyp) in live.iter_mut().enumerate() {
+        // One check per hypothesis, as when each stepped alone; then every hypothesis steps
+        // together, so the decoder reads its weights once for all of them.
+        for _ in &live {
             check(pos)?;
-            let scores = hyp.state.step(hyp.feed)?;
+        }
+        let feeds: Vec<u32> = live.iter().map(|h| h.feed).collect();
+        let mut states: Vec<&mut S> = live.iter_mut().map(|h| &mut h.state).collect();
+        let rows = S::step_batch(&mut states, &feeds)?;
+        check_batch(live.len(), rows.len())?;
+        for (b, (hyp, scores)) in live.iter().zip(rows).enumerate() {
             let text = &scores[..search.text_ids.min(scores.len())];
             let delta = search
                 .trie
@@ -424,5 +464,7 @@ pub(crate) fn greedy_with_keywords<S: Scorer>(
     Ok(hyp.tokens)
 }
 
+#[cfg(test)]
+mod batch_tests;
 #[cfg(test)]
 mod tests;

@@ -321,10 +321,76 @@ need 150-270 ms for three, and the true gap at equal beam width is wider than th
 
 Open from this: three beams cost 75-125 ms more than greedy on a 3 s clip at 1 thread (18
 tokens, two extra hypotheses: about 2 ms per extra hypothesis-token, close to the 2.7 ms a
-greedy token costs alone), so the beams' steps are not sharing any work. Batching them into one
-projection per matrix (the weights stream from memory once, and that stream bounds a step) is the
-first thing to try; then the encoder (338 ms of our 26.6 s call, against the engine's 250 ms
-total).
+greedy token costs alone), so the beams' steps were not sharing any work. They now step as one
+batch ("Batched beam steps" below); the encoder (338 ms of our 26.6 s call, against the engine's
+250 ms total) is next.
+
+## Batched beam steps
+
+Each position's live hypotheses now step together (`DecoderState::step_batch`): every
+projection runs on their `B` new rows at once, so the packed kernel decodes each weight row's
+indices once per step for 4 rows instead of once per hypothesis (a 2- or 3-row tail is padded
+to a 4-row block, whose extra outputs are dropped). Self-attention over each hypothesis's own
+cache, its Engram gather and conv, and its taps stay per hypothesis. Each output row is its own
+sequential sum in every kernel (the rotated packed `dot4`/`dot1`, the dense few-row path, the
+panel path), so the scores are bit-identical to single steps (`kv_cache.rs` at B = 2, 3, 5, 8;
+`search/batch_tests.rs` on every speech clip at 3 and 5 beams). One beam is unchanged.
+
+**Threads.** The split rule gives `min(threads, rows / MIN_ROWS_PER_WORKER)` workers
+(`MIN_ROWS_PER_WORKER` is 16), so a batched step stays on one thread up to 31 rows (hypotheses);
+the t4 cells below differ from t1 only in the encoder. Lowering the rule for the decoder was not
+measured.
+
+**Conditions.** Apple M5, 2026-10-24, main `fa605cc` against this branch, alternating per cell,
+2 rounds (4 under Node). The machine was heavily shared (another implementer building): load
+average 7.2 rising to 16.2 over the native run and 12.1 to 18.5 over the wasm runs. Medians
+swung up to 2× between rounds of the same cell, so the figures are the **best of the rounds'
+minimums** (ms), and even these carry about ±25% (the beams-1 cells, which run identical code on
+both sides, differ by up to that much). The token streams were identical on both sides in every
+cell.
+
+### Single-threaded wasm
+
+`wasm32-wasip1` with `+simd128`, the bench example built unchanged by the `stable` toolchain
+(1.97.1; the pinned 1.99.0 has no wasip1 target here) into `target/wasm-bench`; Node's
+`node:wasi` (V8) with the workspace preopened, and `wasmtime run --dir .` (wasmtime 49).
+en_samantha (3.1 s), 3 calls per invocation:
+
+| runtime | beams | main | branch |
+|---|---|---|---|
+| Node (V8) | 1 | 191 | 148 |
+| Node (V8) | 3 | 280 | 262 |
+| Node (V8) | 5 | 348 | 270 |
+| wasmtime | 1 | 227 | 233 |
+| wasmtime | 3 | 704 | 392 |
+| wasmtime | 5 | 515 | 474 |
+
+Under this load the wasm result is not conclusive: wasmtime at 3 beams is 1.8× faster, Node at
+3 and 5 beams 7% and 22%, and the beams-1 rows (identical code) show the noise is that large.
+It needs a rerun on a quiet machine before it decides anything.
+
+### Native
+
+en_samantha (3.1 s) and the 26.6 s `long` clip of `scripts/bench.sh`, 5 calls (3 for `long`):
+
+| clip | beams | threads | main | branch |
+|---|---|---|---|---|
+| en_samantha | 1 | 1 | 90 | 101 |
+| en_samantha | 1 | 4 | 83 | 93 |
+| en_samantha | 3 | 1 | 175 | 140 |
+| en_samantha | 3 | 4 | 140 | 114 |
+| en_samantha | 5 | 1 | 217 | 166 |
+| en_samantha | 5 | 4 | 338 | 323 |
+| long | 3 | 1 | 2755 | 1905 |
+| long | 3 | 4 | 2279 | 1901 |
+
+On one thread, at 3 and 5 beams, the branch is 20–30% faster on the short clip and about 30%
+on the long one. Main's 5-beam 4-thread cell (338 ms, slower than its own 1-thread 217 ms) is
+noise; against it the branch gains only about 4% there. Both fall short of the 2–3× that a
+weight-bound step would give. Our hypothesis, not yet measured, is that the per-row
+multiply-adds and the per-hypothesis attention, rather than the weight decode, are now most of
+a step's cost; a profile of the batched step decides it. The engine comparison rows were not
+rerun.
 
 ## What is left
 

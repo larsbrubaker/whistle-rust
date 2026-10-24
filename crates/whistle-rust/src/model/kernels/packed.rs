@@ -299,6 +299,21 @@ impl PackedMatrix {
             }
             r += ROWS;
         }
+        // Two or three rows left (a batched decoder step of 2, 3, 6, 7, … hypotheses) share
+        // one decode too: padded with zero rows to a block, whose outputs are dropped. Each
+        // row's sum is its own, so the real rows get exactly the bits `dot1` gives them.
+        if rows - r >= 2 {
+            let zero = vec![0.0f32; n];
+            let tail = |k: usize| if r + k < rows { x(r + k) } else { &zero[..] };
+            let xs = [tail(0), tail(1), tail(2), tail(3)];
+            for c in 0..count {
+                let o = dot4(xs, first + c);
+                for (k, v) in o.iter().enumerate().take(rows - r) {
+                    out[(r + k) * count + c] = *v;
+                }
+            }
+            r = rows;
+        }
         while r < rows {
             for c in 0..count {
                 out[r * count + c] = dot1([x(r)], first + c)[0];

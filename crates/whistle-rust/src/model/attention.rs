@@ -3,9 +3,10 @@
 //! k per head, RoPE, A8 on q and on the KV path, grouped-query attention, the sigmoid gate, A8,
 //! and `out_proj`. The pieces are separate so the decoder's tapped, causal variant
 //! ([`SelfAttention::causal_taps`], `forward_causal`, and its cached one-position step
-//! `forward_step` over a [`KvCache`]) reuses them, and so does cross-attention
-//! (`cross_attention`); the weights are the [`SelfAttention`] bound in `weights`, the arithmetic
-//! is `ops`.
+//! `forward_step` over a [`KvCache`], and `forward_step_batch`, which projects several decodes'
+//! new rows together and attends each against its own cache) reuses them, and so does
+//! cross-attention (`cross_attention`); the weights are the [`SelfAttention`] bound in
+//! `weights`, the arithmetic is `ops`.
 
 use crate::error::Error;
 
@@ -269,7 +270,6 @@ impl SelfAttention {
         rope: &Rope,
         kv_bits: u32,
     ) -> Result<Vec<f32>, Error> {
-        let h = self.heads();
         if x.len() != self.q_proj.cols {
             return Err(Error::Input(format!(
                 "a decoder step of {} values, not one row of {}",
@@ -284,6 +284,68 @@ impl SelfAttention {
             )));
         }
         let new = self.projections(x);
+        let (out, gate) = self.attend_step(new, cache, rope, kv_bits)?;
+        Ok(self.gate_out(out, &gate))
+    }
+
+    /// [`SelfAttention::forward_step`] for several decodes at once: `x` is `[B, d_model]`, row
+    /// `b` the normed input of the new position of `caches[b]` (each at its own position). The
+    /// projections and `out_proj` run on all `B` rows together, so each weight matrix is read
+    /// once per step instead of `B` times; the taps, the cache and the attention stay per row.
+    /// Every kernel sums each output row on its own, so row `b` is bit-identical to
+    /// `forward_step` on it alone. A cache whose position is past the RoPE table, or an `x` of
+    /// other than `B` rows, is [`Error::Input`], checked before any cache changes.
+    pub(crate) fn forward_step_batch(
+        &self,
+        x: &[f32],
+        caches: &mut [&mut KvCache],
+        rope: &Rope,
+        kv_bits: u32,
+    ) -> Result<Vec<f32>, Error> {
+        let d = self.q_proj.cols;
+        if caches.len().checked_mul(d) != Some(x.len()) {
+            return Err(Error::Input(format!(
+                "a batched decoder step of {} values, not {} rows of {d}",
+                x.len(),
+                caches.len()
+            )));
+        }
+        let table = rope.cos.len() / rope.half.max(1);
+        if let Some(c) = caches.iter().find(|c| c.positions >= table) {
+            return Err(Error::Input(format!(
+                "decoder position {} is past the cache's RoPE table",
+                c.positions
+            )));
+        }
+        let all = self.projections(x);
+        let row = |z: &[f32], b: usize, w: usize| z[b * w..(b + 1) * w].to_vec();
+        let (mut out, mut gate) = (Vec::new(), Vec::new());
+        for (b, cache) in caches.iter_mut().enumerate() {
+            let new = Projections {
+                q: row(&all.q, b, self.q_proj.rows),
+                k: row(&all.k, b, self.k_proj.rows),
+                v: row(&all.v, b, self.v_proj.rows),
+                gate: row(&all.gate, b, self.gate_proj.rows),
+            };
+            let (o, g) = self.attend_step(new, cache, rope, kv_bits)?;
+            out.extend_from_slice(&o);
+            gate.extend_from_slice(&g);
+        }
+        Ok(self.gate_out(out, &gate))
+    }
+
+    /// The per-decode part of a cached step: `new` (one row's raw projections) joins the
+    /// cache's history for the taps, its key and value join the cache, and its query attends to
+    /// every cached key. Returns the attention output and the gate for that row, before
+    /// [`SelfAttention::gate_out`].
+    fn attend_step(
+        &self,
+        new: Projections,
+        cache: &mut KvCache,
+        rope: &Rope,
+        kv_bits: u32,
+    ) -> Result<(Vec<f32>, Vec<f32>), Error> {
+        let h = self.heads();
         let history = cache.history.q.len() / self.q_proj.rows.max(1);
         let joined = Projections {
             q: [cache.history.q.as_slice(), &new.q].concat(),
@@ -314,7 +376,7 @@ impl SelfAttention {
         cache.positions += 1;
         let (keys, values) = (cache.k.concat(), cache.v.concat());
         let out = attend(&q, &keys, &values, h, |_, _| true);
-        Ok(self.gate_out(out, &p.gate))
+        Ok((out, p.gate))
     }
 
     /// `out · sigmoid(gate)`, A8, then `out_proj`.

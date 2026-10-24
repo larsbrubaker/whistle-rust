@@ -1,10 +1,10 @@
 // Test area: transcription (`whistle::Whistle`, and the cached decoder `model::DecoderState` it
 // runs). `shared` binds the model once and loads the clips; `kv_cache` pins the cached step to the
-// full recompute; `contract` the end-to-end token streams from WAV on every speech clip (with VAD
-// off and with the default trim); `silence` the gate; `language` forced languages; `errors` the
-// caller-facing errors and cancellation; `inputs` the inputs rejected or emptied before
-// decoding; `threads` bit-identity across worker-thread counts; `timing` prints the cost of one
-// clip and of 30 s.
+// full recompute and the batched step to single steps; `contract` the end-to-end token streams
+// from WAV on every speech clip (with VAD off and with the default trim); `silence` the gate;
+// `language` forced languages; `errors` the caller-facing errors and cancellation; `inputs` the
+// inputs rejected or emptied before decoding; `threads` bit-identity across worker-thread counts;
+// `timing` prints the cost of one clip and of 30 s.
 
 #[path = "support/mod.rs"]
 mod support;

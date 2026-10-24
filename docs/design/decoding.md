@@ -64,8 +64,17 @@ engine's transcripts used as data (`test-data/engine/`, `test-data/engine-extra/
   hypothesis at the 320-token limit. The children are chosen first; then each parent's last
   chosen child takes its state without a copy, and only its other children clone it. Prefix
   sharing was not needed: the copy is small next to a step's cost.
+- **Batched steps.** At each position every live hypothesis steps together
+  (`DecoderState::step_batch`, behind `Scorer::step_batch`): the embedding, the Engram
+  projections, every attention, MLP and mHC projection and the head run on all the new rows at
+  once, so each weight matrix is decoded once per step instead of once per hypothesis. The
+  Engram gather and value conv, the self-attention taps, cache and attention stay per
+  hypothesis. Every kernel sums each output row on its own, so the scores, and therefore the
+  search, are bit-identical to stepping each hypothesis alone (`search/batch_tests.rs` checks
+  every speech clip at 3 and 5 beams). One beam steps alone, as before.
 - **Cancellation.** The handle is checked before every decoder step, each beam's at each
-  position, so the latency stays one step.
+  position (all of a position's checks run before its batched step), so the latency stays one
+  step.
 
 ### Per-beam WER per clip (mean ranking)
 

@@ -50,8 +50,9 @@ fn the_simd_path_reproduces_the_scalar_order_on_every_archive_matrix() {
     let mut widths = std::collections::BTreeSet::new();
     for (i, m) in matrices.iter().enumerate() {
         widths.insert(m.bits);
-        // 1, 4 and 5 rows: the single-row path, one block, a block and a tail.
-        for rows in [1, 4, 5] {
+        // 1, 4 and 5 rows: the single-row path, one block, a block and a tail; 2, 3, 6 and 7
+        // the zero-padded block of a 2- or 3-row tail.
+        for rows in [1, 2, 3, 4, 5, 6, 7] {
             let x = inputs(rows, m.cols(), i as u32 + rows as u32);
             let count = m.rows().min(37);
             let first = m.rows() - count;
