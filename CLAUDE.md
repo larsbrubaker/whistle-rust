@@ -21,9 +21,11 @@ needs (an empty transcript for silence, an error they can show) is decided for t
 
 1. **Pure Rust.** No C/C++, no `-sys` crates, no native build scripts, no linking to the Needle
    engine. The library builds for `wasm32-unknown-unknown` and has no runtime dependencies.
-2. **Clean room.** Port only from Apache-2.0 sources: upstream's model code in
+2. **Clean room.** Port the model only from Apache-2.0 sources: upstream's model code in
    `needle-reference/` (github.com/cactus-compute/needle, pinned in `REFERENCE`) and the
-   Apache-2.0 weights. **Never fetch, read or follow github.com/cactus-compute/cactus** (the
+   Apache-2.0 weights. General-purpose numeric code (e.g. the deterministic math functions) may
+   be ported from permissively licensed sources (MIT, BSD, Apache-2.0, zlib) unrelated to Cactus.
+   **Never fetch, read or follow github.com/cactus-compute/cactus** (the
    engine source, under a non-commercial license) and never disassemble or trace the Needle
    engine binaries: they are a black-box transcript oracle only (`oracle/engine_transcripts.py`).
    What only the closed engine does (beam search, keyword biasing, timestamps, streaming, the
@@ -50,9 +52,14 @@ Three nets. A change is not done until all that apply are green.
    loads its clip fixtures (`support::Fixture`) and compares with the reference. Tests MUST
    exercise production code, never copies. Unit tests that need private access live in
    `src/**/tests.rs`. Name a test for the behaviour it pins.
-2. **End to end** — the Rust greedy decode reproduces every clip's reference token stream
-   exactly (`manifest.json` `tokens`), and the designed decode features hold their quality bar
-   against the engine transcripts (`test-data/engine/`).
+2. **End to end** — run from the WAV through the port's own pipeline and teacher-forced on each
+   clip's reference token stream (`manifest.json` `tokens`), the port's restricted argmax equals
+   the reference token at every position, except the near-ties listed in
+   `test-data/near_ties.json` (each with its measured margins; any unlisted divergence fails,
+   whatever its margin). A free-running snapshot pins the port's own greedy output on every clip,
+   and the designed decode features hold their quality bar against the engine transcripts
+   (`test-data/engine/`). Every target computes the same bits (deterministic math, `src/math`),
+   so these hold identically on native and wasm32.
 3. **wasm32** — the library builds for `wasm32-unknown-unknown` (`scripts/gates.sh`).
 
 Plus the gates that run with net 1:
@@ -76,7 +83,12 @@ modes and under 3e-7 input noise (`docs/design/oracle.md`). So:
   (`layerNN/lanes`), never from the port's own earlier output. Each stage's bound is set from
   the measured error when the stage first lands and written beside its test with that
   measurement; it is never raised afterwards without the orchestrator's sign-off.
-- **The contract is the token stream:** greedy tokens identical to the fixture on every clip.
+- **The contract is the token stream:** teacher-forced on the reference tokens, the port picks
+  the reference token at every position of every clip, except listed near-ties
+  (`test-data/near_ties.json`): positions where the reference itself sat on a coin flip that a
+  last-bit difference in `exp` can move (the port and the reference use different `exp`
+  implementations). A near-tie is listed only with its measured margins on both sides and a
+  margin under 0.05; listing one is a deliberate change with its own commit.
 
 ### Test-first bug fixing
 
