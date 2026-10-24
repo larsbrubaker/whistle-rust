@@ -139,6 +139,16 @@ def table(results):
         print(f"  beams {b}, threads {t}: {same}")
 
 
+def per_round_median(cells):
+    """One cell per round (each its RUNS calls' median) -> the median of those medians."""
+    if not cells:
+        return None
+    out = dict(cells[0])
+    for key in ("median_ms", "encoder_ms"):
+        out[key] = statistics.median(c[key] for c in cells)
+    return out
+
+
 def wasm_table(results):
     order = ["native", "node-simd128", "node-scalar", "wasmtime-simd128", "wasmtime-scalar"]
     runs = {}
@@ -150,10 +160,12 @@ def wasm_table(results):
     for beams in sorted({r["beams"] for rows in runs.values() for r in rows}):
         print(f"\nbeams {beams}, 1 thread: median wall ms per transcription (encoder-only ms)")
         print(" | ".join(["clip", "sec"] + names + ["node simd/native", "simd speedup (node)"]))
-        clips = [r for r in runs.get("native", next(iter(runs.values()))) if r["beams"] == beams]
+        # The first round's row per clip: later rounds repeat the same clips.
+        clips = list({r["clip"]: r for r in reversed(runs.get("native", next(iter(runs.values()))))
+                      if r["beams"] == beams}.values())[::-1]
         for ref in clips:
-            cell = {n: next((r for r in runs[n] if r["beams"] == beams and r["clip"] == ref["clip"]),
-                            None) for n in names}
+            cell = {n: per_round_median([r for r in runs[n] if r["beams"] == beams
+                                         and r["clip"] == ref["clip"]]) for n in names}
             row = [ref["clip"], f"{ref['seconds']:.1f}"]
             row += [f"{c['median_ms']:.0f} ({c['encoder_ms']:.0f})" if c else "-"
                     for c in cell.values()]
@@ -162,8 +174,9 @@ def wasm_table(results):
             row.append(f"{sc['median_ms'] / ns['median_ms']:.2f}x" if ns and sc else "-")
             print(" | ".join(row))
         for n in names[1:]:
-            same = sum(1 for ref in clips for r in runs[n] if r["beams"] == beams
-                       and r["clip"] == ref["clip"] and r["text"] == ref["text"])
+            same = sum(1 for ref in clips
+                       if all(r["text"] == ref["text"] for r in runs[n]
+                              if r["beams"] == beams and r["clip"] == ref["clip"]))
             print(f"  {n}: text identical to native on {same} of {len(clips)} clips")
 
 

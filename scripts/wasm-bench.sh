@@ -3,15 +3,19 @@
 # wasm"). Builds crates/whistle-rust/examples/bench.rs for wasm32-wasip1 twice, with simd128 and
 # scalar, plus the native release build, then times all of them at one thread on the 8 speech
 # clips and the ~26.6 s long clip scripts/bench_tools.py writes (temp dir, nothing committed):
-# native, Node (V8, via scripts/wasm-bench.mjs) and wasmtime, at beams 1 and 3. Prints the table.
+# native, Node (V8, via scripts/wasm-bench.mjs) and wasmtime, at beams 1 and 3, in ROUNDS rounds
+# that interleave the runtimes. Prints the table (each cell the median of the per-round medians)
+# and keeps the raw JSON lines under target/wasm-bench-results/<timestamp>/.
 #
-#   scripts/wasm-bench.sh            RUNS=3 timed calls per clip (one warm-up); override via env
+#   scripts/wasm-bench.sh            ROUNDS=3 rounds of RUNS=3 timed calls per clip (one warm-up
+#                                    each); override either via env
 #   scripts/wasm-bench.sh profile    node --cpu-prof on a simd128 build with debug info: a 3 s
 #                                    clip at beams 1 and 3, the long clip at beams 1; summarized
 #                                    by scripts/wasm_profile.py, profiles kept in target/wasm-prof
 set -euo pipefail
 cd "$(dirname "$0")/.."
 RUNS=${RUNS:-3}
+ROUNDS=${ROUNDS:-3}
 MODEL=models/whistle.cact
 NODE=${NODE:-node}
 WASMTIME=${WASMTIME:-wasmtime}
@@ -60,13 +64,33 @@ build target/wasm-bench '-C target-feature=+simd128'
 build target/wasm-bench-scalar ''
 cargo build --release -p whistle-rust --example bench
 clips=(test-data/clips/*_*.wav "$tmp/long.wav")
-for beams in 1 3; do
-  args=(--model "$MODEL" --runs "$RUNS" --beams "$beams" --threads 1 "${clips[@]}")
-  target/release/examples/bench "${args[@]}" >>"$tmp/native.jsonl"
-  node_run target/wasm-bench/$WASM "${args[@]}" >>"$tmp/node-simd128.jsonl"
-  node_run target/wasm-bench-scalar/$WASM "${args[@]}" >>"$tmp/node-scalar.jsonl"
-  wasmtime_run target/wasm-bench/$WASM "${args[@]}" >>"$tmp/wasmtime-simd128.jsonl"
-  wasmtime_run target/wasm-bench-scalar/$WASM "${args[@]}" >>"$tmp/wasmtime-scalar.jsonl"
+results=target/wasm-bench-results/$(date +%Y%m%d-%H%M%S)
+mkdir -p "$results"
+runtimes=(native node-simd128 node-scalar wasmtime-simd128 wasmtime-scalar)
+run_one() { # runtime, bench args...
+  local name=$1
+  shift
+  case $name in
+    native) target/release/examples/bench "$@" ;;
+    node-simd128) node_run target/wasm-bench/$WASM "$@" ;;
+    node-scalar) node_run target/wasm-bench-scalar/$WASM "$@" ;;
+    wasmtime-simd128) wasmtime_run target/wasm-bench/$WASM "$@" ;;
+    wasmtime-scalar) wasmtime_run target/wasm-bench-scalar/$WASM "$@" ;;
+  esac
+}
+# Load drifts over a run, so each round runs every runtime once per beam count, and the starting
+# runtime rotates from round to round: no runtime always runs first or last, and every cell is
+# the median of ROUNDS per-round medians rather than one sample of whatever load it ran under.
+for ((round = 0; round < ROUNDS; round++)); do
+  for beams in 1 3; do
+    args=(--model "$MODEL" --runs "$RUNS" --beams "$beams" --threads 1 "${clips[@]}")
+    for ((i = 0; i < ${#runtimes[@]}; i++)); do
+      name=${runtimes[$(((i + round) % ${#runtimes[@]}))]}
+      run_one "$name" "${args[@]}" >>"$results/$name.jsonl"
+    done
+  done
+  echo "round $((round + 1)) of $ROUNDS done, load average $(uptime | sed 's/.*load averages*: //')"
 done
 echo "load average at end: $(uptime | sed 's/.*load averages*: //')"
-python3 -I scripts/bench_tools.py wasmtable "$tmp"
+echo "raw JSON lines: $results"
+python3 -I scripts/bench_tools.py wasmtable "$results"

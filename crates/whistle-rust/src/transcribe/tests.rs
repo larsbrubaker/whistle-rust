@@ -50,9 +50,14 @@ fn cancel_at(samples: Vec<f32>, rate: u32, at: Stage) -> (Result<(), Error>, Vec
     let result = whistle().run(Cow::Owned(samples), rate, &options, &mut |stage| {
         if stage == at && !seen.contains(&at) {
             let handle = cancel.clone();
+            // wasm32 cannot spawn a thread, so there the cancel fires on the calling thread: the
+            // call still has to notice it at its next check, which is what these tests pin.
+            #[cfg(not(target_arch = "wasm32"))]
             std::thread::spawn(move || handle.cancel())
                 .join()
                 .expect("the cancelling thread runs");
+            #[cfg(target_arch = "wasm32")]
+            handle.cancel();
         }
         seen.push(stage);
     });

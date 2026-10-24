@@ -31,6 +31,10 @@ fn encoder_and_logits(threads: usize) -> (Vec<u32>, Vec<u32>) {
 }
 
 #[test]
+#[cfg_attr(
+    target_arch = "wasm32",
+    ignore = "wasm32 has no worker threads: whistle::threads() is always 1 there"
+)]
 fn one_and_four_worker_threads_give_bit_identical_encoder_output_and_logits() {
     let (enc1, logits1) = encoder_and_logits_bits(1);
     let (enc4, logits4) = encoder_and_logits_bits(4);

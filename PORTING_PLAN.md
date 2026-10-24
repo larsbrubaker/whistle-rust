@@ -15,9 +15,12 @@ at one beam, ~2.2 ms per decoder token); what is left.
 slower computers on the web are where transcription is slowest, so performance work is chosen
 and measured for one thread on wasm first; native threads are a bonus.
 
-- Check the token contract on wasm: the wasm builds gave native's text on only 8 of 9
-  benchmark clips (`docs/design/performance.md` "Single-threaded wasm"); `exp`/`ln`/`cos` come
-  from a different libm there. Run the test suite on wasm32-wasip1 under wasmtime and find out.
+- Make native and wasm compute the same bits (`scripts/wasm-test.sh` runs the whole suite on
+  wasm32-wasip1 under wasmtime, simd128 and scalar, and every contract passes; but the 26.6 s
+  benchmark clip decodes differently, and `examples/stage_hashes.rs` shows the first difference
+  in the stem's `silu`: f32 `exp` from the platform libm). Port deterministic pure-Rust math
+  (musl, MIT) for every transcendental the model, front end, VAD and decoding use, so every
+  target computes identical bits; re-measure the token contract and the stage bounds on native.
 - Optimise for one wasm thread, by the Node (V8) profile (`scripts/wasm-bench.sh profile`): the
   decoder's packed kernel is 33% of a 3 s clip at one beam and 56% at three (each weight is
   index-decoded for one multiply-add; batching helps at 3+ beams, a wasm-friendly index layout

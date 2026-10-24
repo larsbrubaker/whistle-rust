@@ -101,7 +101,11 @@ fn abandoning_reports_retraction_only_for_partial_keywords() {
 }
 
 fn tokenizer() -> Tokenizer {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models/whistle.cact");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("the workspace root")
+        .join("models/whistle.cact");
     let bytes = std::fs::read(root).expect("models/whistle.cact");
     Tokenizer::from_archive(&Archive::parse(&bytes).unwrap()).unwrap()
 }

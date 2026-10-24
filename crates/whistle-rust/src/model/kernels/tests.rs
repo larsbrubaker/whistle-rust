@@ -100,6 +100,10 @@ fn an_all_negative_zero_product_keeps_its_sign_as_the_sequential_sum_does() {
 }
 
 #[test]
+#[cfg_attr(
+    target_arch = "wasm32",
+    ignore = "wasm32 cannot spawn worker threads; the library never asks for more than one there"
+)]
 fn every_thread_count_gives_bit_identical_projections() {
     // Row counts that split evenly, unevenly, barely, and not at all (one and three rows stay
     // on one thread), all above the work threshold.
@@ -173,6 +177,10 @@ fn an_empty_input_width_projects_to_zeros() {
 }
 
 #[test]
+#[cfg_attr(
+    target_arch = "wasm32",
+    ignore = "wasm32 has no worker threads: threads() is always 1 there"
+)]
 fn a_huge_thread_setting_is_capped_and_projects_without_overflow() {
     with_threads(usize::MAX, || assert_eq!(threads(), MAX_THREADS));
     set_threads(usize::MAX);

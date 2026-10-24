@@ -14,7 +14,11 @@ use crate::transcribe::search::Ranking;
 use crate::transcribe::{AlignmentPass, Cancel, Options, Stage, Whistle};
 
 fn repo() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("the workspace root")
+        .to_path_buf()
 }
 
 fn whistle() -> &'static Whistle {

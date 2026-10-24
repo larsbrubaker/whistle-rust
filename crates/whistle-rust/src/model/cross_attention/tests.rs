@@ -24,7 +24,10 @@ fn values(n: usize, seed: u32) -> Vec<f32> {
 
 #[test]
 fn captured_probabilities_rebuild_the_attention_output() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("the workspace root");
     let bytes = std::fs::read(root.join("models/whistle.cact")).expect("whistle.cact");
     let w = Weights::from_archive(&Archive::parse(&bytes).unwrap()).unwrap();
     let cross = &w.decoder[0].cross_attn;

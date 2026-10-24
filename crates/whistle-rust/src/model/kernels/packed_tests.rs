@@ -11,7 +11,11 @@ use crate::quant::CqRows;
 
 /// Every packed matrix of the bundled archive, if present (the tests skip without it).
 fn archive_matrices() -> Option<Vec<PackedMatrix>> {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../models/whistle.cact");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("the workspace root")
+        .join("models/whistle.cact");
     let bytes = std::fs::read(path).ok()?;
     let archive = Archive::parse(&bytes).ok()?;
     let mut out = Vec::new();
@@ -88,6 +92,10 @@ fn the_packed_projection_matches_the_dense_one_to_rounding() {
 }
 
 #[test]
+#[cfg_attr(
+    target_arch = "wasm32",
+    ignore = "wasm32 cannot spawn worker threads; the library never asks for more than one there"
+)]
 fn threads_do_not_change_the_packed_projection() {
     let Some(matrices) = archive_matrices() else {
         eprintln!("models/whistle.cact missing: skipped");
@@ -105,7 +113,11 @@ fn threads_do_not_change_the_packed_projection() {
 
 #[test]
 fn every_cq_matrix_the_model_projects_is_bound_packed_in_its_order() {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../models/whistle.cact");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("the workspace root")
+        .join("models/whistle.cact");
     let Ok(bytes) = std::fs::read(path) else {
         eprintln!("models/whistle.cact missing: skipped");
         return;
@@ -213,6 +225,10 @@ fn the_band_decode_reproduces_the_archive_dequantization_bit_for_bit_on_every_pa
 }
 
 #[test]
+#[cfg_attr(
+    target_arch = "wasm32",
+    ignore = "wasm32 cannot spawn worker threads; the library never asks for more than one there"
+)]
 fn threads_do_not_change_the_dense_order() {
     let Some(matrices) = archive_matrices() else {
         eprintln!("models/whistle.cact missing: skipped");
