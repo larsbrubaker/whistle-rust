@@ -74,7 +74,7 @@ impl Engine {
     }
 
     /// Push mono samples at `rate` Hz (resampled to 16 kHz when needed); the update as JSON
-    /// `{"text", "continues", "pending", "language"}`.
+    /// `{"text", "continues", "pending", "pendingContinues", "language"}`.
     pub fn push(&mut self, samples: &[f32], rate: u32) -> Result<String, JsValue> {
         let stream = self
             .stream
@@ -206,10 +206,11 @@ fn words_json(words: &[Word]) -> String {
 
 fn update_json(update: &StreamUpdate) -> String {
     format!(
-        "{{\"text\":{},\"continues\":{},\"pending\":{},\"language\":{}}}",
+        "{{\"text\":{},\"continues\":{},\"pending\":{},\"pendingContinues\":{},\"language\":{}}}",
         json_string(&update.text),
         update.continues,
         json_string(&update.pending),
+        update.pending_continues,
         language_json(&update.language)
     )
 }

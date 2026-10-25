@@ -18,9 +18,12 @@ outlives). `Options::streaming()` is the live preset: the defaults with `beams: 
 `push(&[f32])` takes 16 kHz mono chunks of any size and runs every pass the chunk completes
 before it returns, so a push of many seconds blocks for many passes; live callers push small
 chunks (a step or less) as they arrive. `finish(self)` commits everything left. Each returns a
-`StreamUpdate`: `committed` (the words new in this update), `text` (them joined), `pending` (the
-latest pass's unconfirmed words), `language`, `dropped` (seconds dropped at the cap, below) and `continues` (its `text` begins
-with the rest of the word before it: append it with no space).
+`StreamUpdate` (`#[non_exhaustive]`, so a field can be added without breaking callers):
+`committed` (the words new in this update), `text` (them joined), `pending` (the latest pass's
+unconfirmed words), `language`, `dropped` (seconds dropped at the cap, below), `continues` (its
+`text` begins with the rest of the word before it: append it with no space) and
+`pending_continues` (`pending` begins with the rest of the last committed word, "0 mm" after a
+committed "2": show it with no space, or a preview reads "2 0 mm").
 `transcript()` is everything committed so far as a `Transcript`, also after an error (an update
 that failed is not returned, so its words reach the caller only there); `buffered()` the samples
 held (never over `MAX_SAMPLES`); `dropped()` the total dropped. `Options::cancel` is checked at
@@ -96,7 +99,9 @@ time the rest's share of the word's; it is **glued** to the committed word befor
 text (the transcript, an update's `text`, `pending`), so the transcript reads "matterhackers"
 or "20", never "matter hackers" or "2 0". An update's `text` can therefore begin with the rest
 of a word: `StreamUpdate::continues` is then true, and a caller appending updates adds no space
-before it. The head must be exactly the end of the committed text and hold the whole last
+before it. The rest can also wait in `pending` (agreement has not committed it yet): then
+`StreamUpdate::pending_continues` is true, and a caller previewing the tail after the committed
+text adds no space either. The head must be exactly the end of the committed text and hold the whole last
 committed word: the "t" of "the" after a committed "about" is no continuation (it glued
 "abouthe" on the 33 s no-pause stream).
 
@@ -131,8 +136,32 @@ for consuming "Please" and 5 for consuming nothing, and the latest-position rule
 "Please". Re-reads where some characters match ("on the" read as "on a") are still absorbed. A
 possibly doubled article is better than a lost word.
 
-**Accepted:** "make a" committed, then read "make the cube…", commits "make a the cube": no
-letter repeats, but a word ("a" re-read as "the") does, since the committed "a" is final.
+**Re-reads with other characters.** A committed word read again with a longer or different
+spelling ("mm" as "millimeters", "20" as "twenty", "Q20" as "queue 20") costs less to delete
+from C than to align against the new reading (2 against 9 for "mm" and "millimeters"), so the
+cut lands before the re-read, and the stream committed it twice: en_samantha with a faint hiss
+(0.01 peak to peak) and leading silence streamed "Make the Q20 queue 20 mm wide…" at 30 of 320
+offsets (75 of 320 at 0.02; `sweep_offsets` in `tests/streaming/offsets.rs` with
+`SWEEP_CLIP=en_samantha SWEEP_STEP=50 SWEEP_NOISE=0.01`, or `0.02`), and a browser recording
+"20 mm millimeters wide". Characters cannot tell those words from new ones; time can. The
+alignment counts the characters at C's end that it deleted (`Cut::unmatched`; of equal-cost
+paths, the one deleting least), and `realign::re_read` takes the committed lettered words
+wholly deleted that way and their end: the pass's words after the cut, in order, whose
+midpoint lies before that end and that end at most 0.1 s past it were said where those
+committed words were, so they are a re-read, not new; the first word that fails ends the run.
+The re-reads measured end at most 0.06 s past; a new word timed over a committed word the pass
+left out runs on well past it ("it" committed to 0.70 s, a new "cubes" read over 0.45–0.90 s),
+and stays new. Nothing is taken by time when the cut matched C to its end (no deletion), when
+it is inside a word (a continuation), or when nothing matched (the cut moved to the pass's
+start: the pass did not hear C, and a settled restart's short first word, "to" from 0.1 s
+before the commit point, has its midpoint before the committed end). A punctuation-only
+committed word never bounds the re-read: after "edges" "." read as "edge and", only the "s" is
+deleted, and "and" is new. A doubled word is better than a lost one.
+
+**Accepted:** "make a" committed, then read "make the cube…": when the pass times "the" where
+"a" was, it is a re-read and the stream reads "make a cube"; when it times "the" after "a", it
+commits "make a the cube": no letter repeats, but a word does, since the committed "a" is
+final.
 
 When the best alignment changes more than half of C's characters, the pass read the utterance
 too differently to place the cut: the utterance restarts at the commit point, and the pass runs

@@ -42,10 +42,14 @@ Beam search (default 3 beams), keyword biasing, word timestamps, windowing and s
 (`docs/design/decoding.md`, `timestamps.md`, `windowing.md`, `streaming.md`); what is left:
 
 - Streaming quality: a word committed and then read differently by a later pass stays as
-  committed (no retraction), so live text can keep an early misreading ("matter" for
-  "Matterhackers" parts, "make a the cube"); a merged re-read can swallow part of the next word.
-  Per-update cost grows with the utterance (up to a 30 s decode per step); re-measure on wasm
-  and consider bounding it.
+  committed (no retraction), so live text can keep an early misreading ("Q20" for "cube 20",
+  "matter" for "Matterhackers" parts). A re-read with other characters is no longer committed
+  again when its words lie in time where the committed ones were (`realign::re_read`), but a
+  pass word that straddles the committed end still is: "Q20" committed, then "20mm" read as one
+  word over "20" and the new "mm", streams "Q20 20mm" (en_samantha, 0.02 hiss, 7500 samples of
+  leading silence; `tests/streaming/offsets.rs` sweeps this), and a merged re-read can swallow
+  part of the next word. Per-update cost grows with the utterance (up to a 30 s decode per
+  step); re-measure on wasm and consider bounding it.
 - Keyword biasing at 5+ beams finds fewer keywords than at 1 or 3 (partial keyword paths crowd
   the beam): per-beam-count tuning or a cap on hypotheses inside a keyword.
 - More clips (long audio, noise, real microphone recordings) via `oracle/clips.json`; the

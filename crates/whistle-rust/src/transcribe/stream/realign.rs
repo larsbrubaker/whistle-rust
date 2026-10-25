@@ -2,7 +2,9 @@
 //! pass"): a character-level semi-global alignment of everything the stream committed in the
 //! utterance against a prefix of the pass's words, both normalized (`super::normalize`: lower
 //! case, letters and digits, no spaces). `stream.rs` takes the words after the cut as the pass's
-//! new words; the tests in `tests.rs` pin the cases that word-level matching got wrong.
+//! new words, less those that re-read, in other words, committed words the alignment could not
+//! match (`re_read`, by time); the tests in `tests.rs` pin the cases that word-level matching
+//! got wrong.
 
 /// Where the committed text ends in a pass's words.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,6 +17,11 @@ pub(super) struct Cut {
     pub offset: usize,
     /// The alignment's edit distance (characters).
     pub cost: usize,
+    /// Characters at the end of the committed text that the alignment deleted: no character of
+    /// the pass before the cut stands for them (0 when the committed text's last character is
+    /// matched or substituted, and 0 when nothing matched: then the pass did not hear the
+    /// committed text, so none of its words can be a re-read of it).
+    pub unmatched: usize,
 }
 
 /// Aligns all of `committed` (normalized) against a prefix of `words` (each normalized; empty
@@ -43,15 +50,23 @@ pub(super) fn cut(committed: &str, last: &str, words: &[String], committed_marks
     let m = p.len();
     // The last row of the edit-distance table, two rows at a time: `row[j]` aligns all of `c`
     // seen so far against `p[..j]`, the pass's start fixed and its suffix free.
+    // `tail[j]` counts the committed characters the path to `row[j]` deleted last, in a row:
+    // of equal-cost moves the one deleting least is taken, so `unmatched` never overstates.
     let mut row: Vec<usize> = (0..=m).collect();
     let mut next = vec![0; m + 1];
+    let mut tail = vec![0; m + 1];
+    let mut next_tail = vec![0; m + 1];
     for (i, &ch) in c.iter().enumerate() {
         next[0] = i + 1;
+        next_tail[0] = i + 1;
         for j in 1..=m {
-            let substitute = row[j - 1] + usize::from(p[j - 1].0 != ch);
-            next[j] = substitute.min(row[j] + 1).min(next[j - 1] + 1);
+            let substitute = (row[j - 1] + usize::from(p[j - 1].0 != ch), 0);
+            let insert = (next[j - 1] + 1, next_tail[j - 1]);
+            let delete = (row[j] + 1, tail[j] + 1);
+            (next[j], next_tail[j]) = substitute.min(insert).min(delete);
         }
         std::mem::swap(&mut row, &mut next);
+        std::mem::swap(&mut tail, &mut next_tail);
     }
     let boundary = |j: usize| j == 0 || j == m || p[j].2 == 0;
     let mut best = 0;
@@ -81,13 +96,17 @@ pub(super) fn cut(committed: &str, last: &str, words: &[String], committed_marks
     }
     let cost = row[best];
     if best == 0 {
-        // Nothing of the pass is committed: every word is new, punctuation first included.
+        // Nothing of the pass is committed: every word is new, punctuation first included, and
+        // none is taken for a re-read by its time (a short new word right after the floor of a
+        // settled restart has its midpoint before the committed end).
         return Cut {
             word: 0,
             offset: 0,
             cost,
+            unmatched: 0,
         };
     }
+    let unmatched = tail[best];
     if boundary(best) {
         // After the word holding the last aligned character, past the committed marks.
         let mut word = p[best - 1].1 + 1;
@@ -100,11 +119,61 @@ pub(super) fn cut(committed: &str, last: &str, words: &[String], committed_marks
             word,
             offset: 0,
             cost,
+            unmatched,
         };
     }
     let (_, word, offset) = p[best];
-    Cut { word, offset, cost }
+    Cut {
+        word,
+        offset,
+        cost,
+        unmatched,
+    }
 }
+
+/// How many of the pass's words after a boundary cut re-read committed words the alignment
+/// left unmatched: `committed` is the committed words the pass was aligned against, each as
+/// its normalized length and its end (seconds), `unmatched` the cut's [`Cut::unmatched`], and
+/// `pass` the pass's words from the cut on, each as its start and end. A committed word the
+/// pass read with other characters ("mm" then "millimeters", "Q20" then "queue 20", "20" then
+/// "twenty") costs less to delete than to align against the longer reading, so the cut lands
+/// before the re-read and its words would be committed again. Time tells them apart: the
+/// committed words whose characters were all deleted end at some time, and a word of the pass
+/// whose midpoint lies before that time, and that ends no more than [`RE_READ_OVERRUN`] after
+/// it, was said there, so it is that word read again, not a new one. Words are taken in order
+/// and the first one that fails ends the run, so a new word is never taken for a re-read by a
+/// later one's timing.
+pub(super) fn re_read(committed: &[(usize, f32)], unmatched: usize, pass: &[(f32, f32)]) -> usize {
+    // The committed words wholly deleted, from the end: the last lettered one's end bounds the
+    // re-read. A word only partly deleted was partly heard before the cut, so it says nothing;
+    // punctuation-only words have no characters to delete, so they never bound it (a "." after
+    // a partly deleted "edges" would otherwise reach past "edge" into the next word).
+    let mut left = unmatched;
+    let mut end = None;
+    for &(len, word_end) in committed.iter().rev() {
+        if left == 0 || len > left {
+            break;
+        }
+        left -= len;
+        if len > 0 {
+            end = Some(end.map_or(word_end, |e: f32| e.max(word_end)));
+        }
+    }
+    let Some(end) = end else {
+        return 0;
+    };
+    pass.iter()
+        .take_while(|&&(start, word_end)| {
+            (start + word_end) / 2.0 < end && word_end <= end + RE_READ_OVERRUN
+        })
+        .count()
+}
+
+/// How far (0.1 s) past the end of the committed words it re-reads a pass word may run: two
+/// passes time the same word within a few hundredths of a second (the re-reads measured end at
+/// most 0.06 s past), while a new word timed over a committed word the pass left out runs on
+/// well past its end ("it" committed to 0.7 s, then a new "cubes" read over 0.45–0.9 s).
+const RE_READ_OVERRUN: f32 = 0.1;
 
 /// Whether a pass that spells `heard` characters says nothing about `committed` characters:
 /// under half as many (an empty pass, or a fragment), it cannot hold the committed text, and

@@ -3,7 +3,8 @@
 // decode and chunk-size independence; `behaviour` that committed words never change, times are
 // monotonic, silence commits nothing, a long stream stays under 30 s and cancel stops it;
 // `engine` compares with the engine's own streaming output (test-data/engine-stream/);
-// `measure` (ignored) prints the per-update cost.
+// `offsets` streams clips after varying leading silence and hiss (re-reads committed twice, and
+// an ignored sweep); `measure` (ignored) prints the per-update cost.
 
 #[path = "support/mod.rs"]
 mod support;
@@ -16,6 +17,8 @@ mod clips;
 mod engine;
 #[path = "streaming/measure.rs"]
 mod measure;
+#[path = "streaming/offsets.rs"]
+mod offsets;
 #[path = "streaming/run.rs"]
 mod run;
 #[allow(dead_code)] // the clip loader, concatenations and recall helpers are shared

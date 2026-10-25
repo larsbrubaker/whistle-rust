@@ -86,7 +86,7 @@ fn a_long_transcript_scrolls_and_stays_at_the_newest_words() {
         state.apply_update(
             &format!("sentence number {i} goes here."),
             false,
-            "",
+            ("", false),
             None,
             1.0,
             1.0,

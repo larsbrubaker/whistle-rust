@@ -1,9 +1,10 @@
 // Unit tests for the streaming policy's pure parts (`stream.rs`, `realign.rs`): the word
 // normalizer agreement compares with, and the character alignment that finds where the
-// committed text ends in a new pass, on every case word-level matching got wrong; plus the
-// dropped-audio report at the 30 s cap, from the state that causes it.
+// committed text ends in a new pass, on every case word-level matching got wrong, and the
+// re-reads it takes by time; plus the dropped-audio report at the 30 s cap and the pending
+// tail's continuation flag, from the states that cause them.
 
-use super::realign::{cut, rest_of, says_nothing, Cut};
+use super::realign::{cut, re_read, rest_of, says_nothing, Cut};
 use super::{normalize, MAX_SAMPLES};
 
 /// The pass's words after the committed text, the first as the rest of its word when the cut
@@ -32,6 +33,137 @@ fn new_text(committed: &str, pass: &str) -> Vec<String> {
         out[0] = format!("+{}", rest_of(words[word], offset));
     }
     out
+}
+
+/// Words with times, `(word, start, end)`, as committed or read by a pass.
+type Timed<'a> = &'a [(&'a str, f32, f32)];
+
+/// As `new_text`, with each word's time: the pass's words after the committed text, less those
+/// that re-read committed words the alignment left unmatched (`re_read`), as `stream.rs` takes
+/// them at a boundary cut.
+fn new_timed(committed: Timed, pass: Timed) -> Vec<String> {
+    let text = |words: Timed| -> String {
+        let spelled: Vec<&str> = words.iter().map(|w| w.0).collect();
+        spelled.join(" ")
+    };
+    let normalized: String = committed.iter().map(|w| normalize(w.0)).collect();
+    let last = committed
+        .iter()
+        .rev()
+        .map(|w| normalize(w.0))
+        .find(|w| !w.is_empty())
+        .unwrap_or_default();
+    let spelled: Vec<String> = pass.iter().map(|w| normalize(w.0)).collect();
+    let c = cut(&normalized, &last, &spelled, 0);
+    assert_eq!(c.offset, 0, "{} | {}", text(committed), text(pass));
+    let lengths: Vec<(usize, f32)> = committed
+        .iter()
+        .map(|w| (normalize(w.0).chars().count(), w.2))
+        .collect();
+    let rest = &pass[c.word.min(pass.len())..];
+    let times: Vec<(f32, f32)> = rest.iter().map(|w| (w.1, w.2)).collect();
+    let skip = re_read(&lengths, c.unmatched, &times);
+    rest[skip..].iter().map(|w| w.0.to_string()).collect()
+}
+
+#[test]
+fn a_committed_word_re_read_longer_is_not_new() {
+    // "mm" committed; the next pass reads the same audio as "millimeters": deleting "mm"
+    // costs 2, stretching it over "millimeters" 9, so the cut lands before "millimeters".
+    let committed = [("cube", 0.48, 0.72), ("20", 0.72, 1.04), ("mm", 1.04, 1.68)];
+    let pass = [
+        ("cube", 0.48, 0.72),
+        ("20", 0.72, 1.04),
+        ("millimeters", 1.04, 1.74),
+        ("wide", 1.74, 1.9),
+    ];
+    assert_eq!(new_timed(&committed, &pass), ["wide"]);
+    // A number committed as digits and read again as a word.
+    let committed = [
+        ("the", 0.32, 0.48),
+        ("cube", 0.48, 0.72),
+        ("20", 0.72, 1.04),
+    ];
+    let pass = [
+        ("the", 0.32, 0.48),
+        ("cube", 0.48, 0.72),
+        ("twenty", 0.7, 1.06),
+        ("millimeters", 1.06, 1.7),
+    ];
+    assert_eq!(new_timed(&committed, &pass), ["millimeters"]);
+}
+
+#[test]
+fn a_committed_word_re_read_as_two_is_not_new() {
+    // "cube 20" committed as "Q20", then read "queue 20 mm" (en_samantha, measured).
+    let committed = [("Make", 0.22, 0.46), ("the", 0.46, 0.7), ("Q20", 0.7, 1.1)];
+    let pass = [
+        ("Make", 0.22, 0.46),
+        ("the", 0.46, 0.7),
+        ("queue", 0.7, 0.9),
+        ("20", 0.9, 1.1),
+        ("mm", 1.1, 1.82),
+    ];
+    assert_eq!(new_timed(&committed, &pass), ["mm"]);
+}
+
+#[test]
+fn words_after_an_unmatched_committed_word_stay_new() {
+    // The pass did not hear the committed word: its words come after it in time.
+    let committed = [("edges", 2.64, 2.96)];
+    let pass = [("Please", 3.1, 3.4), ("export", 3.4, 3.8)];
+    assert_eq!(new_timed(&committed, &pass), ["Please", "export"]);
+    // "a" committed, then "the cube": "the" said after "a" is new; said where "a" was, a re-read.
+    let committed = [("make", 0.2, 0.45), ("a", 0.45, 0.6)];
+    let late = [("make", 0.2, 0.45), ("the", 0.62, 0.8), ("cube", 0.8, 1.0)];
+    assert_eq!(new_timed(&committed, &late), ["the", "cube"]);
+    let same = [
+        ("make", 0.2, 0.45),
+        ("the", 0.45, 0.62),
+        ("cube", 0.62, 0.9),
+    ];
+    assert_eq!(new_timed(&committed, &same), ["cube"]);
+}
+
+#[test]
+fn a_new_word_in_a_pass_that_matched_nothing_survives() {
+    // A settled restart decodes from 0.1 s before the commit point; no character of the
+    // committed "edges" matches, so the pass did not hear it, and its short first word "to",
+    // whose midpoint falls before the committed end, is new, not a re-read.
+    let committed = [("edges", 2.64, 2.96)];
+    let pass = [("to", 2.86, 3.0), ("print", 3.0, 3.4)];
+    assert_eq!(new_timed(&committed, &pass), ["to", "print"]);
+}
+
+#[test]
+fn a_new_word_running_well_past_the_committed_end_survives() {
+    // The pass leaves out the committed "it" and times the new "cubes" over its audio and on:
+    // its midpoint is before the committed end, but it ends 0.2 s past it.
+    let committed = [("move", 0.2, 0.45), ("it", 0.45, 0.7)];
+    let pass = [("move", 0.2, 0.45), ("cubes", 0.45, 0.9)];
+    assert_eq!(new_timed(&committed, &pass), ["cubes"]);
+}
+
+#[test]
+fn a_committed_mark_after_a_partly_deleted_word_bounds_nothing() {
+    // "edges" committed with a "." of its own; the pass reads "edge and": only the "s" is
+    // deleted, so no lettered word is wholly unmatched and "and" is new.
+    let committed = [("the", 2.4, 2.64), ("edges", 2.64, 2.96), (".", 2.96, 3.3)];
+    let pass = [("the", 2.4, 2.64), ("edge", 2.64, 2.96), ("and", 3.0, 3.2)];
+    assert_eq!(new_timed(&committed, &pass), ["and"]);
+}
+
+#[test]
+fn a_fully_matched_cut_takes_nothing_by_time() {
+    // Nothing unmatched: a next word timed early (its start before the committed end) is new.
+    let committed = [("make", 0.2, 0.45), ("the", 0.45, 0.7)];
+    let pass = [("make", 0.2, 0.45), ("the", 0.45, 0.6), ("cube", 0.6, 0.75)];
+    assert_eq!(new_timed(&committed, &pass), ["cube"]);
+    let spelled: Vec<String> = ["make", "the", "cube"]
+        .iter()
+        .map(|w| normalize(w))
+        .collect();
+    assert_eq!(cut("makethe", "the", &spelled, 0).unmatched, 0);
 }
 
 #[test]
@@ -196,4 +328,39 @@ fn a_30_s_alignment_is_cheap() {
         committed.len()
     );
     assert_eq!(c.cost, 0);
+}
+
+#[test]
+fn a_pending_tail_that_continues_the_last_committed_word_says_so() {
+    // "2" committed, and the latest pass read "20 mm": its pending tail is the rest of "20"
+    // and then "mm", so a caller previewing it after the committed text adds no space.
+    let word = |text: &str, start: f32, end: f32| crate::transcribe::Word {
+        word: text.to_string(),
+        start,
+        end,
+        probability: 1.0,
+    };
+    let hyp = |text: &str, start: f32, end: f32, glued: bool| super::Hyp {
+        word: word(text, start, end),
+        tokens: Vec::new(),
+        glued,
+    };
+    let mut stream = crate::transcribe::tests::whistle()
+        .stream(&crate::transcribe::Options::streaming())
+        .expect("opens");
+    stream.words = vec![word("cube", 0.48, 0.72), word("2", 0.72, 0.88)];
+    stream.text = "cube 2".to_string();
+    stream.pending = vec![hyp("0", 0.88, 1.04, true), hyp("mm", 1.04, 1.68, false)];
+    let update = stream.push(&[]).expect("pushes");
+    assert_eq!(update.pending, "0 mm");
+    assert!(update.pending_continues);
+    assert!(!update.continues, "nothing committed");
+    // A tail that starts a word of its own does not continue.
+    stream.pending = vec![hyp("mm", 1.04, 1.68, false)];
+    let update = stream.push(&[]).expect("pushes");
+    assert_eq!(update.pending, "mm");
+    assert!(!update.pending_continues);
+    // No tail, nothing to continue.
+    stream.pending.clear();
+    assert!(!stream.push(&[]).expect("pushes").pending_continues);
 }

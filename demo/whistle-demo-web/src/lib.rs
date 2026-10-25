@@ -123,17 +123,28 @@ pub fn ui_phase(name: &str, message: &str) {
     });
 }
 
-/// One stream update; `ms` of compute for `audio_s` seconds of new audio.
+/// One stream update (`pending_continues`: the tail continues the last committed word); `ms`
+/// of compute for `audio_s` seconds of new audio.
 #[wasm_bindgen]
 pub fn ui_update(
     text: &str,
     continues: bool,
     pending: &str,
+    pending_continues: bool,
     language: Option<String>,
     ms: f64,
     audio_s: f64,
 ) {
-    with_state(|s| s.apply_update(text, continues, pending, language, ms, audio_s));
+    with_state(|s| {
+        s.apply_update(
+            text,
+            continues,
+            (pending, pending_continues),
+            language,
+            ms,
+            audio_s,
+        )
+    });
 }
 
 /// The final transcript: `text`, its language, the words ("\n"-separated) with their start

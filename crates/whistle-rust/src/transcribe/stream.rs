@@ -64,7 +64,9 @@ const RESTART_SHARE: usize = 2;
 const RESTART_LEAD_IN: u64 = RATE / 10;
 
 /// What one [`Stream::push`] or [`Stream::finish`] committed, and what is still unconfirmed.
+/// Non-exhaustive: later versions may report more, so match it with `..`.
 #[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct StreamUpdate {
     /// The words this update committed, with times in seconds from the start of the stream.
     pub committed: Vec<Word>,
@@ -84,6 +86,10 @@ pub struct StreamUpdate {
     /// `text` begins with the rest of the last word committed before this update (the pass
     /// read it longer: "2" committed, then "20"), so a caller appending it adds no space.
     pub continues: bool,
+    /// `pending` begins with the rest of the last word committed (this update's included: "2"
+    /// committed, then a pass reading "20 mm" leaves "0 mm" pending), so a caller showing the
+    /// tail after the committed text adds no space before it.
+    pub pending_continues: bool,
 }
 
 /// What aligning a pass against the committed text found.
@@ -276,6 +282,7 @@ impl Stream<'_> {
             glue_or_join(&mut pending, h.word.word.trim(), h.glued);
         }
         update.pending = pending;
+        update.pending_continues = self.pending.first().is_some_and(|h| h.glued);
         update.language = self.label(!self.words.is_empty() || !self.pending.is_empty());
     }
 
@@ -480,6 +487,15 @@ impl Stream<'_> {
             if let Some(first) = new.first_mut() {
                 self.keep_rest(first, cut.offset, spelled[cut.word].chars().count());
             }
+        } else if cut.unmatched > 0 {
+            // Committed words the alignment could not match may be read again after the cut
+            // with other characters ("mm" as "millimeters"): those words are not new.
+            let committed: Vec<(usize, f32)> = heard
+                .iter()
+                .map(|w| (normalize(&w.word).chars().count(), w.end))
+                .collect();
+            let pass: Vec<(f32, f32)> = new.iter().map(|h| (h.word.start, h.word.end)).collect();
+            new.drain(..realign::re_read(&committed, cut.unmatched, &pass));
         }
         Aligned::New(new)
     }

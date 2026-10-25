@@ -3,7 +3,7 @@
 // build-wasm.sh with simd128) and uses its `Engine` export. Messages (see src/protocol.ts):
 //   in:  init {urls} | start {options} | push {samples, rate} | finish | file {name, bytes, options}
 //   out: progress {loaded, total, source} | loading | ready {source, ms} |
-//        update {text, continues, pending, language, ms, audioS} |
+//        update {text, continues, pending, pendingContinues, language, ms, audioS} |
 //        final {text, language, words, ms, audioS} | error {message}
 // The model download, check and cache live in src/model.ts.
 import init, { Engine, model_bytes, model_sha256, model_url } from "../pkg/worker/whistle_demo_worker.js";

@@ -73,10 +73,12 @@ fn live(whistle: &Whistle, chunks: impl Iterator<Item = Vec<f32>>) -> Result<(),
 
 Each `StreamUpdate` holds the words newly committed (never retracted, times from the start of
 the stream), their text (`continues` when it begins with the rest of the word before: append
-it with no space), the unconfirmed `pending` tail, the language and any audio `dropped` at the
-30 s cap; `transcript()` returns everything committed so far. A word commits when two
-passes one `stream_step` (1 s) apart agree on it, about 1.3 s after it ends, or when a pause
-ends the utterance ([streaming.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/streaming.md)). The stream borrows the `Whistle`, so an app
+it with no space), the unconfirmed `pending` tail (`pending_continues` when it begins with the
+rest of the last committed word, "0 mm" after a committed "2": show it with no space before
+it), the language and any audio `dropped` at the 30 s cap; `transcript()` returns everything
+committed so far. `StreamUpdate` is `#[non_exhaustive]`: later versions may add fields. A
+word commits when two passes one `stream_step` (1 s) apart agree on it, about 1.3 s after it
+ends, or when a pause ends the utterance ([streaming.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/streaming.md)). The stream borrows the `Whistle`, so an app
 keeps the model alive beside it.
 
 ## Getting the model

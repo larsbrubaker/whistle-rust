@@ -52,7 +52,7 @@ worker.onmessage = (event: MessageEvent) => {
       ui_phase("ready", "");
       break;
     case "update":
-      ui_update(m.text, m.continues, m.pending, m.language ?? undefined, m.ms, m.audioS);
+      ui_update(m.text, m.continues, m.pending, m.pendingContinues, m.language ?? undefined, m.ms, m.audioS);
       break;
     case "final": {
       const words: Word[] = m.words ?? [];

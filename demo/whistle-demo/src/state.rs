@@ -196,12 +196,14 @@ impl DemoState {
     }
 
     /// One stream update: `text` is newly committed (`continues`: appended with no space),
-    /// `pending` replaces the tail; `ms` of compute for `audio_s` seconds of new audio.
+    /// `pending` replaces the tail; `ms` of compute for `audio_s` seconds of new audio. A tail
+    /// that continues the last committed word (`pending.1`: "0 mm" after a committed "2") is
+    /// shown with that word's start, "20 mm": shown alone it would read as a word "0".
     pub fn apply_update(
         &self,
         text: &str,
         continues: bool,
-        pending: &str,
+        pending: (&str, bool),
         language: Option<String>,
         ms: f64,
         audio_s: f64,
@@ -213,7 +215,13 @@ impl DemoState {
                 }
                 s.committed.push_str(text);
             }
-            s.pending = pending.to_string();
+            let (tail, tail_continues) = pending;
+            s.pending = if tail_continues && !tail.is_empty() {
+                let head = s.committed.rsplit(' ').next().unwrap_or_default();
+                format!("{head}{tail}")
+            } else {
+                tail.to_string()
+            };
             if language.is_some() {
                 s.language = language;
             }
@@ -244,6 +252,7 @@ impl DemoState {
         self.inner.borrow().committed.clone()
     }
 
+    /// The unconfirmed tail as shown: with the start of the word it continues, if it does.
     pub fn pending(&self) -> String {
         self.inner.borrow().pending.clone()
     }
@@ -316,11 +325,33 @@ mod tests {
     fn updates_append_committed_text_and_replace_the_pending_tail() {
         let state = DemoState::new();
         state.start_listening();
-        state.apply_update("Hello", false, "wor", Some("en".into()), 120.0, 1.0);
-        state.apply_update("world", false, "", None, 80.0, 1.0);
-        state.apply_update("s.", true, "and", None, 80.0, 1.0);
+        state.apply_update(
+            "Hello",
+            false,
+            ("wor", false),
+            Some("en".into()),
+            120.0,
+            1.0,
+        );
+        state.apply_update("world", false, ("", false), None, 80.0, 1.0);
+        state.apply_update("s.", true, ("and", false), None, 80.0, 1.0);
         assert_eq!(state.committed(), "Hello worlds.");
         assert_eq!(state.pending(), "and");
+    }
+
+    #[test]
+    fn a_pending_tail_that_continues_the_last_word_is_shown_with_its_start() {
+        // "2" committed, then a pass reading "20 mm": the tail "0 mm" continues "2", so the
+        // preview shows "20 mm", never a word "0".
+        let state = DemoState::new();
+        state.start_listening();
+        state.apply_update("Make the cube 2", false, ("0 mm", true), None, 80.0, 1.0);
+        assert_eq!(state.committed(), "Make the cube 2");
+        assert_eq!(state.pending(), "20 mm");
+        // Once the rest commits, the next tail stands on its own.
+        state.apply_update("0 mm", true, ("wide", false), None, 80.0, 1.0);
+        assert_eq!(state.committed(), "Make the cube 20 mm");
+        assert_eq!(state.pending(), "wide");
     }
 
     #[test]
@@ -330,7 +361,7 @@ mod tests {
         assert_eq!(state.status_line(), "Downloading model 8.0 / 16.0 MB (50%)");
         state.set_phase(Phase::Ready);
         state.start_listening();
-        state.apply_update("Hi", false, "", Some("en".into()), 250.0, 1.0);
+        state.apply_update("Hi", false, ("", false), Some("en".into()), 250.0, 1.0);
         assert_eq!(
             state.status_line(),
             "Listening \u{b7} en \u{b7} last update 250 ms, RTF 0.25"
