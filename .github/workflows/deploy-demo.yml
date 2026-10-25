@@ -1,13 +1,13 @@
 # Builds the browser demo (demo/: whistle-demo-web, whistle-demo-worker and web/) and
-# publishes it to GitHub Pages at https://larsbrubaker.github.io/whistle-rust/. It runs by hand
-# (workflow_dispatch) until Pages is enabled; then add `push: branches: [main]` back so every push
-# redeploys. whistle.cact (Apache-2.0, Cactus Compute) is fetched and checksummed by
+# publishes it to GitHub Pages at https://larsbrubaker.github.io/whistle-rust/ on every push to
+# main, or by hand (workflow_dispatch). whistle.cact (Apache-2.0, Cactus Compute) is fetched and checksummed by
 # scripts/fetch-weights.sh and deployed next to the page, so the demo downloads it from Pages
-# (Hugging Face is its fallback). Pages must be enabled in the repository settings with
-# Source: GitHub Actions.
+# (Hugging Face is its fallback). Pages is enabled with Source: GitHub Actions.
 name: Deploy demo
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

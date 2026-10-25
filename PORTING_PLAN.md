@@ -54,11 +54,10 @@ Beam search (default 3 beams), keyword biasing, word timestamps, windowing and s
 ## 8. Integration
 
 - The browser demo (`demo/`, agg-gui: live microphone transcript, a WAV file path, the model
-  downloaded, checksummed and cached, transcription in a Web Worker) is in; to publish it,
-  enable GitHub Pages (Source: GitHub Actions), run `deploy-demo.yml`, then switch it to run on
-  every push. Still unverified by hand: live microphone streaming (per-update time and real-time
-  factor in the browser), the word-timestamps display, the Hugging Face fallback, the file
-  picker. A native demo shell (microphone through the platform recorders) is not built.
+  downloaded, checksummed and cached, transcription in a Web Worker) is in, and deploys to
+  https://larsbrubaker.github.io/whistle-rust/ on every push to main. Still unverified by hand:
+  live microphone streaming (per-update time and real-time factor in the browser), the
+  word-timestamps display, the Hugging Face fallback, the file picker. A native demo shell (microphone through the platform recorders) is not built.
 - MatterCAD Rust: the desktop Whistle provider lands in mattercad-rust (its roadmap, `ai.md`);
   the browser provider needs a Web Worker host like the demo's.
 
