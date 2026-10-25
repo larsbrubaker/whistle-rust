@@ -92,6 +92,8 @@ struct Inner {
     model_source: String,
     /// Set once the worker reported the model ready.
     model_loaded: bool,
+    /// Why Record is unavailable (a shell with no microphone source), or `None` when it works.
+    mic_unavailable: Option<String>,
 }
 
 /// Shared handle to the demo's state (cheap to clone; single-threaded, like the UI).
@@ -123,6 +125,7 @@ impl DemoState {
                 options: UiOptions::default(),
                 model_source: String::new(),
                 model_loaded: false,
+                mic_unavailable: None,
             })),
             version: Rc::new(Cell::new(0)),
         }
@@ -267,12 +270,33 @@ impl DemoState {
             .join("  ")
     }
 
+    /// Mark the microphone unavailable, with a note saying why (`None`: it works). The shell
+    /// sets it once, before the UI shows.
+    pub fn set_mic_unavailable(&self, note: Option<String>) {
+        self.change(|s| s.mic_unavailable = note);
+    }
+
+    /// Why Record is unavailable, or `None` when it works.
+    pub fn mic_unavailable(&self) -> Option<String> {
+        self.inner.borrow().mic_unavailable.clone()
+    }
+
+    /// Whether Record can start now: a microphone exists and [`DemoState::can_start`].
+    pub fn can_record(&self) -> bool {
+        self.inner.borrow().mic_unavailable.is_none() && self.can_start()
+    }
+
     /// Whether the Record button should read "Stop".
     pub fn is_listening(&self) -> bool {
         matches!(
             self.inner.borrow().phase,
             Phase::Listening | Phase::RequestingMic
         )
+    }
+
+    /// Whether the model has loaded (it stays loaded through work and errors).
+    pub fn model_loaded(&self) -> bool {
+        self.inner.borrow().model_loaded
     }
 
     /// Whether Record and the file picker can start something now: the model has loaded and
@@ -381,6 +405,34 @@ mod tests {
         assert_eq!(options.keyword_list(), vec!["PETG", "MatterCAD"]);
         assert_eq!(UiOptions::default().language_code(), None);
         assert_eq!(UiOptions::default().beam_count(), 1);
+    }
+
+    #[test]
+    fn record_needs_a_microphone_and_says_why_when_there_is_none() {
+        let state = DemoState::new();
+        state.set_phase(Phase::Ready);
+        assert!(state.can_record());
+        state.set_mic_unavailable(Some("no microphone in this build".into()));
+        assert!(!state.can_record());
+        assert!(state.can_start(), "files still work");
+        assert_eq!(
+            state.mic_unavailable().as_deref(),
+            Some("no microphone in this build")
+        );
+    }
+
+    #[test]
+    fn the_model_stays_loaded_through_work_and_errors() {
+        let state = DemoState::new();
+        assert!(!state.model_loaded());
+        state.set_phase(Phase::Loading);
+        assert!(!state.model_loaded());
+        state.set_phase(Phase::Ready);
+        state.start_file("a.wav");
+        assert!(state.model_loaded());
+        assert!(!state.can_start(), "busy");
+        state.set_phase(Phase::Error("bad file".into()));
+        assert!(state.model_loaded());
     }
 
     #[test]

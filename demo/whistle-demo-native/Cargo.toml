@@ -1,0 +1,37 @@
+# whistle-demo-native: the demo on the desktop. The same whistle-demo UI in a native window
+# (agg-gui-shell), the model on an engine thread (src/engine.rs), files picked (rfd), dropped or
+# named on the command line. The model is the checkout's models/whistle.cact, a path given on
+# the command line, or a checked download into the cache (src/model.rs). Live audio comes in
+# through the `Capture` seam (src/capture.rs); no microphone source is wired in yet, so Record
+# is shown unavailable. `cargo run -p whistle-demo-native --release` from demo/ (README.md).
+[package]
+name = "whistle-demo-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+description = "Desktop shell of the whistle-rust demo (live speech-to-text)."
+
+[[bin]]
+name = "whistle-demo-native"
+path = "src/main.rs"
+
+[dependencies]
+whistle-demo = { path = "../whistle-demo" }
+whistle-rust = { workspace = true }
+agg-gui = { workspace = true }
+agg-gui-shell = { workspace = true }
+# The model's SHA-256 (the browser has SubtleCrypto). MIT OR Apache-2.0.
+sha2 = "0.10"
+# The model download: ureq over rustls with the RustCrypto provider and the Mozilla roots
+# compiled in, the pure-Rust stack agg-gui's http_fetch and agg-gui-whistle use (no ring or
+# aws-lc). ureq and rustls-rustcrypto MIT OR Apache-2.0; webpki-roots CDLA-Permissive-2.0.
+ureq = { version = "3.5", default-features = false, features = ["rustls-no-provider", "rustls-webpki-roots"] }
+rustls-rustcrypto = "0.0.2-alpha"
+# The OS file dialog (blocking, as MatterCAD's and HDTreeMap's desktop shells use it). Only the
+# xdg-portal backend on Linux: the desktop portal over D-Bus, so no GTK or Wayland libraries
+# are linked or needed to build. MIT.
+rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }

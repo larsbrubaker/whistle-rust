@@ -2,6 +2,8 @@
 //! row, the status line, the transcript and the license note, all in one page-wide drop target
 //! (`drop_target.rs`). Parts that change with [`DemoState`] sit in `Rebuilder`s keyed on its
 //! version; the options row is built once, so typing in the keywords field keeps its focus.
+//! [`Platform`] supplies the words that name the shell; a shell without a microphone
+//! ([`DemoState::mic_unavailable`]) gets a disabled Record button and a note saying why.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -15,32 +17,33 @@ use agg_gui::{
 
 use crate::drop_target::DropTarget;
 use crate::state::{DemoState, BEAM_CHOICES, LANGUAGE_CHOICES};
-use crate::{DemoHost, APP_TITLE, MODEL_LICENSE_URL, SOURCE_URL};
+use crate::{DemoHost, Platform, MODEL_LICENSE_URL, SOURCE_URL};
 
 /// Widget id of the transcript's scroll view.
 pub const TRANSCRIPT_ID: &str = "transcript";
 
-pub fn build_root(state: DemoState, host: Rc<dyn DemoHost>, font: Arc<Font>) -> Box<dyn Widget> {
+pub fn build_root(
+    state: DemoState,
+    host: Rc<dyn DemoHost>,
+    font: Arc<Font>,
+    platform: &Platform,
+) -> Box<dyn Widget> {
     let column = FlexColumn::new()
         .with_panel_bg()
         .with_top_anchor(true)
         .with_gap(12.0)
         .with_inner_padding(Insets::all(20.0))
         .add(Box::new(
-            Label::new(APP_TITLE, Arc::clone(&font))
+            Label::new(platform.title, Arc::clone(&font))
                 .with_font_size(22.0)
                 .with_strong(true),
         ))
         .add(Box::new(
-            Label::new(
-                "Live speech-to-text with Whistle, running entirely in this page \
-                 (pure Rust, WebAssembly, one thread). Nothing you say leaves your device.",
-                Arc::clone(&font),
-            )
-            .with_wrap(true)
-            .with_dim(true),
+            Label::new(platform.blurb, Arc::clone(&font))
+                .with_wrap(true)
+                .with_dim(true),
         ))
-        .add(controls(&state, &host, &font))
+        .add(controls(&state, &host, &font, platform.drop_hint))
         .add(options_row(&state, &font))
         .add(status(&state, &font))
         .add_flex(transcript(&state, &font), 1.0)
@@ -57,7 +60,12 @@ fn host_drop(host: &Rc<dyn DemoHost>, state: &DemoState, name: &str, bytes: Arc<
     host.transcribe_file(name, bytes, &state.options());
 }
 
-fn controls(state: &DemoState, host: &Rc<dyn DemoHost>, font: &Arc<Font>) -> Box<dyn Widget> {
+pub(crate) fn controls(
+    state: &DemoState,
+    host: &Rc<dyn DemoHost>,
+    font: &Arc<Font>,
+    drop_hint: &'static str,
+) -> Box<dyn Widget> {
     let version_state = state.clone();
     let state = state.clone();
     let host = Rc::clone(host);
@@ -73,12 +81,12 @@ fn controls(state: &DemoState, host: &Rc<dyn DemoHost>, font: &Arc<Font>) -> Box
                 let record = Button::new(label, Arc::clone(&font))
                     .with_font_size(16.0)
                     .with_enabled_fn(move || {
-                        enabled_state.is_listening() || enabled_state.can_start()
+                        enabled_state.is_listening() || enabled_state.can_record()
                     })
                     .on_click(move || {
                         if record_state.is_listening() {
                             record_host.stop_recording();
-                        } else if record_state.can_start() {
+                        } else if record_state.can_record() {
                             record_host.start_recording(&record_state.options());
                         }
                     })
@@ -93,17 +101,24 @@ fn controls(state: &DemoState, host: &Rc<dyn DemoHost>, font: &Arc<Font>) -> Box
                         }
                     })
                     .with_name("pick-file");
-                Box::new(
-                    FlexRow::new()
-                        .with_gap(10.0)
-                        .add(Box::new(record))
-                        .add(Box::new(pick))
-                        .add(Box::new(
-                            Label::new("or drop one on the page", Arc::clone(&font))
-                                .with_dim(true)
-                                .with_v_anchor(VAnchor::CENTER),
-                        )),
-                ) as Box<dyn Widget>
+                let mut row = FlexRow::new()
+                    .with_gap(10.0)
+                    .add(Box::new(record))
+                    .add(Box::new(pick))
+                    .add(Box::new(
+                        Label::new(drop_hint, Arc::clone(&font))
+                            .with_dim(true)
+                            .with_v_anchor(VAnchor::CENTER),
+                    ));
+                if let Some(note) = state.mic_unavailable() {
+                    row = row.add(Box::new(
+                        Label::new(format!("({note})"), Arc::clone(&font))
+                            .with_dim(true)
+                            .with_v_anchor(VAnchor::CENTER)
+                            .with_name("mic-note"),
+                    ));
+                }
+                Box::new(row) as Box<dyn Widget>
             },
         )
         .with_h_anchor(HAnchor::STRETCH),
@@ -190,14 +205,17 @@ pub(crate) fn transcript(state: &DemoState, font: &Arc<Font>) -> Box<dyn Widget>
                 .with_gap(6.0)
                 .with_h_anchor(HAnchor::STRETCH);
             if committed.is_empty() && pending.is_empty() {
+                let hint = if state.mic_unavailable().is_some() {
+                    "Transcribe a WAV file (English, German, French, Spanish, Italian, Dutch \
+                     or Polish)."
+                } else {
+                    "Press Record and speak (English, German, French, Spanish, Italian, \
+                     Dutch or Polish), or transcribe a WAV file."
+                };
                 column = column.add(Box::new(
-                    Label::new(
-                        "Press Record and speak (English, German, French, Spanish, Italian, \
-                         Dutch or Polish), or transcribe a WAV file.",
-                        Arc::clone(&font),
-                    )
-                    .with_wrap(true)
-                    .with_dim(true),
+                    Label::new(hint, Arc::clone(&font))
+                        .with_wrap(true)
+                        .with_dim(true),
                 ));
             }
             if !committed.is_empty() {

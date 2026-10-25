@@ -115,11 +115,12 @@ crates/
   whistle-rust/        the library (`whistle`): .cact reader, CQ dequant, tokenizer, mel front
                        end, stem, encoder, decoder, decoding; tests/ holds the stage tests
   workspace-gates/     file_compliance (tests only)
-demo/                  the browser demo, its own Cargo workspace (demo/README.md), so the
+demo/                  the demo (browser and desktop), its own Cargo workspace (demo/README.md), so the
                        library never depends on agg-gui:
   whistle-demo/        the agg-gui UI and its state (rlib, tested natively)
   whistle-demo-web/    the UI's wasm (agg-gui-web-shell); empty natively
   whistle-demo-worker/ the transcription Web Worker's wasm (`Engine`, simd128); empty natively
+  whistle-demo-native/ the desktop build: the same UI on agg-gui-shell, model on an engine thread
   web/                 the page (bun + vite): main.ts, worker.ts, model download and cache,
                        microphone capture; build-wasm.sh fills web/pkg/
 oracle/                Python (needle-reference + JAX): fixtures, clip synthesis, engine
@@ -166,7 +167,7 @@ cargo build -p whistle-rust --target wasm32-unknown-unknown
 cargo clippy --workspace --all-targets -- -D warnings
 scripts/fetch-weights.sh [--checkpoint] [--engine]   # models/whistle.cact (+ fp32 checkpoint, engine CLI)
 scripts/fetch-reference.sh                    # needle-reference/ at the pinned commit
-scripts/demo-gates.sh                         # the demo's gate: fmt, clippy (native, wasm32), tests, wasm builds, tsc, bundle
+scripts/demo-gates.sh                         # the demo's gate: fmt, clippy (native, wasm32), tests, native build, wasm builds, tsc, bundle
 demo/web/build-wasm.sh                        # the demo's wasm (needs wasm-pack and ../agg-gui, ../agg-rust, ../tess2-rust)
 (cd demo/web && bun install && bun run dev)   # serve the demo (link models/whistle.cact into demo/web/public/ first)
 oracle/setup.sh                               # oracle/.venv (Python 3.12, JAX)

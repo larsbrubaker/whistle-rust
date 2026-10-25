@@ -11,9 +11,12 @@
 # The `wasm` job builds the library for wasm32-unknown-unknown with and without simd128, and
 # the bench example for wasm32-wasip1 (what the wasm benchmark runs).
 #
-# The `demo` job checks the browser demo (demo/, its own Cargo workspace) with
-# scripts/demo-gates.sh. Only it clones the sibling checkouts the demo's GUI toolkit needs
-# (agg-gui, agg-rust, tess2-rust); the library's jobs never build the demo.
+# The `demo` job checks the demo (demo/, its own Cargo workspace: the browser build and the
+# desktop one, whistle-demo-native) with scripts/demo-gates.sh. Only it clones the sibling
+# checkouts the demo's GUI toolkit needs (agg-gui, agg-rust, tess2-rust); the library's jobs
+# never build the demo. The desktop build needs no system packages (no audio library: live
+# microphone input is not wired in yet; the file dialog talks to the desktop portal over
+# D-Bus), and its tests need the model, fetched and cached as in the `test` job.
 #
 # The toolchain is the one pinned in rust-toolchain.toml, read from that file. Checkouts are LF
 # on every OS (.gitattributes), so Windows needs no core.autocrlf override.
@@ -98,7 +101,9 @@ jobs:
 
   demo:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A cold cache took 9 min before the desktop build; winit, wgpu and the rest of its tree
+    # compile in three steps more (clippy, tests, the binary), all at the demo's opt-level 2.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - name: Clone the demo's sibling checkouts (agg-gui, agg-rust, tess2-rust)
@@ -106,9 +111,11 @@ jobs:
           for repo in agg-gui agg-rust tess2-rust; do
             git clone --depth 1 "https://github.com/larsbrubaker/$repo.git" "../$repo"
           done
-      - name: Read the pinned toolchain
+      - name: Read the pinned toolchain and model checksum
         id: pins
-        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+          echo "model=$(awk '$2 == "models/whistle.cact" { print $1 }' scripts/weights.sha256)" >> "$GITHUB_OUTPUT"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ steps.pins.outputs.channel }}
@@ -117,8 +124,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: demo
+      - name: Cache the model
+        uses: actions/cache@v6
+        with:
+          path: models
+          key: whistle-cact-${{ runner.os }}-${{ steps.pins.outputs.model }}
+      - name: Fetch the model
+        run: scripts/fetch-weights.sh
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       - uses: oven-sh/setup-bun@v2
-      - name: Demo gates (fmt, clippy native and wasm32, tests, wasm builds, tsc, bundle)
+      - name: Demo gates (fmt, clippy native and wasm32, tests, desktop build, wasm builds, tsc, bundle)
         run: scripts/demo-gates.sh

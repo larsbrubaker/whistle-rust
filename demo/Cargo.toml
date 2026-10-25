@@ -1,17 +1,19 @@
-# The whistle-rust browser demo: its own Cargo workspace, so the library's workspace, CI test
-# job and package never depend on the GUI toolkit (see CLAUDE.md, demo/README.md).
+# The whistle-rust demo (browser and desktop): its own Cargo workspace, so the library's
+# workspace, CI test job and package never depend on the GUI toolkit (see CLAUDE.md,
+# demo/README.md).
 #
 # - whistle-demo        (rlib)   the agg-gui UI and its state, tested natively
 # - whistle-demo-web    (cdylib) the UI's wasm on agg-gui-web-shell; empty natively
 # - whistle-demo-worker (cdylib) the transcription Web Worker's wasm (simd128); empty natively
+# - whistle-demo-native (bin)    the same UI on the desktop (agg-gui-shell), model on a thread
 # - web/                         the page (bun + vite); web/build-wasm.sh fills web/pkg/
 #
-# The library is a path dependency (../crates/whistle-rust). agg-gui and agg-gui-web-shell come
-# from the sibling agg-gui checkout (../../agg-gui from here), which needs the agg-rust and
-# tess2-rust checkouts beside it; CI's demo job clones all three.
+# The library is a path dependency (../crates/whistle-rust). agg-gui, agg-gui-web-shell and
+# agg-gui-shell come from the sibling agg-gui checkout (../../agg-gui from here), which needs
+# the agg-rust and tess2-rust checkouts beside it; CI's demo job clones all three.
 [workspace]
 resolver = "2"
-members = ["whistle-demo", "whistle-demo-web", "whistle-demo-worker"]
+members = ["whistle-demo", "whistle-demo-web", "whistle-demo-worker", "whistle-demo-native"]
 
 [workspace.package]
 version = "0.1.0"
@@ -26,6 +28,7 @@ repository = "https://github.com/larsbrubaker/whistle-rust"
 whistle-rust = { path = "../crates/whistle-rust" }
 agg-gui = { path = "../../agg-gui/agg-gui" }
 agg-gui-web-shell = { path = "../../agg-gui/agg-gui-web-shell" }
+agg-gui-shell = { path = "../../agg-gui/agg-gui-shell" }
 
 # Inference and rendering are arithmetic-heavy: unoptimized builds would crawl.
 [profile.dev]

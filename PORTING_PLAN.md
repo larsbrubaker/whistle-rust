@@ -70,7 +70,12 @@ Beam search (default 3 beams), keyword biasing, word timestamps, windowing and s
   downloaded, checksummed and cached, transcription in a Web Worker) is in, and deploys to
   https://larsbrubaker.github.io/whistle-rust/ on every push to main. Still unverified by hand:
   live microphone streaming (per-update time and real-time factor in the browser), the
-  word-timestamps display, the Hugging Face fallback, the file picker. A native demo shell (microphone through the platform recorders) is not built.
+  word-timestamps display, the Hugging Face fallback, the file picker.
+- The desktop demo (`demo/whistle-demo-native`, agg-gui-shell) transcribes WAV files; its
+  microphone waits on a shared pure-Rust recorder crate (MatterCAD's AVFoundation / WASAPI /
+  PulseAudio recorders, extracted), behind its `Capture` seam. Then: macOS microphone
+  permission (Info.plist usage string, a denied message) and merging pushes when the engine
+  falls behind a live microphone.
 - MatterCAD Rust: the desktop Whistle provider lands in mattercad-rust (its roadmap, `ai.md`);
   the browser provider needs a Web Worker host like the demo's.
 

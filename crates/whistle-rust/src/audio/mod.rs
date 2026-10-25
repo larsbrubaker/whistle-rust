@@ -1,16 +1,19 @@
-//! The audio front end: WAV decoding (`wav`), resampling to 16 kHz (`resample`) and Whistle's
-//! input features (`mel`, built on the in-crate real FFT in `fft`). Everything the encoder's stem
-//! consumes starts here; the model sees only the normalized log-mel `Features`.
+//! The audio front end: WAV decoding (`wav`), resampling to 16 kHz (`resample` for a whole
+//! clip, `stream_resample` for audio that arrives in pieces) and Whistle's input features
+//! (`mel`, built on the in-crate real FFT in `fft`). Everything the encoder's stem consumes
+//! starts here; the model sees only the normalized log-mel `Features`.
 
 pub(crate) mod fft;
 mod mel;
 mod resample;
+mod stream_resample;
 mod wav;
 
 use std::fmt;
 
 pub use mel::{features, mel_matrix, Features, FFT_BINS, HOP, MELS};
 pub use resample::resample;
+pub use stream_resample::StreamResampler;
 pub use wav::{read_wav, Audio};
 
 /// The sample rate Whistle's features are defined at (`WhistleConfig.rate`).

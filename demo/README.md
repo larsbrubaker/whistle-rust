@@ -1,8 +1,9 @@
-# whistle-rust browser demo
+# whistle-rust demo
 
 Live speech-to-text in a web page, on the whistle-rust library: press Record and speak, or
 pick or drop a WAV file. Deployed at
-[larsbrubaker.github.io/whistle-rust](https://larsbrubaker.github.io/whistle-rust/).
+[larsbrubaker.github.io/whistle-rust](https://larsbrubaker.github.io/whistle-rust/). The same
+UI also runs in a desktop window ([below](#desktop-build)).
 
 This directory is its own Cargo workspace, so the library's workspace, CI test job and crates.io
 package never depend on the GUI toolkit.
@@ -12,6 +13,7 @@ package never depend on the GUI toolkit.
 | `whistle-demo/` | the agg-gui UI and its state (rlib; unit and layout tests run natively) |
 | `whistle-demo-web/` | the UI's wasm on agg-gui-web-shell, on the page's main thread |
 | `whistle-demo-worker/` | the transcription Web Worker's wasm: `Engine` wraps `Whistle` and `Stream` |
+| `whistle-demo-native/` | the desktop build: the same UI on agg-gui-shell, the model on an engine thread |
 | `web/` | the page (bun + vite): `main.ts` glue, `worker.ts`, `model.ts` (download, SHA-256, Cache API), `microphone.ts` (AudioWorklet, ScriptProcessor fallback) |
 
 The model runs only in the worker, one thread, so the UI never blocks; the worker's wasm holds
@@ -31,6 +33,62 @@ ln -sf ../../../models/whistle.cact demo/web/public/whistle.cact
 demo/web/build-wasm.sh                                     # demo/web/pkg/ui and pkg/worker
 (cd demo/web && bun install && bun run dev)
 scripts/demo-gates.sh                                      # the demo's full check
+```
+
+## Desktop build
+
+```bash
+scripts/fetch-weights.sh                         # models/whistle.cact (optional, see below)
+cd demo && cargo run -p whistle-demo-native --release
+cargo run -p whistle-demo-native --release -- ../test-data/clips/en_samantha.wav
+cargo run -p whistle-demo-native --release -- --help
+```
+
+(`.claude/launch.json` has it as `whistle-demo-native`.) The same whistle-demo UI in a native
+window on agg-gui-shell: transcribe a WAV picked in the OS dialog, dropped on the window, opened
+from the Finder or named on the command line. The parts:
+
+| file | what |
+|---|---|
+| `engine.rs` | the engine thread, the desktop's Web Worker: owns the model and the live stream, answers `ToEngine` messages in order with timed `FromEngine` replies |
+| `bridge.rs` | the UI's `DemoHost`: sends the UI's requests to the engine and applies the replies to `DemoState` |
+| `capture.rs` | the live-audio seam: a `Capture` delivers mono chunks to a sink on its own thread; `WavCapture` plays a file through it |
+| `model.rs` | where the model comes from, checked against `whistle::model_file`'s size and SHA-256 |
+| `shell_host.rs` | the shell's hooks: apply what arrived on each idle pass; open what the OS asks to open |
+
+**Model.** `--model FILE` loads only that file. Otherwise the checkout's
+`models/whistle.cact` (what `scripts/fetch-weights.sh` writes), then the cache
+(`~/Library/Caches`, `%LOCALAPPDATA%` or `$XDG_CACHE_HOME`, under
+`whistle-rust/<sha256>/whistle.cact`), then a download of `whistle::model_file::MODEL_URL`
+into the cache. Every copy is checked; a damaged cached copy is deleted, and a download that
+fails the check is never cached. The download is ureq over rustls with the RustCrypto
+provider (pure Rust).
+
+**Threads.** The UI thread never runs the model. The library splits each pass's projections
+over one worker thread per core but one, 1 to 4 (`--threads N` to choose).
+
+**Microphone.** Not wired in yet: Record is shown unavailable with a note. A live source
+plugs into the `Capture` trait (start with a sink, stop with every chunk delivered); the
+bridge forwards its chunks to the engine's stream as the browser's microphone feeds its
+worker. `--mic-from-wav FILE` plays a file through that path in real time (`--record` starts
+it once the model is ready), so the live text, committed and pending, can be seen without a
+microphone.
+
+**Device rates and sessions.** Audio at a device's rate (44.1 or 48 kHz) goes through one
+`whistle::audio::StreamResampler` per stream, in the engine here and in the browser's worker
+alike, so 100 ms pushes come out exactly as the whole recording would: resampling each push
+on its own put a seam at every boundary, enough to read "printing" as "granting". Each
+recording and file is a numbered session; the engine drops audio for a stream that has ended
+(a failed push ends its stream), and the bridge drops replies to any session but the current
+one, so a late update from an old recording never shows in a new one.
+
+**Scripted runs.** Every final transcript is also printed to stdout with the status line.
+`--screenshot FILE.png` waits (up to 12 s) for the first transcript or error, saves the
+window and exits:
+
+```bash
+cargo run -p whistle-demo-native --release -- \
+  ../test-data/clips/en_samantha.wav --screenshot /tmp/whistle-native.png
 ```
 
 ## The transcript's scroll view

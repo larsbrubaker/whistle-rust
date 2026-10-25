@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
-# The browser demo's gate (demo/, its own Cargo workspace; CLAUDE.md "Commands"). The library's
-# gate is scripts/gates.sh and never builds the demo, so the library needs no GUI toolkit; this
-# one needs the sibling ../agg-gui, ../agg-rust and ../tess2-rust checkouts, wasm-pack and bun.
+# The demo's gate (demo/, its own Cargo workspace: the browser build and the desktop one;
+# CLAUDE.md "Commands"). The library's gate is scripts/gates.sh and never builds the demo, so
+# the library needs no GUI toolkit; this one needs the sibling ../agg-gui, ../agg-rust and
+# ../tess2-rust checkouts, wasm-pack, bun, and models/whistle.cact (scripts/fetch-weights.sh)
+# for the desktop build's tests.
 #
 # Steps, each timed; every step runs even after an earlier one fails:
 #   fmt      cargo fmt --check on the demo workspace
 #   clippy   cargo clippy, native (all targets) and wasm32 (the two wasm crates), -D warnings
-#   tests    cargo test on the demo workspace (the UI's state and layout tests)
+#   tests    cargo test on the demo workspace (the UI's state and layout tests; the desktop
+#            build's engine, model location and host message flow, on the real model)
+#   native   cargo build of whistle-demo-native, the desktop binary, for this machine
 #   wasm     demo/web/build-wasm.sh (the UI module, and the worker module with simd128)
 #   tsc      tsc --noEmit on demo/web
 #   bundle   bun run build (vite) on demo/web
@@ -31,6 +35,7 @@ step clippy cargo clippy --manifest-path "$manifest" --workspace --all-targets -
 step clippy-wasm cargo clippy --manifest-path "$manifest" -p whistle-demo-web -p whistle-demo-worker \
   --target wasm32-unknown-unknown -- -D warnings
 step tests cargo test --manifest-path "$manifest" --workspace
+step native cargo build --manifest-path "$manifest" -p whistle-demo-native
 step wasm demo/web/build-wasm.sh
 in_web() { (cd demo/web && "$@"); }
 step deps in_web bun install --frozen-lockfile

@@ -33,8 +33,13 @@ downloads nothing.
 
 ![The demo after transcribing en_daniel.wav](docs/demo.png)
 
+The same UI also runs as a desktop app on macOS, Windows and Linux (`cd demo && cargo run -p
+whistle-demo-native --release`): pick, drop or name a WAV file and it is transcribed on an
+engine thread, with the model from `models/whistle.cact` or a checked download. Live
+microphone input is not in the desktop build yet.
+
 The demo is its own Cargo workspace in [`demo/`](demo/README.md), so the library and its CI
-never depend on the GUI toolkit; how to build and run it is there.
+never depend on the GUI toolkit; how to build and run both builds is there.
 `.github/workflows/deploy-demo.yml` deploys it, with `whistle.cact`, to GitHub Pages on every
 push to `main`. Pages must be enabled in the repository settings (Pages, Source: GitHub
 Actions).

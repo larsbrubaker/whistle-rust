@@ -6,6 +6,11 @@
       "runtimeExecutable": "bun",
       "runtimeArgs": ["--cwd=demo/web", "run", "dev", "--port", "5191", "--strictPort"],
       "port": 5191
+    },
+    {
+      "name": "whistle-demo-native",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "--manifest-path", "demo/Cargo.toml", "-p", "whistle-demo-native", "--release"]
     }
   ]
 }

@@ -2,14 +2,40 @@
 //! and a long transcript scrolls with the newest words in view. Also pins the agg-gui
 //! limitation the transcript works around (a top-anchored column behind a `Rebuilder` inside
 //! a `ScrollView` is laid out off screen): when that test starts failing, agg-gui has fixed it.
+//! And a shell without a microphone shows Record disabled, with its note.
 
+use std::rc::Rc;
 use std::sync::Arc;
 
 use agg_gui::{FlexColumn, Label, Rebuilder, Rect, ScrollView, Size, Widget};
 
-use super::transcript;
-use crate::install_fonts;
-use crate::state::{DemoState, Phase};
+use super::{controls, transcript};
+use crate::state::{DemoState, Phase, UiOptions};
+use crate::{install_fonts, DemoHost};
+
+/// A host that does nothing (the layout tests never click).
+struct NoOpHost;
+
+impl DemoHost for NoOpHost {
+    fn start_recording(&self, _: &UiOptions) {}
+    fn stop_recording(&self) {}
+    fn pick_file(&self, _: &UiOptions) {}
+    fn transcribe_file(&self, _: &str, _: Arc<[u8]>, _: &UiOptions) {}
+    fn open_url(&self, _: &str) {}
+}
+
+/// The widget with id `id` under `root`.
+fn widget<'a>(root: &'a dyn Widget, id: &str) -> Option<&'a dyn Widget> {
+    for child in root.children() {
+        if child.id() == Some(id) {
+            return Some(child.as_ref());
+        }
+        if let Some(found) = widget(child.as_ref(), id) {
+            return Some(found);
+        }
+    }
+    None
+}
 
 /// The bounds of the widget with id `id`, in the coordinates of `root`'s content (parent
 /// offsets summed; Y up).
@@ -105,4 +131,29 @@ fn a_long_transcript_scrolls_and_stays_at_the_newest_words() {
         scroll.scroll_offset(),
         scroll.max_scroll_value()
     );
+}
+
+#[test]
+fn without_a_microphone_record_is_disabled_and_a_note_says_why() {
+    let font = install_fonts(1.0);
+    let state = DemoState::new();
+    state.set_phase(Phase::Ready);
+    let host: Rc<dyn DemoHost> = Rc::new(NoOpHost);
+    let mut row = controls(&state, &host, &font, "or drop one on the window");
+    row.layout(Size::new(900.0, 40.0));
+    let record = widget(row.as_ref(), "record").expect("Record shown");
+    assert!(record.is_enabled(), "a microphone by default");
+    assert!(widget(row.as_ref(), "mic-note").is_none());
+
+    state.set_mic_unavailable(Some("no microphone yet".into()));
+    row.layout(Size::new(900.0, 40.0));
+    let record = widget(row.as_ref(), "record").expect("Record shown");
+    assert!(!record.is_enabled());
+    let note = widget(row.as_ref(), "mic-note")
+        .and_then(|w| w.as_any())
+        .and_then(|a| a.downcast_ref::<Label>())
+        .expect("the note is a Label");
+    assert_eq!(note.text_str(), "(no microphone yet)");
+    let pick = widget(row.as_ref(), "pick-file").expect("the file button shown");
+    assert!(pick.is_enabled(), "files still work");
 }

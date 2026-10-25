@@ -87,6 +87,33 @@ word commits when two passes one `stream_step` (1 s) apart agree on it, about 1.
 ends, or when a pause ends the utterance ([streaming.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/streaming.md)). The stream borrows the `Whistle`, so an app
 keeps the model alive beside it.
 
+A microphone at its own rate (44.1 or 48 kHz) goes through `audio::StreamResampler` on the way
+in. It keeps its filter's history and phase across pushes, so the pushes come out exactly as
+`audio::resample` converts the whole recording; resampling each push on its own would put a
+seam at every push boundary, enough to change a word. `finish` gives the last few
+milliseconds, which wait for input past them:
+
+```rust,no_run
+use whistle::audio::StreamResampler;
+use whistle::{Options, Whistle};
+
+fn live_at(
+    whistle: &Whistle,
+    rate: u32,
+    chunks: impl Iterator<Item = Vec<f32>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut to_16k = StreamResampler::new(rate, 16_000)?;
+    let mut stream = whistle.stream(&Options::streaming())?;
+    for chunk in chunks {
+        let update = stream.push(&to_16k.push(&chunk))?;
+        println!("{} [{}]", update.text, update.pending);
+    }
+    stream.push(&to_16k.finish())?;
+    println!("{}", stream.finish()?.text);
+    Ok(())
+}
+```
+
 ## Getting the model
 
 The weights are not in the crate. `whistle::model_file` names the exact file this crate version

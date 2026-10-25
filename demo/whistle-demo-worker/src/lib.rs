@@ -4,13 +4,16 @@
 //! one live `Stream`, and answers each call with a small JSON string that `demo/web/src/worker.ts`
 //! forwards to the page. The worker is one thread, like the phones and slow laptops the demo
 //! targets; the page's UI (whistle-demo-web) never runs the model, so it never blocks. Timing
-//! is measured by the worker around each call.
+//! is measured by the worker around each call. Audio at the device's rate (the microphone's
+//! fallback path) goes through one `whistle::audio::StreamResampler` per stream, so the pushes
+//! come out as the whole recording would, with no seam at their boundaries.
 //!
 //! Natively the crate is empty (a workspace member only so fmt and clippy cover it).
 
 #![cfg(target_arch = "wasm32")]
 
 use wasm_bindgen::prelude::*;
+use whistle::audio::StreamResampler;
 use whistle::{Options, Stream, StreamUpdate, Transcript, Whistle, Word};
 
 /// The model and the live stream, in the transcription worker.
@@ -20,6 +23,8 @@ pub struct Engine {
     /// model for its whole life, so a `'static` borrow is the honest lifetime.
     whistle: &'static Whistle,
     stream: Option<Stream<'static>>,
+    /// The stream's audio rate and its conversion to 16 kHz (equal rates pass through).
+    to_model: Option<(u32, StreamResampler)>,
     /// Every word the stream committed, for the final transcript's timings.
     words: Vec<Word>,
     /// Every word's text the stream committed, joined as the UI joins updates.
@@ -51,6 +56,7 @@ impl Engine {
         Ok(Engine {
             whistle: Box::leak(Box::new(whistle)),
             stream: None,
+            to_model: None,
             words: Vec::new(),
             text: String::new(),
             word_timestamps: false,
@@ -67,6 +73,7 @@ impl Engine {
     ) -> Result<(), JsValue> {
         let options = options(language, beams, keywords, word_timestamps);
         self.stream = Some(self.whistle.stream(&options).map_err(js_err)?);
+        self.to_model = None;
         self.words.clear();
         self.text.clear();
         self.word_timestamps = word_timestamps;
@@ -76,16 +83,15 @@ impl Engine {
     /// Push mono samples at `rate` Hz (resampled to 16 kHz when needed); the update as JSON
     /// `{"text", "continues", "pending", "pendingContinues", "language"}`.
     pub fn push(&mut self, samples: &[f32], rate: u32) -> Result<String, JsValue> {
+        if self.stream.is_none() {
+            return Err(JsValue::from_str("no stream is open"));
+        }
+        let audio = self.convert(samples, rate)?;
         let stream = self
             .stream
             .as_mut()
             .ok_or_else(|| JsValue::from_str("no stream is open"))?;
-        let update = if rate == 16_000 {
-            stream.push(samples)
-        } else {
-            stream.push(&whistle::audio::resample(samples, rate, 16_000))
-        }
-        .map_err(js_err)?;
+        let update = stream.push(&audio).map_err(js_err)?;
         self.record(&update);
         Ok(update_json(&update))
     }
@@ -93,10 +99,16 @@ impl Engine {
     /// Finish the stream: the last update as JSON, plus `"words"` (every committed word with
     /// its times, when word timestamps were asked for) and `"full"` (the whole text).
     pub fn finish(&mut self) -> Result<String, JsValue> {
-        let stream = self
+        let mut stream = self
             .stream
             .take()
             .ok_or_else(|| JsValue::from_str("no stream is open"))?;
+        // The conversion's last few milliseconds, then the stream's last pass.
+        let tail = self.flush();
+        if !tail.is_empty() {
+            let update = stream.push(&tail).map_err(js_err)?;
+            self.record(&update);
+        }
         let update = stream.finish().map_err(js_err)?;
         self.record(&update);
         let words = if self.word_timestamps {
@@ -110,6 +122,30 @@ impl Engine {
             &json[..json.len() - 1],
             json_string(&self.text)
         ))
+    }
+
+    /// `samples` at `rate` Hz as 16 kHz samples ready so far. A push at a new rate ends the old
+    /// rate's audio first (its tail leads the output).
+    fn convert(&mut self, samples: &[f32], rate: u32) -> Result<Vec<f32>, JsValue> {
+        if let Some((current, resampler)) = self.to_model.as_mut() {
+            if *current == rate {
+                return Ok(resampler.push(samples));
+            }
+        }
+        let mut out = self.flush();
+        let mut resampler = StreamResampler::new(rate, whistle::audio::SAMPLE_RATE)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        out.extend(resampler.push(samples));
+        self.to_model = Some((rate, resampler));
+        Ok(out)
+    }
+
+    /// The 16 kHz samples the conversion still owes.
+    fn flush(&mut self) -> Vec<f32> {
+        self.to_model
+            .take()
+            .map(|(_, mut r)| r.finish())
+            .unwrap_or_default()
     }
 
     /// Keep an update's words and text for the final transcript.
