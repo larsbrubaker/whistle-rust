@@ -7,8 +7,9 @@
 //! (`model::DecoderState`): step 0 picks a language tag (or feeds the forced one), then
 //! `search` picks text tokens, greedily as `whistle_finetune._score_quantised` defines with one
 //! beam or by beam search with more, optionally biased towards [`Options::keywords`]
-//! (`keywords`), until EOS or `max_seq_len` tokens. A [`Cancel`] handle is checked between the
-//! stages, between windows, between encoder layers and between decoder steps.
+//! (`keywords`), until EOS or `max_seq_len` tokens, with every hypothesis rolled back past any
+//! repetition loop it runs into (`repeat`). A [`Cancel`] handle is checked between the stages,
+//! between windows, between encoder layers and between decoder steps.
 //! `docs/design/transcribe.md` describes the call, `docs/design/windowing.md` the windows and
 //! `docs/design/decoding.md` the search. Live audio goes through [`Whistle::stream`] (`stream`,
 //! `docs/design/streaming.md`), which decodes a growing buffer with `decode_window` and commits
@@ -31,6 +32,7 @@ use crate::vad;
 mod align;
 mod keywords;
 mod long;
+mod repeat;
 mod search;
 mod stream;
 mod window;
@@ -41,6 +43,7 @@ pub use window::{plan_windows, Window, OVERLAP_SAMPLES};
 
 use keywords::KeywordTrie;
 pub use keywords::DEFAULT_KEYWORD_BONUS;
+use repeat::Pieces;
 use search::{Ranking, Search};
 
 /// The most beams [`Options::beams`] accepts: each beam is a decoder state stepped every
@@ -211,6 +214,13 @@ pub struct Transcript {
     /// streamed word continued inside a token repeats that token): `text` and `words` are
     /// authoritative.
     pub tokens: Vec<u32>,
+    /// The repetition guard fired on this transcript's decode (on any window of a long input,
+    /// on any pass a stream committed words from): the decoder ran into a loop, repeating a
+    /// token or phrase, and was rolled back past it (or, after three loops, cut at it). The
+    /// text holds no loop, but the audio was likely garbled, noise or not speech: a caller
+    /// with another reading of the same audio (a live stream's) may prefer that one
+    /// (`docs/design/decoding.md` "Repetition guard").
+    pub repeated: bool,
     /// The words of `text` with their times in the input, when [`Options::word_timestamps`] is
     /// set (empty otherwise, and for an empty transcript). In order and non-overlapping; within
     /// one window of a long input each word ends where the next one starts, and the pauses
@@ -244,6 +254,7 @@ impl Transcript {
             language: None,
             tokens: Vec::new(),
             words: Vec::new(),
+            repeated: false,
         }
     }
 }
@@ -257,6 +268,8 @@ pub struct Whistle {
     tags: Vec<u32>,
     /// The first language tag id: ids below it are text, ids from it on are tags.
     first_tag: usize,
+    /// Which text pieces start a word, for the repetition guard.
+    pieces: Pieces,
 }
 
 impl Whistle {
@@ -300,11 +313,13 @@ impl Whistle {
                  with text before the tags"
             )));
         }
+        let pieces = Pieces::new(&tokenizer, first_tag);
         Ok(Whistle {
             weights,
             tokenizer,
             tags,
             first_tag,
+            pieces,
         })
     }
 
@@ -500,10 +515,12 @@ impl Whistle {
             max_len: max,
             trie: trie.as_ref(),
             ranking,
+            pieces: &self.pieces,
         };
-        let text_tokens = search::decode(&search, state, self.tags[index], &mut |pos| {
+        let decode = search::decode(&search, state, self.tags[index], &mut |pos| {
             check(Stage::DecoderStep(pos))
         })?;
+        let text_tokens = decode.tokens;
         check(Stage::Done)?;
         if text_tokens.is_empty() {
             return Ok(None);
@@ -528,6 +545,7 @@ impl Whistle {
             language: Some(LANGUAGES[index].to_string()),
             tokens: text_tokens,
             words,
+            repeated: decode.looped,
         };
         Ok(Some(Decoded {
             transcript,

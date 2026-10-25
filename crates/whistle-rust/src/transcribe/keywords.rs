@@ -16,7 +16,7 @@ pub const DEFAULT_KEYWORD_BONUS: f32 = 3.0;
 /// The first and last character of text id `id`'s piece, `▁` read as a space. A byte piece
 /// is its byte when that is ASCII; any other byte is part of a multi-byte character, which in
 /// these languages is a letter, so it reads as one. Control and unknown pieces carry no text.
-fn piece_edges(tokenizer: &Tokenizer, id: u32) -> (Option<char>, Option<char>) {
+pub(crate) fn piece_edges(tokenizer: &Tokenizer, id: u32) -> (Option<char>, Option<char>) {
     match tokenizer.piece_type(id) {
         Some(PieceType::Byte(b)) => {
             let c = if b.is_ascii() { char::from(b) } else { 'a' };

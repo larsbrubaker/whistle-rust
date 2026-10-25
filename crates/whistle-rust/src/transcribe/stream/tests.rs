@@ -341,6 +341,7 @@ fn a_pending_tail_that_continues_the_last_committed_word_says_so() {
         probability: 1.0,
     };
     let hyp = |text: &str, start: f32, end: f32, glued: bool| super::Hyp {
+        repeated: false,
         word: word(text, start, end),
         tokens: Vec::new(),
         glued,

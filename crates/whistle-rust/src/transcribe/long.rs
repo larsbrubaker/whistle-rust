@@ -42,6 +42,7 @@ impl Whistle {
         let mut text = String::new();
         let mut tokens = Vec::new();
         let mut words: Vec<Word> = Vec::new();
+        let mut repeated = false;
         for (i, w) in windows.iter().enumerate() {
             check(Stage::Window(i))?;
             let hard = w.keep_from.is_some() || w.keep_until.is_some();
@@ -59,6 +60,7 @@ impl Whistle {
                 continue;
             };
             let t = decoded.transcript;
+            repeated |= t.repeated;
             let (kept_tokens, kept_words) = if hard {
                 self.keep_own_words(w, t.tokens, t.words)
             } else {
@@ -87,6 +89,7 @@ impl Whistle {
             language: language.or(label).map(|i| LANGUAGES[i].to_string()),
             tokens,
             words,
+            repeated,
         })
     }
 

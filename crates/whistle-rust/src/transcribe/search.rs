@@ -3,12 +3,15 @@
 //! scripted model), with optional keyword biasing (`keywords`). One beam is exactly the greedy
 //! decode `whistle_finetune._score_quantised` defines (each step's pick is the argmax of the
 //! raw text scores, ties to the lowest id), plus the keyword adjustment when there is one.
-//! `docs/design/decoding.md` describes the scoring, the stopping rule and the measurements.
+//! Every hypothesis is checked after each step by the repetition guard (`repeat`), which stops
+//! one that has run into a loop. `docs/design/decoding.md` describes the scoring, the stopping
+//! rule, the guard and the measurements.
 
 use crate::error::Error;
 use crate::model::DecoderState;
 
 use super::keywords::{KeywordTrie, Matcher};
+use super::repeat::{Guard, Pieces, Verdict};
 
 /// A decoder that can be forked: feed one token, get the next token's scores.
 pub(crate) trait Scorer: Clone {
@@ -64,6 +67,8 @@ pub(crate) struct Search<'a> {
     pub max_len: usize,
     pub trie: Option<&'a KeywordTrie>,
     pub ranking: Ranking,
+    /// Which text ids start a word, for the repetition guard.
+    pub pieces: &'a Pieces,
 }
 
 /// How the finished hypotheses are ranked for the final choice.
@@ -77,7 +82,8 @@ pub(crate) enum Ranking {
 }
 
 /// One hypothesis: its state (fed up to but not including `feed`), its text tokens, its score
-/// and its keyword matcher.
+/// (and the score after each token, for a roll-back), its keyword matcher and its repetition
+/// guard.
 #[derive(Clone)]
 struct Hypothesis<S> {
     state: S,
@@ -85,14 +91,41 @@ struct Hypothesis<S> {
     tokens: Vec<u32>,
     /// Model log-probability plus the keyword adjustments so far: what the search ranks by.
     score: f64,
+    history: Vec<f64>,
     matcher: Matcher,
+    guard: Guard,
 }
 
-/// A finished hypothesis: ended by EOS, or cut at the length limit.
+impl<S> Hypothesis<S> {
+    fn start(state: S, tag: u32) -> Hypothesis<S> {
+        Hypothesis {
+            state,
+            feed: tag,
+            tokens: Vec::new(),
+            score: 0.0,
+            history: Vec::new(),
+            matcher: Matcher::start(),
+            guard: Guard::default(),
+        }
+    }
+
+    /// Appends `token` with the score after it.
+    fn push(&mut self, token: u32, score: f64) {
+        self.tokens.push(token);
+        self.history.push(score);
+        self.feed = token;
+        self.score = score;
+    }
+}
+
+/// A finished hypothesis: ended by EOS, or cut at the length limit or by the repetition guard
+/// (`repeat`).
 pub(crate) struct Finished {
     pub tokens: Vec<u32>,
     pub score: f64,
     pub ended: bool,
+    /// The guard rolled this hypothesis back or cut it at least once.
+    pub guarded: bool,
 }
 
 impl Finished {
@@ -172,15 +205,22 @@ pub(crate) fn sort_candidates(candidates: &mut [Candidate]) {
     });
 }
 
+/// What a decode chose: its text tokens, and whether the repetition guard rolled it back past a
+/// loop or cut it at one at least once (`repeat`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub(crate) struct Decode {
+    pub tokens: Vec<u32>,
+    pub looped: bool,
+}
+
 /// Decodes the text after the tag. `state` has fed BOS; the first step feeds `tag`. `check`
 /// runs before every decoder step (each beam's, at its position; the cancellation point).
-/// Returns the chosen text tokens.
 pub(crate) fn decode<S: Scorer>(
     search: &Search<'_>,
     state: S,
     tag: u32,
     check: &mut dyn FnMut(usize) -> Result<(), Error>,
-) -> Result<Vec<u32>, Error> {
+) -> Result<Decode, Error> {
     let beams = search.beams.max(1);
     if let (1, Some(trie)) = (beams, search.trie) {
         return greedy_with_keywords(search, trie, state, tag, check);
@@ -199,7 +239,10 @@ pub(crate) fn decode<S: Scorer>(
             best = Some(f);
         }
     }
-    Ok(best.map(|f| f.tokens.clone()).unwrap_or_default())
+    Ok(best.map_or_else(Decode::default, |f| Decode {
+        tokens: f.tokens.clone(),
+        looped: f.guarded,
+    }))
 }
 
 /// The beam search proper; returns every finished hypothesis in the order it finished.
@@ -210,21 +253,28 @@ pub(crate) fn beam_search<S: Scorer>(
     tag: u32,
     check: &mut dyn FnMut(usize) -> Result<(), Error>,
 ) -> Result<Vec<Finished>, Error> {
-    let mut live = vec![Hypothesis {
-        state,
-        feed: tag,
-        tokens: Vec::new(),
-        score: 0.0,
-        matcher: Matcher::start(),
-    }];
+    // The state with only BOS fed, from which a rolled-back hypothesis is fed again.
+    let root = state.clone();
+    let mut live = vec![Hypothesis::start(state, tag)];
     let mut finished: Vec<Finished> = Vec::new();
-    // Position 1 feeds the tag; the sequence `[BOS, tag, text..]` never exceeds `max_len`.
-    for pos in 1..search.max_len.saturating_sub(1) {
+    // The sequence `[BOS, tag, text..]` never exceeds `max_len`: a hypothesis with
+    // `max_len - 2` text tokens is cut there, as the greedy decode is, its pending keyword
+    // bonus retracted. Hypotheses can differ in length once one has been rolled back.
+    let limit = search.max_len.saturating_sub(2);
+    loop {
+        let (full, open): (Vec<_>, Vec<_>) =
+            live.into_iter().partition(|h| h.tokens.len() >= limit);
+        finished.extend(full.into_iter().map(|h| cut(search, h)));
+        live = open;
+        if live.is_empty() {
+            return Ok(finished);
+        }
         let mut candidates = Vec::new();
-        // One check per hypothesis, as when each stepped alone; then every hypothesis steps
-        // together, so the decoder reads its weights once for all of them.
-        for _ in &live {
-            check(pos)?;
+        // One check per hypothesis at its position (1 feeds the tag), as when each stepped
+        // alone; then every hypothesis steps together, so the decoder reads its weights once
+        // for all of them.
+        for h in &live {
+            check(h.tokens.len() + 1)?;
         }
         let feeds: Vec<u32> = live.iter().map(|h| h.feed).collect();
         let mut states: Vec<&mut S> = live.iter_mut().map(|h| &mut h.state).collect();
@@ -236,9 +286,13 @@ pub(crate) fn beam_search<S: Scorer>(
                 .trie
                 .map(|t| t.deltas(&hyp.matcher, text.len(), search.eos));
             let lse = if beams > 1 { log_sum_exp(text) } else { 0.0 };
+            let banned = hyp.guard.banned(hyp.tokens.len());
             // `beams + 1` per hypothesis: even if one of them is EOS, `beams` live
-            // extensions remain, enough for the global best `beams`.
-            for (token, ranked) in top_k(text, delta.as_deref(), beams + 1) {
+            // extensions remain, enough for the global best `beams`. Tokens the guard banned
+            // here are skipped.
+            let best = top_k(text, delta.as_deref(), beams + 1 + banned.len());
+            let allowed = best.into_iter().filter(|(t, _)| !banned.contains(t));
+            for (token, ranked) in allowed.take(beams + 1) {
                 let lp = finite(f64::from(text[token as usize])) - lse;
                 let adjust = delta.as_ref().map_or(0.0, |d| d[token as usize]);
                 candidates.push(Candidate {
@@ -265,29 +319,33 @@ pub(crate) fn beam_search<S: Scorer>(
                     tokens: live[c.beam].tokens.clone(),
                     score: c.score,
                     ended: true,
+                    guarded: live[c.beam].guard.fired(),
                 });
             } else {
                 chosen.push(c);
             }
         }
-        // Stop once `beams` hypotheses have finished and the best of them ranks at least as
+        // Stop once `beams` hypotheses have reached EOS and the best of them ranks at least as
         // high as the best live one does now. Under the sum without keywords that is exact (a
         // live score only falls; a keyword bonus can raise it); under the mean it is a
         // heuristic, since a live mean can still rise. The live
-        // ones never reached EOS, so they are dropped, not counted as cut.
-        let rank = |f: &Finished| finite(f.ranked(search.ranking));
-        let best_done = finished.iter().map(rank).fold(f64::NEG_INFINITY, f64::max);
+        // ones never reached EOS, so they are dropped, not counted as cut. Loops the guard
+        // cut do not count: they never reached EOS either.
+        let ranked = |f: &Finished| finite(f.ranked(search.ranking));
+        let ended = finished.iter().filter(|f| f.ended);
+        let best_done = ended.clone().map(ranked).fold(f64::NEG_INFINITY, f64::max);
         let best_live = chosen
             .iter()
             .map(|c| {
-                rank(&Finished {
+                ranked(&Finished {
                     tokens: vec![0; live[c.beam].tokens.len() + 1],
                     score: c.score,
                     ended: false,
+                    guarded: false,
                 })
             })
             .fold(f64::NEG_INFINITY, f64::max);
-        if chosen.is_empty() || (finished.len() >= beams && best_done >= best_live) {
+        if chosen.is_empty() || (ended.count() >= beams && best_done >= best_live) {
             return Ok(finished);
         }
         // Then build: each parent's last chosen child takes its state, earlier ones clone it.
@@ -308,26 +366,75 @@ pub(crate) fn beam_search<S: Scorer>(
             if let Some(t) = search.trie {
                 hyp.matcher = t.advance(&hyp.matcher, c.token, search.eos).0;
             }
-            hyp.tokens.push(c.token);
-            hyp.feed = c.token;
-            hyp.score = c.score;
-            next.push(hyp);
+            hyp.push(c.token, c.score);
+            match hyp.guard.check(&hyp.tokens, search.pieces) {
+                None => next.push(hyp),
+                // The token made a loop: back to the end of its first copy, with the token
+                // that started the second banned there, to read on past it.
+                Some(Verdict::Rewind(keep)) => {
+                    roll_back(search, &mut hyp, keep);
+                    hyp.feed = hyp.tokens.last().copied().unwrap_or(tag);
+                    hyp.state = refeed(&root, tag, &hyp.tokens, check)?;
+                    next.push(hyp);
+                }
+                // Out of roll-backs: cut at the first copy, as at the length limit.
+                Some(Verdict::Cut(keep)) => {
+                    roll_back(search, &mut hyp, keep);
+                    finished.push(cut(search, hyp));
+                }
+            }
+        }
+        if next.is_empty() {
+            return Ok(finished);
         }
         live = next;
     }
-    // At the real length limit, hypotheses still live are cut there, as the greedy decode
-    // is; their pending keyword bonus is retracted.
-    for hyp in live {
-        let pending = search
-            .trie
-            .map_or(0.0, |t| t.advance(&hyp.matcher, search.eos, search.eos).1);
-        finished.push(Finished {
-            tokens: hyp.tokens,
-            score: hyp.score + pending,
-            ended: false,
+}
+
+/// Rolls `hyp`'s tokens, score and keyword matcher back to its first `keep` tokens (its state
+/// is the caller's to rebuild).
+fn roll_back<S>(search: &Search<'_>, hyp: &mut Hypothesis<S>, keep: usize) {
+    hyp.tokens.truncate(keep);
+    hyp.history.truncate(keep);
+    hyp.score = hyp.history.last().copied().unwrap_or(0.0);
+    if let Some(t) = search.trie {
+        hyp.matcher = hyp.tokens.iter().fold(Matcher::start(), |m, &token| {
+            t.advance(&m, token, search.eos).0
         });
     }
-    Ok(finished)
+}
+
+/// A state with `[BOS, tag, tokens..]` fed but the last: `root` (BOS fed) fed `tag` and every
+/// token of `tokens` but the last, which is the hypothesis's next feed (as is `tag` when
+/// `tokens` is empty). Rebuilding from the root costs one decoder step per kept token and
+/// needs no snapshot of every position; `check` runs before each step, at its position.
+fn refeed<S: Scorer>(
+    root: &S,
+    tag: u32,
+    tokens: &[u32],
+    check: &mut dyn FnMut(usize) -> Result<(), Error>,
+) -> Result<S, Error> {
+    let mut state = root.clone();
+    let feeds = std::iter::once(tag).chain(tokens.iter().copied());
+    for (i, token) in feeds.take(tokens.len()).enumerate() {
+        check(i + 1)?;
+        state.step(token)?;
+    }
+    Ok(state)
+}
+
+/// `hyp` finished without EOS (at the length limit, or cut by the guard): its pending keyword
+/// bonus is retracted.
+fn cut<S>(search: &Search<'_>, hyp: Hypothesis<S>) -> Finished {
+    let pending = search
+        .trie
+        .map_or(0.0, |t| t.advance(&hyp.matcher, search.eos, search.eos).1);
+    Finished {
+        guarded: hyp.guard.fired(),
+        tokens: hyp.tokens,
+        score: hyp.score + pending,
+        ended: false,
+    }
 }
 
 /// How many alternatives one beam tries at a single position where a keyword it started was
@@ -368,21 +475,17 @@ struct Checkpoint<S> {
 /// checkpointed; if that keyword is then abandoned unfinished (by an ordinary token, by
 /// starting another keyword, or by the length limit), the decode returns there and picks
 /// again without that token (after [`MAX_RETRIES`] at one position, or [`MAX_BACKTRACKS`] in
-/// the decode, the unbiased pick). Completing the checkpointed keyword releases it.
+/// the decode, the unbiased pick). Completing the checkpointed keyword releases it. A loop
+/// (`repeat`) ends the decode where the guard finds it, as in the beam search.
 pub(crate) fn greedy_with_keywords<S: Scorer>(
     search: &Search<'_>,
     trie: &KeywordTrie,
     state: S,
     tag: u32,
     check: &mut dyn FnMut(usize) -> Result<(), Error>,
-) -> Result<Vec<u32>, Error> {
-    let mut hyp = Hypothesis {
-        state,
-        feed: tag,
-        tokens: Vec::new(),
-        score: 0.0,
-        matcher: Matcher::start(),
-    };
+) -> Result<Decode, Error> {
+    let root = state.clone();
+    let mut hyp = Hypothesis::start(state, tag);
     let mut checkpoint: Option<Checkpoint<S>> = None;
     let mut resume: Option<(Vec<f32>, Vec<u32>)> = None;
     let mut backtracks = 0;
@@ -419,9 +522,11 @@ pub(crate) fn greedy_with_keywords<S: Scorer>(
         };
         let biased = backtracks < MAX_BACKTRACKS && banned.len() < MAX_RETRIES;
         let delta = biased.then(|| trie.deltas(&hyp.matcher, scores.len(), search.eos));
-        let unbiased = pick(&scores, None, &[]);
+        // The repetition guard's bans hold for the model's own pick too.
+        let guarded = hyp.guard.banned(hyp.tokens.len());
+        let unbiased = pick(&scores, None, &guarded);
         let token = if biased {
-            pick(&scores, delta.as_deref(), &banned)
+            pick(&scores, delta.as_deref(), &[&banned[..], &guarded].concat())
         } else {
             unbiased
         };
@@ -457,11 +562,33 @@ pub(crate) fn greedy_with_keywords<S: Scorer>(
         if token == search.eos {
             break;
         }
-        hyp.tokens.push(token);
-        hyp.feed = token;
-        pos += 1;
+        hyp.push(token, 0.0);
+        match hyp.guard.check(&hyp.tokens, search.pieces) {
+            None => pos += 1,
+            // A loop: back to the end of its first copy, its second copy's first token banned
+            // there, as the beam search does. A checkpoint inside the dropped text goes with it.
+            Some(Verdict::Rewind(keep)) => {
+                roll_back(search, &mut hyp, keep);
+                hyp.feed = hyp.tokens.last().copied().unwrap_or(tag);
+                hyp.state = refeed(&root, tag, &hyp.tokens, check)?;
+                if checkpoint
+                    .as_ref()
+                    .is_some_and(|c| c.hyp.tokens.len() >= keep)
+                {
+                    checkpoint = None;
+                }
+                pos = keep + 1;
+            }
+            Some(Verdict::Cut(keep)) => {
+                hyp.tokens.truncate(keep);
+                break;
+            }
+        }
     }
-    Ok(hyp.tokens)
+    Ok(Decode {
+        looped: hyp.guard.fired(),
+        tokens: hyp.tokens,
+    })
 }
 
 #[cfg(test)]

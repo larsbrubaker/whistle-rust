@@ -47,6 +47,11 @@ from the start of the input and its `probability`, aligned from the decoder's cr
 (within one 80 ms frame of the engine's on the test clips, for about +55 ms on a 3.4 s clip;
 [timestamps.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/timestamps.md)).
 `Transcript` is `PartialEq` but not `Eq` (the times are f32).
+`transcript.repeated` is true when the decoder ran into a repetition loop (a token or phrase
+repeated over and over, which garbled audio, noise or a language the model was not trained on
+can cause) and was rolled back past it: the text holds no loop, but it is a reading of audio
+the model could barely hear. A caller with another reading of the same audio (a live stream's
+committed text) may prefer that one ([decoding.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/decoding.md), "Repetition guard").
 Audio over 30 s is split into windows of at most 30 s (`whistle::plan_windows` shows the cuts;
 [windowing.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/windowing.md)):
 the language detected on the first window with at least 3 words is forced on the rest (set
@@ -76,7 +81,8 @@ the stream), their text (`continues` when it begins with the rest of the word be
 it with no space), the unconfirmed `pending` tail (`pending_continues` when it begins with the
 rest of the last committed word, "0 mm" after a committed "2": show it with no space before
 it), the language and any audio `dropped` at the 30 s cap; `transcript()` returns everything
-committed so far. `StreamUpdate` is `#[non_exhaustive]`: later versions may add fields. A
+committed so far (its `repeated` set when a pass it committed words from ran into a loop).
+`StreamUpdate` is `#[non_exhaustive]`: later versions may add fields. A
 word commits when two passes one `stream_step` (1 s) apart agree on it, about 1.3 s after it
 ends, or when a pause ends the utterance ([streaming.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/streaming.md)). The stream borrows the `Whistle`, so an app
 keeps the model alive beside it.

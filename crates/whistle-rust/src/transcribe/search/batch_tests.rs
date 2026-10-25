@@ -88,6 +88,7 @@ fn batched_beam_search_is_identical_to_stepping_each_hypothesis_alone() {
                 max_len: max,
                 trie: None,
                 ranking: Ranking::Mean,
+                pieces: &wh.pieces,
             };
             let batched = beam_search(&search, beams, state.clone(), tag, &mut no_check)
                 .expect("batched search");

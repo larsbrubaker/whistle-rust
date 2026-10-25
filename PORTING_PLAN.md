@@ -52,6 +52,15 @@ Beam search (default 3 beams), keyword biasing, word timestamps, windowing and s
   step); re-measure on wasm and consider bounding it.
 - Keyword biasing at 5+ beams finds fewer keywords than at 1 or 3 (partial keyword paths crowd
   the beam): per-beam-count tuning or a cap on hypotheses inside a keyword.
+- Garbage audio still decodes to confident nonsense, sometimes in the wrong language (the
+  repetition guard only stops loops). Measured at one beam: the 8 contract clips have a
+  language-tag probability of at least 0.995 and a mean token log-probability between −0.04
+  and −0.39; of 48 garbled variants, the 8 decoded in the wrong language all had tag
+  probability ≤ 0.87 and mean log-probability ≤ −0.55, but some right-language garbage is as
+  low, and pure noise reads "Thank you." at 0.74 / −0.01. A rule such as "emit nothing below
+  0.9 and −0.5" fits these numbers; it needs real microphone and accented recordings to set,
+  a choice between emitting nothing and exposing a confidence on `Transcript`, and a rule for
+  streams (language forced after the first commit).
 - More clips (long audio, noise, real microphone recordings) via `oracle/clips.json`; the
   alignment heads were fitted on the 8 contract clips and hold on 3 held-out clips so far.
 

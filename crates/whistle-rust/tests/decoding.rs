@@ -3,7 +3,8 @@
 // re-scores a transcript; `wer` scores word error rates. The gate runs a few pinned checks at
 // one beam and at three: `greedy` (one beam is the greedy contract; the option checks),
 // `beams` (determinism, the measured score against greedy, the pinned WER) and `keywords`
-// (biasing on the extra clips, irrelevant keywords harmless). The slow measurements (the bonus
+// (biasing on the extra clips, irrelevant keywords harmless), `repeat` (the repetition guard on
+// garbled audio). The slow measurements (the bonus
 // sweep, the score check at every beam count, timing) are `#[ignore]` tests that print the
 // tables in docs/design/decoding.md; the WER table per ranking is `src/transcribe/tests.rs`.
 
@@ -18,6 +19,8 @@ mod clips;
 mod greedy;
 #[path = "decoding/keywords.rs"]
 mod keywords;
+#[path = "decoding/repeat.rs"]
+mod repeat;
 #[path = "decoding/timing.rs"]
 mod timing;
 #[path = "decoding/wer.rs"]

@@ -127,6 +127,20 @@ stays, the floor does not move and there is no restart (an empty pass would othe
 of the committed text and restart). If the stream or the utterance ends there, what is pending
 commits.
 
+**A pass that loops.** The repetition guard (`docs/design/decoding.md` "Repetition guard")
+rolls a pass's decode back past a loop and reads on, so a pass that ran into one still has
+words for the audio after it, and they take part in agreement as any pass's do. On de_anna
+garbled by replayed 128 ms blocks (`tests/streaming/garbled.rs`) the final pass, over the whole
+clip, loops; before the guard it committed "Bib" and 316 more "ib", now "Biby Biby macht den
+Würfetz zweit Senti Mimi eta Höhe." (at three beams "Bibby Bibby macht den Würfetz zwei
+Zentimeter höher."). The same garbled start followed by the clean clip twice, with no pause,
+makes the passes start in the loop; the words after it commit as the speech arrives (treating a looping pass as one that said nothing, as the guard's first version did,
+committed one word before the end there, and would hold up to 30 s of speech behind a loop at
+an utterance's start). A committed word from a pass the guard fired on sets
+`Stream::transcript().repeated`. The guard sees one pass's tokens, not the committed text, so
+a loop built up across passes that each repeat a phrase a few times would not be caught (not
+observed).
+
 **Consuming must match something.** A cut that costs no less than consuming nothing (every
 committed character substituted or deleted) moves to the pass's start: no character of the
 committed text matched, so the pass did not hear it, and nothing of the pass is consumed. A

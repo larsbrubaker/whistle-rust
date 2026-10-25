@@ -110,6 +110,8 @@ struct Hyp {
     /// The rest of a word whose start is already committed (the alignment cut inside it): its
     /// text continues the previous word's with no space.
     glued: bool,
+    /// The pass it came from was rolled back past a loop by the repetition guard.
+    repeated: bool,
 }
 
 /// A live transcription: push audio as it arrives, read the committed words from each
@@ -148,6 +150,8 @@ pub struct Stream<'a> {
     text: String,
     /// Samples dropped uncommitted at the cap, in total.
     dropped: u64,
+    /// Some committed word came from a pass the repetition guard fired on.
+    repeated: bool,
 }
 
 impl Whistle {
@@ -183,6 +187,7 @@ impl Whistle {
             tokens: Vec::new(),
             text: String::new(),
             dropped: 0,
+            repeated: false,
         })
     }
 }
@@ -243,6 +248,7 @@ impl Stream<'_> {
             language: self.label(!self.words.is_empty()),
             tokens: self.tokens.clone(),
             words: self.words.clone(),
+            repeated: self.repeated,
         }
     }
 
@@ -433,6 +439,7 @@ impl Stream<'_> {
                     word,
                     tokens: t.tokens[s..e].to_vec(),
                     glued: false,
+                    repeated: t.repeated,
                 }
             })
             .collect();
@@ -531,6 +538,7 @@ impl Stream<'_> {
         let mut words = Vec::with_capacity(hyps.len());
         let mut glued = Vec::with_capacity(hyps.len());
         for h in hyps {
+            self.repeated |= h.repeated;
             self.tokens.extend(h.tokens);
             words.push(h.word);
             glued.push(h.glued);

@@ -8,6 +8,7 @@
 
 pub mod archive;
 pub mod forced;
+pub mod garble;
 pub mod npy;
 pub mod sha256;
 

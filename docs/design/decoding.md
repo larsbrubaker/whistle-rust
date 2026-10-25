@@ -135,6 +135,88 @@ these clips for more than twice the extra cost. Greedy is `beams: 1`; the contra
 explicitly, since the fixtures pin the greedy decode. `the_default_options_give_the_engine_transcript_on_every_clip`
 pins the default's result.
 
+## Repetition guard
+
+On audio it cannot read (garbled by a late audio callback, noise, a language it was not
+trained on) the decoder can lock into repeating one token or phrase with confidence until the
+length limit: a browser recording garbled by a busy main thread decoded as "et les trucs, je
+trouve que je trouve le même mémoire, je trouve que je trouve que …", 873 characters with "je
+trouve que" 59 times (its zlib compression ratio 14.6, against Whisper's rejection threshold of
+2.4 and about 0.9 for normal text). The reference (`needle-reference/`) has nothing for this:
+its decode loops (`model/run.py`, `whistle_finetune._score_quantised`) are a plain argmax to EOS
+or the limit. So it is designed here (`src/transcribe/repeat.rs`).
+
+- **Rule.** After every step each hypothesis's text tokens are checked for a loop at their
+  tail: for each block length `n` from 1 up, the run of tokens each equal to the one `n` before
+  it, counted back from the end. The tail is a loop when that repetition spans at least
+  `MIN_COPIES` (5) blocks and `MIN_SPAN` (30) tokens, and, if it holds any word start (a piece
+  beginning with `▁`), at least `MIN_WORDS` (20) of them; the shortest such block is the loop.
+  A repetition inside one word ("B" then "ib" over and over) has no word start and needs only
+  the token span. Exact and token-level: a few comparisons per step, the same on every target,
+  no compression or floating point. Checked at every step, a repetition is caught as soon as it
+  reaches the threshold, so only the tail needs checking.
+- **Why words as well as tokens.** A token span alone (the guard's first version) cut real
+  speech: in Polish and Italian one short word is several tokens, so "Więcej" or "Dość" said six
+  times, "Più" seven, "Sì" twelve, "Sí" ten, German "Ja, ja" or "ha ha" sixteen spanned 30
+  tokens. People repeat a short word that often; twenty words of one repeated block they do
+  not. Never firing, through the real tokenizer and checked after every token
+  (`repeat/tests.rs`): those, and "no no no no no", "one two one two", counting to twelve in
+  words and twenty in digits, "I'm sorry," four times, "testing one two three" three times,
+  "la" and "ha" sixteen times, "Undo" eight, Dutch "Nee" ten and "Hoger" six, Polish "Tak"
+  ten, "Przesuń w lewo" four times, and more in all seven languages. The French loop fires at
+  its seventh copy, after 166 characters (its zlib ratio passes 2.4 at about 130). Cost of the
+  margin: a loop of short words runs to twenty copies before it is caught.
+- **Roll back and ban.** When a hypothesis's tail becomes a loop, it is rolled back to the end
+  of the loop's first copy (its tokens, its score from a per-token history, its keyword
+  matcher replayed over the kept tokens), and the token that started the second copy is banned
+  at that position; the decode then carries on from there. Its decoder state is rebuilt by
+  feeding the tag and the kept tokens again from the state with only BOS fed (one decoder step
+  per kept token, no snapshot of every position). Banned tokens are kept per position and per
+  hypothesis (a fork inherits them), and a roll-back to an earlier position drops the bans
+  after it. After `MAX_REWINDS` (3) roll-backs a hypothesis that loops again is cut at the
+  first copy, as at the length limit. Banning without rolling back does not work: the decode
+  repeats the loop a token off. The same rule applies to every hypothesis of a beam search; a
+  rolled-back hypothesis keeps its slot and steps with the others (the batched step takes
+  hypotheses at different positions). With keywords at one beam, a keyword checkpoint inside
+  the dropped text is dropped with it.
+- **The cut lies at a word boundary.** The first copy kept starts where the repetition starts,
+  so a loop entered part way into its block ("trouve que je" after "je") keeps one whole copy.
+  When the token after the copy would continue a word (the first copy capitalised, the later
+  ones not: "Więcej, w|ięcej"), the cut moves back to the last word boundary inside the copy
+  (a piece starting with `▁` or a non-letter), so the kept text never ends in the head of a
+  word ("Więcej,", not "Więcej, w"), and the token banned is the one that starts the next word.
+  The first copy is kept, rather than cutting before the loop, because a decoder that gets
+  stuck usually repeats the last thing it heard.
+- **Reported** on the transcript: `Transcript::repeated` is true when the guard rolled back or
+  cut the chosen hypothesis at least once (any window of a long input; any pass a stream
+  committed words from). The text holds no loop, but the audio was likely garbled or not
+  speech, so a caller with another reading of the same audio (a live stream's text) may
+  prefer that. A sibling hypothesis that took EOS before its repetition reached the threshold
+  ranks on its score like any other: below the threshold is not a loop.
+- **Measured** on de_anna garbled by `tests/support/garble.rs` (`replayed_blocks`, 128 ms
+  blocks with about one in four replayed, seed 2; `tests/decoding/repeat.rs`). Before: "B" then
+  "ib" 317 times to the 320-token limit at one and three beams. Cut at the loop (the first
+  version): "Bib". Rolled back: one beam reads "Biby Biby macht den Würfetz zweit Senti Mimi eta
+  Höhe." (one roll-back, EOS after 31 tokens), three beams "Bibby Bibby macht den Würfetz zwei
+  Zentimeter höher." (one roll-back, about 63 batched steps of three, against 318 before). A
+  one-beam scan of 288 garbled variants of the contract clips (blocks replayed, blocks repeated
+  or skipped back, blocks shuffled; four seeds; 64, 128 and 250 ms blocks; each with the
+  detector on and off, 576 decodes): before, 5 decodes ran to the limit ("bi", "más", "alc"
+  repeated) and 6 repeated a phrase until EOS ("petits" and "a ver," about 40 and 30 times,
+  "The farts," 11); with the guard it fires on exactly those 11, none runs to the limit, and
+  they read "Biches más machinieros, el tema de cesa y limítos al más.", "Tu trouves des petits
+  pouces, tu vois. Là, je vais la résoudre.", "Y dicen que no te lo voy a leer, a ver.",
+  "Alcal, calle. Alcal, calle. Calle. Calle. Calle.", "The farts, the fast, the farts, the
+  fleets open to the fleet. …". The other 565 decodes are unchanged, including repetitions under
+  the thresholds ("He's the breakfast." five times, "drie" six, "Mętnych," five). No contract
+  or extra clip's output changes, and the guard never fires on a contract clip at one or three
+  beams: the snapshots, the contract, the near-ties and the engine comparisons pass unchanged.
+- **Cost.** A roll-back costs one decoder step per kept token, at most `MAX_REWINDS` times per
+  hypothesis; a loop late in a long window (a few hundred tokens kept) costs that many extra
+  steps each time. Truncating the decoder's caches in place would make it free; not needed yet.
+- **What it does not do.** A garbled clip that does not loop still decodes to confident
+  nonsense, sometimes in the wrong language (`PORTING_PLAN.md` item 7).
+
 ## Keyword biasing
 
 - **Trie.** A token-level prefix trie of every keyword in three spellings (as written, first

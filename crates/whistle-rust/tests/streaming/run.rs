@@ -61,7 +61,7 @@ pub struct Fed {
     /// `Stream::transcript` after each push (not after finish).
     pub transcripts: Vec<Transcript>,
     /// Everything committed, finish included: the updates' texts joined, their words, the last
-    /// language reported (no tokens).
+    /// language reported (no tokens, `repeated` false).
     pub last: Transcript,
     pub max_buffered: usize,
     pub times: Vec<Duration>,
@@ -103,6 +103,8 @@ pub fn feed(samples: &[f32], chunk: f32, options: &Options) -> Fed {
         text: joined(&fed),
         language: fed.updates.iter().rev().find_map(|u| u.language.clone()),
         tokens: Vec::new(),
+        // The updates do not carry it; the transcripts after each push do.
+        repeated: false,
         words: fed
             .updates
             .iter()
