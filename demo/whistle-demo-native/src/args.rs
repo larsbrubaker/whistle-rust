@@ -14,8 +14,10 @@ usage: whistle-demo-native [options] [FILE.wav]
                          default: the checkout's models/whistle.cact, then the cache,
                          then a download of the pinned file (checked by size and SHA-256)
   --threads N            worker threads for the model (default: one per core but one, 1 to 4)
-  --mic-from-wav FILE    play FILE through the live-audio path in real time, as a microphone
-  --record               start recording once the model is ready (with --mic-from-wav)
+  --mic-from-wav FILE    play FILE through the live-audio path in real time, in place of the
+                         microphone
+  --record               start recording once the model is ready (from the microphone, or
+                         from --mic-from-wav)
   --screenshot FILE      once a transcript (or an error) is shown, save the window as a PNG
                          and exit
   -h, --help             this text";
@@ -71,9 +73,6 @@ impl Args {
                 _ => return Err("only one WAV file at a time".into()),
             }
         }
-        if out.record && out.mic_from_wav.is_none() {
-            return Err("--record needs --mic-from-wav (no microphone source yet)".into());
-        }
         Ok(out)
     }
 }
@@ -109,6 +108,8 @@ mod tests {
         .unwrap();
         assert!(a.record);
         assert_eq!(a.screenshot, Some(PathBuf::from("s.png")));
+        // Without --mic-from-wav, --record records from the microphone.
+        assert!(parse(&["--record"]).unwrap().record);
         assert_eq!(parse(&[]).unwrap(), Args::default());
     }
 
@@ -119,7 +120,6 @@ mod tests {
         assert!(parse(&["--threads", "x"]).is_err());
         assert_eq!(parse(&["--bogus"]).unwrap_err(), "unknown option --bogus");
         assert!(parse(&["a.wav", "b.wav"]).is_err());
-        assert!(parse(&["--record"]).unwrap_err().contains("--mic-from-wav"));
     }
 
     #[test]

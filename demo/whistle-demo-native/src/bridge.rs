@@ -10,10 +10,15 @@
 //!
 //! Each recording and file is a session with its own number (`engine.rs`): replies to any but
 //! the current one are dropped, so a late update from an old stream never reaches a new one.
+//!
+//! A recording says Listening only once audio flows: until the capture's first chunk (a
+//! microphone can wait on a permission prompt, or take a moment to open) it is asking for the
+//! microphone, and a Stop then ends it with no transcript, since nothing was heard.
 
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -31,6 +36,9 @@ pub type Wake = Arc<dyn Fn() + Send + Sync>;
 #[derive(Debug)]
 pub enum Event {
     Engine(FromEngine),
+    /// The session's first audio arrived (sent before that audio reaches the engine, so before
+    /// any update it causes).
+    CaptureStarted(Session),
     /// The capture ended on its own, with the failure if there was one.
     CaptureEnded(Option<String>),
 }
@@ -51,6 +59,8 @@ pub struct Bridge {
     wake: Wake,
     capture: RefCell<Option<Box<dyn Capture>>>,
     capturing: Cell<bool>,
+    /// Whether the current recording's capture has delivered any audio (set by its sink).
+    heard: RefCell<Arc<AtomicBool>>,
     /// Waiting for the model.
     startup: RefCell<Vec<Startup>>,
     /// Finished transcripts and errors so far (the screenshot run waits for one).
@@ -105,6 +115,7 @@ impl Bridge {
             wake,
             capture: RefCell::new(capture),
             capturing: Cell::new(false),
+            heard: RefCell::new(Arc::new(AtomicBool::new(false))),
             startup: RefCell::new(Vec::new()),
             outcomes: Cell::new(0),
             session: Cell::new(0),
@@ -204,6 +215,11 @@ impl Bridge {
     fn apply(&self, event: Event) {
         match event {
             Event::Engine(msg) => self.apply_engine(msg),
+            Event::CaptureStarted(session) => {
+                if session == self.session.get() && self.state.phase() == Phase::RequestingMic {
+                    self.state.start_listening();
+                }
+            }
             Event::CaptureEnded(None) => self.stop_recording(),
             Event::CaptureEnded(Some(e)) => {
                 self.stop_capture();
@@ -316,6 +332,8 @@ impl DemoHost for Bridge {
             session,
             options: options.clone(),
         });
+        let heard = Arc::new(AtomicBool::new(false));
+        *self.heard.borrow_mut() = Arc::clone(&heard);
         let (engine, events, wake) = (
             self.engine.clone(),
             self.events_tx.clone(),
@@ -323,6 +341,11 @@ impl DemoHost for Bridge {
         );
         let sink = Box::new(move |event| match event {
             CaptureEvent::Audio { samples, rate } => {
+                if !heard.swap(true, Ordering::SeqCst)
+                    && events.send(Event::CaptureStarted(session)).is_ok()
+                {
+                    wake();
+                }
                 // A closed engine is reported by the bridge's own next send.
                 let _ = engine.send(ToEngine::Push {
                     session,
@@ -337,10 +360,8 @@ impl DemoHost for Bridge {
             }
         });
         match capture.start(sink) {
-            Ok(()) => {
-                self.capturing.set(true);
-                self.state.start_listening();
-            }
+            // Listening once the first audio arrives (`Event::CaptureStarted`).
+            Ok(()) => self.capturing.set(true),
             Err(e) => {
                 self.send(ToEngine::Cancel { session });
                 self.fail(format!("could not start the microphone: {e}"));
@@ -356,12 +377,22 @@ impl DemoHost for Bridge {
             return;
         }
         // Every chunk is in the engine's inbox once the capture stopped, so Finish follows
-        // the last of the audio.
+        // the last of the audio, and whether there was any is known.
         self.stop_capture();
+        let session = self.session.get();
+        if !self.heard.borrow().load(Ordering::SeqCst) {
+            // Still asking for the microphone: nothing was heard, so no transcript.
+            self.send(ToEngine::Cancel { session });
+            self.state.set_phase(Phase::Ready);
+            return;
+        }
+        if self.state.phase() == Phase::RequestingMic {
+            // Audio came, but its CaptureStarted is still queued (and will find the phase
+            // moved on): clear the old transcript now, before this stream's updates land.
+            self.state.start_listening();
+        }
         self.state.set_phase(Phase::Transcribing);
-        self.send(ToEngine::Finish {
-            session: self.session.get(),
-        });
+        self.send(ToEngine::Finish { session });
     }
 
     fn pick_file(&self, _options: &UiOptions) {

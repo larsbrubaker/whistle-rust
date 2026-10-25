@@ -7,10 +7,10 @@
 //! `models/whistle.cact`, the cache, or a checked download (`model.rs`). Files come from the OS
 //! dialog (rfd), a drop on the window, the OS's open request or the command line.
 //!
-//! Live audio enters through the capture seam (`capture.rs`). No microphone source is wired in
-//! yet, so Record shows as unavailable with a note; `--mic-from-wav` plays a file through the
-//! same live path. `bridge.rs` connects the UI, the engine and the capture; `shell_host.rs` is
-//! the shell's side.
+//! Live audio enters through the capture seam (`capture.rs`): the system microphone through
+//! agg-mic (`mic.rs`), or with `--mic-from-wav` a file played through the same live path. Where
+//! agg-mic has no microphone support, Record shows as unavailable with its note. `bridge.rs`
+//! connects the UI, the engine and the capture; `shell_host.rs` is the shell's side.
 //!
 //! Run from `demo/`: `cargo run -p whistle-demo-native --release` (see `--help`).
 
@@ -18,6 +18,7 @@ mod args;
 mod bridge;
 mod capture;
 mod engine;
+mod mic;
 mod model;
 mod shell_host;
 #[cfg(test)]
@@ -32,11 +33,12 @@ use whistle_demo::{build_app_on, install_fonts, DemoState, Platform, DESKTOP_TIT
 use crate::args::{default_threads, Args, USAGE};
 use crate::bridge::{Bridge, Startup, Wake};
 use crate::capture::{Capture, WavCapture};
+use crate::mic::MicCapture;
 use crate::model::ModelSource;
 use crate::shell_host::DemoShellHost;
 
-/// Why Record is unavailable in this build.
-const MIC_NOTE: &str = "live microphone input is not in the desktop build yet";
+/// The name the sound server lists the recording under (Linux).
+const APP_NAME: &str = "whistle-demo-native";
 
 /// Painted frames before `--screenshot` captures, once the transcript is shown: enough for the
 /// layout the new text asks for and a settled paint.
@@ -58,18 +60,23 @@ fn main() -> ExitCode {
     let cores = std::thread::available_parallelism().map_or(1, |n| n.get());
     whistle::set_threads(args.threads.unwrap_or_else(|| default_threads(cores)));
 
-    let capture: Option<Box<dyn Capture>> = match &args.mic_from_wav {
+    // The live source, or why Record is unavailable. Nothing here asks for the microphone:
+    // only pressing Record does.
+    let (capture, mic_note): (Option<Box<dyn Capture>>, String) = match &args.mic_from_wav {
         Some(path) => match std::fs::read(path)
             .map_err(|e| e.to_string())
             .and_then(|bytes| WavCapture::from_wav(&bytes, true))
         {
-            Ok(capture) => Some(Box::new(capture)),
+            Ok(capture) => (Some(Box::new(capture)), String::new()),
             Err(e) => {
                 eprintln!("whistle-demo-native: {}: {e}", path.display());
                 return ExitCode::from(2);
             }
         },
-        None => None,
+        None => match MicCapture::new(agg_mic::Microphone::with_app_name(APP_NAME)) {
+            Ok(capture) => (Some(Box::new(capture)), String::new()),
+            Err(note) => (None, note),
+        },
     };
 
     let mut config = ShellConfig::new(DESKTOP_TITLE)
@@ -91,7 +98,7 @@ fn main() -> ExitCode {
             state.clone(),
             ModelSource::new(args.model.clone()),
             capture.take().flatten(),
-            MIC_NOTE,
+            &mic_note,
             wake,
         );
         if let Some(path) = &args.wav {

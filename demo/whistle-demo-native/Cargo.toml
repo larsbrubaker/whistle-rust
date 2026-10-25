@@ -2,8 +2,9 @@
 # (agg-gui-shell), the model on an engine thread (src/engine.rs), files picked (rfd), dropped or
 # named on the command line. The model is the checkout's models/whistle.cact, a path given on
 # the command line, or a checked download into the cache (src/model.rs). Live audio comes in
-# through the `Capture` seam (src/capture.rs); no microphone source is wired in yet, so Record
-# is shown unavailable. `cargo run -p whistle-demo-native --release` from demo/ (README.md).
+# through the `Capture` seam (src/capture.rs): the system microphone (agg-mic, src/mic.rs) or
+# a WAV played in real time. `cargo run -p whistle-demo-native --release` from demo/
+# (README.md).
 [package]
 name = "whistle-demo-native"
 version.workspace = true
@@ -24,6 +25,11 @@ whistle-demo = { path = "../whistle-demo" }
 whistle-rust = { workspace = true }
 agg-gui = { workspace = true }
 agg-gui-shell = { workspace = true }
+# The system microphone, pure Rust with no -sys crates or build scripts: AVFoundation through
+# objc2 on macOS, WASAPI through `windows` on Windows, the PulseAudio protocol (`pulseaudio`)
+# on Linux, so the Linux build needs no audio packages. MIT; its platform crates' notices are
+# in agg-gui's agg-mic/THIRD_PARTY_NOTICES.md (demo/README.md).
+agg-mic = { workspace = true }
 # The model's SHA-256 (the browser has SubtleCrypto). MIT OR Apache-2.0.
 sha2 = "0.10"
 # The model download: ureq over rustls with the RustCrypto provider and the Mozilla roots

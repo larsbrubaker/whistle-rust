@@ -1,8 +1,8 @@
 //! The seam a live audio source plugs into: [`Capture`] starts delivering mono chunks to a
 //! [`Sink`] on a thread of its own and stops on request. The bridge (`bridge.rs`) forwards each
 //! chunk to the engine thread (`engine.rs`) as a stream push, as the browser's microphone feeds
-//! its worker. A system microphone is a `Capture` still to come (a shared pure-Rust recorder);
-//! until then the desktop demo has none and shows Record unavailable.
+//! its worker. The system microphone is `MicCapture` (`mic.rs`, over agg-mic); where agg-mic has
+//! no microphone support the desktop demo has no capture and shows Record unavailable.
 //!
 //! [`WavCapture`] plays a WAV file through the same seam, in real time or as fast as it can: the
 //! tests stream clips with it, and `--mic-from-wav` runs the live path without a microphone.

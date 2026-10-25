@@ -1,8 +1,11 @@
-//! What the desktop demo's tests share (`engine_tests.rs`, `bridge_tests.rs`, `model_tests.rs`,
-//! `shell_host.rs`): the test clips from the checkout's `test-data/clips/`, what the one they
-//! stream says, and scratch directories that delete themselves.
+//! What the desktop demo's tests share (`engine_tests.rs`, `bridge_tests.rs`, `mic_tests.rs`,
+//! `model_tests.rs`, `shell_host.rs`): the test clips from the checkout's `test-data/clips/`,
+//! what the one they stream says, the checkout's model as the only source, and scratch
+//! directories that delete themselves.
 
 use std::path::{Path, PathBuf};
+
+use crate::model::{checkout_model, ModelSource};
 
 /// What every reading of `en_samantha` says (the library's snapshot and the engine's transcript).
 pub const SAMANTHA: &str = "Make the cube 20 mm wide and round the top edges.";
@@ -13,6 +16,16 @@ pub fn clip(name: &str) -> Vec<u8> {
         .join("../../test-data/clips")
         .join(format!("{name}.wav"));
     std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+}
+
+/// The checkout's `models/whistle.cact` and nothing else (no cache, no download).
+pub fn local_model() -> ModelSource {
+    ModelSource {
+        path: Some(checkout_model()),
+        checkout: None,
+        cache_dir: None,
+        url: String::new(),
+    }
 }
 
 /// A fresh, empty directory for one test, deleted with everything in it when dropped (the

@@ -14,9 +14,10 @@
 # The `demo` job checks the demo (demo/, its own Cargo workspace: the browser build and the
 # desktop one, whistle-demo-native) with scripts/demo-gates.sh. Only it clones the sibling
 # checkouts the demo's GUI toolkit needs (agg-gui, agg-rust, tess2-rust); the library's jobs
-# never build the demo. The desktop build needs no system packages (no audio library: live
-# microphone input is not wired in yet; the file dialog talks to the desktop portal over
-# D-Bus), and its tests need the model, fetched and cached as in the `test` job.
+# never build the demo. The desktop build needs no system packages (no audio library: its
+# microphone, agg-mic, speaks the PulseAudio protocol in pure Rust; the file dialog talks to the
+# desktop portal over D-Bus), and its tests need the model, fetched and cached as in the `test`
+# job. They never open a real microphone (a fake agg-mic backend stands in).
 #
 # The toolchain is the one pinned in rust-toolchain.toml, read from that file. Checkouts are LF
 # on every OS (.gitattributes), so Windows needs no core.autocrlf override.

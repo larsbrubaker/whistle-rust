@@ -45,14 +45,15 @@ cargo run -p whistle-demo-native --release -- --help
 ```
 
 (`.claude/launch.json` has it as `whistle-demo-native`.) The same whistle-demo UI in a native
-window on agg-gui-shell: transcribe a WAV picked in the OS dialog, dropped on the window, opened
-from the Finder or named on the command line. The parts:
+window on agg-gui-shell: press Record and speak, or transcribe a WAV picked in the OS dialog,
+dropped on the window, opened from the Finder or named on the command line. The parts:
 
 | file | what |
 |---|---|
 | `engine.rs` | the engine thread, the desktop's Web Worker: owns the model and the live stream, answers `ToEngine` messages in order with timed `FromEngine` replies |
 | `bridge.rs` | the UI's `DemoHost`: sends the UI's requests to the engine and applies the replies to `DemoState` |
 | `capture.rs` | the live-audio seam: a `Capture` delivers mono chunks to a sink on its own thread; `WavCapture` plays a file through it |
+| `mic.rs` | `MicCapture`: the system microphone (agg-mic) as a `Capture`, its blocking start on a thread of its own |
 | `model.rs` | where the model comes from, checked against `whistle::model_file`'s size and SHA-256 |
 | `shell_host.rs` | the shell's hooks: apply what arrived on each idle pass; open what the OS asks to open |
 
@@ -67,12 +68,49 @@ provider (pure Rust).
 **Threads.** The UI thread never runs the model. The library splits each pass's projections
 over one worker thread per core but one, 1 to 4 (`--threads N` to choose).
 
-**Microphone.** Not wired in yet: Record is shown unavailable with a note. A live source
-plugs into the `Capture` trait (start with a sink, stop with every chunk delivered); the
-bridge forwards its chunks to the engine's stream as the browser's microphone feeds its
-worker. `--mic-from-wav FILE` plays a file through that path in real time (`--record` starts
-it once the model is ready), so the live text, committed and pending, can be seen without a
-microphone.
+**Microphone.** Record captures the default input device through
+[agg-mic](https://github.com/larsbrubaker/agg-gui/tree/main/agg-mic) (agg-gui's sibling crate,
+`../agg-gui/agg-mic`): AVFoundation on macOS, WASAPI on Windows, the PulseAudio protocol on
+Linux (PulseAudio or PipeWire's pulse server), all pure Rust with no `-sys` crates, so the Linux
+build needs no audio packages. Where agg-mic has no microphone support, Record is shown
+unavailable with its note. `MicCapture` (`mic.rs`) plugs it into the `Capture` trait (start
+with a sink, stop with every chunk delivered): agg-mic's start blocks until audio flows (on
+macOS through the permission prompt), so it runs on a thread of its own, and a refusal, a
+missing device or a microphone unplugged mid-recording ends the recording with agg-mic's
+message in the UI. The UI says Listening only once the first audio arrives; until then it is
+asking for the microphone, and a Stop returns to Ready with no transcript. A Stop cannot take
+down a permission prompt, so a Record while the last one's prompt is still up says to answer it
+first instead of starting. The chunks come at the rate agg-mic hands over (the device's own on macOS,
+usually 16 kHz on Windows and Linux), and the bridge forwards them to the engine's stream as the browser's microphone feeds its
+worker. `--record` starts recording once the model is ready. `--mic-from-wav FILE` plays a
+file through the same path in real time instead of the microphone, so the live text, committed and pending, can be seen without a microphone or a permission
+prompt.
+
+**macOS microphone permission.** A bare `cargo run` binary is not an app bundle, so macOS
+attributes its microphone use to the app that launched it: Terminal, iTerm, VS Code or another
+IDE. The first Record asks for (or uses) *that* app's permission, which every program it starts
+then shares; turning it off again is under System Settings > Privacy & Security > Microphone,
+for that app. If the launching app's own Info.plist lacks `NSMicrophoneUsageDescription`, macOS
+may end the process at Record instead of prompting. A refusal shows agg-mic's message, which
+says where to turn it on. A bundled build of the demo would need `NSMicrophoneUsageDescription`
+in its Info.plist and, under the hardened runtime, the
+`com.apple.security.device.audio-input` entitlement (without it the process gets silence and
+no prompt); there is no bundled build yet.
+
+**Falling behind a live microphone.** Each `Stream::push` runs one pass per second of audio it
+completes (`Options::stream_step`), so merging the pushes queued while a pass ran would not
+save any passes: the engine, like the browser's worker, answers every push in order. One pass
+over 1 s of audio, one thread, release, measured on an M5: median / max 225 / 446 ms at 1 beam
+and 413 / 965 ms at 3 beams on a 45 s stream (`docs/design/streaming.md`); the desktop build
+runs up to 4 threads. So at 1 beam a machine about twice as slow per thread as the M5, and at
+3 beams one barely slower, would fall behind and its text lag more the longer the user speaks;
+catching up needs the stream to skip passes, which `Stream` does not offer yet.
+
+**Licenses.** agg-mic is MIT; its platform crates (objc2 and its AVFoundation bindings,
+`windows`, `pulseaudio` and theirs) are listed with their notices in agg-mic's
+[`THIRD_PARTY_NOTICES.md`](https://github.com/larsbrubaker/agg-gui/blob/main/agg-mic/THIRD_PARTY_NOTICES.md),
+which a shipped copy of the desktop binary would carry. The library's own
+`THIRD_PARTY_NOTICES.md` covers only the library, which depends on none of them.
 
 **Device rates and sessions.** Audio at a device's rate (44.1 or 48 kHz) goes through one
 `whistle::audio::StreamResampler` per stream, in the engine here and in the browser's worker

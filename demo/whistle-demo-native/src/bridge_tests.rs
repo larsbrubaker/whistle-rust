@@ -13,20 +13,11 @@ use whistle_demo::{DemoHost, DemoState, Phase};
 
 use super::*;
 use crate::capture::WavCapture;
-use crate::model::{checkout_model, ModelSource};
-use crate::test_support::{clip, Scratch, SAMANTHA};
+use crate::model::ModelSource;
+use crate::test_support::{clip, local_model, Scratch, SAMANTHA};
 
 /// Long enough for a debug build to load the model and transcribe a clip.
 const PATIENCE: Duration = Duration::from_secs(120);
-
-fn local_model() -> ModelSource {
-    ModelSource {
-        path: Some(checkout_model()),
-        checkout: None,
-        cache_dir: None,
-        url: String::new(),
-    }
-}
 
 fn bridge(capture: Option<Box<dyn Capture>>) -> Rc<Bridge> {
     Bridge::start(
@@ -181,16 +172,21 @@ fn a_model_that_cannot_load_is_an_error_the_ui_shows() {
     assert!(!bridge.state().can_start());
 }
 
-/// A capture that starts and never delivers (a microphone in a quiet room), or fails to start.
+/// A capture that starts with one chunk of silence and delivers nothing more (a microphone in a
+/// quiet room, as far as the transcript goes), or fails to start.
 struct QuietCapture {
     fails: bool,
 }
 
 impl Capture for QuietCapture {
-    fn start(&mut self, _sink: crate::capture::Sink) -> Result<(), String> {
+    fn start(&mut self, mut sink: crate::capture::Sink) -> Result<(), String> {
         if self.fails {
             Err("no input device".into())
         } else {
+            sink(CaptureEvent::Audio {
+                samples: vec![0.0; 1600],
+                rate: 16_000,
+            });
             Ok(())
         }
     }
@@ -215,6 +211,9 @@ fn a_late_update_from_an_old_stream_does_not_reach_a_new_recording() {
     let bridge = bridge(Some(Box::new(QuietCapture { fails: false })));
     until_ready(&bridge);
     bridge.start_recording(&UiOptions::default());
+    // Its audio has come: Listening (so Stop finishes the stream).
+    bridge.drain();
+    assert_eq!(bridge.state().phase(), Phase::Listening);
     let old = bridge.session.get();
     bridge.stop_recording();
     assert!(
@@ -222,6 +221,7 @@ fn a_late_update_from_an_old_stream_does_not_reach_a_new_recording() {
         "the first stream finished"
     );
     bridge.start_recording(&UiOptions::default());
+    bridge.drain();
     assert_eq!(bridge.state().phase(), Phase::Listening);
 
     bridge.events_tx.send(update(old, "stale words")).unwrap();

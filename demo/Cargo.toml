@@ -8,9 +8,10 @@
 # - whistle-demo-native (bin)    the same UI on the desktop (agg-gui-shell), model on a thread
 # - web/                         the page (bun + vite); web/build-wasm.sh fills web/pkg/
 #
-# The library is a path dependency (../crates/whistle-rust). agg-gui, agg-gui-web-shell and
-# agg-gui-shell come from the sibling agg-gui checkout (../../agg-gui from here), which needs
-# the agg-rust and tess2-rust checkouts beside it; CI's demo job clones all three.
+# The library is a path dependency (../crates/whistle-rust). agg-gui, agg-gui-web-shell,
+# agg-gui-shell and agg-mic (the desktop build's microphone) come from the sibling agg-gui
+# checkout (../../agg-gui from here), which needs the agg-rust and tess2-rust checkouts beside
+# it; CI's demo job clones all three.
 [workspace]
 resolver = "2"
 members = ["whistle-demo", "whistle-demo-web", "whistle-demo-worker", "whistle-demo-native"]
@@ -29,6 +30,7 @@ whistle-rust = { path = "../crates/whistle-rust" }
 agg-gui = { path = "../../agg-gui/agg-gui" }
 agg-gui-web-shell = { path = "../../agg-gui/agg-gui-web-shell" }
 agg-gui-shell = { path = "../../agg-gui/agg-gui-shell" }
+agg-mic = { path = "../../agg-gui/agg-mic" }
 
 # Inference and rendering are arithmetic-heavy: unoptimized builds would crawl.
 [profile.dev]

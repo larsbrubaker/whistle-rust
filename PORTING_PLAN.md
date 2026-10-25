@@ -71,11 +71,19 @@ Beam search (default 3 beams), keyword biasing, word timestamps, windowing and s
   https://larsbrubaker.github.io/whistle-rust/ on every push to main. Still unverified by hand:
   live microphone streaming (per-update time and real-time factor in the browser), the
   word-timestamps display, the Hugging Face fallback, the file picker.
-- The desktop demo (`demo/whistle-demo-native`, agg-gui-shell) transcribes WAV files; its
-  microphone waits on a shared pure-Rust recorder crate (MatterCAD's AVFoundation / WASAPI /
-  PulseAudio recorders, extracted), behind its `Capture` seam. Then: macOS microphone
-  permission (Info.plist usage string, a denied message) and merging pushes when the engine
-  falls behind a live microphone.
+- The desktop demo (`demo/whistle-demo-native`, agg-gui-shell) transcribes WAV files and
+  records from the microphone through agg-mic. Still unverified by hand: a real recording on
+  each OS (the tests use a fake agg-mic backend). Left:
+  - macOS permission for a bundled build: an app bundle with `NSMicrophoneUsageDescription` in
+    its Info.plist and, if it is signed with the hardened runtime, the
+    `com.apple.security.device.audio-input` entitlement. Today a `cargo run` binary borrows the
+    launching terminal's or IDE's permission (`demo/README.md`).
+  - Falling behind a live microphone: merging queued pushes saves nothing, since `Stream::push`
+    runs one pass per second of audio whatever the chunking. At 1 beam one thread on an M5
+    peaks at 446 ms per 1 s step, at 3 beams 965 ms (`docs/design/streaming.md`), so a slower
+    machine, or 3 beams, can fall behind and lag more the longer the user speaks. Catching up
+    needs the library to let a stream skip passes (one pass over all the audio queued, not one
+    per second of it); measure on a slow machine first.
 - MatterCAD Rust: the desktop Whistle provider lands in mattercad-rust (its roadmap, `ai.md`);
   the browser provider needs a Web Worker host like the demo's.
 
