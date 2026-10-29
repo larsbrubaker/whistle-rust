@@ -2,15 +2,15 @@
 
 Open work only, in landing order. Each item says what a caller can do once it lands and what it
 needs. Delete an item when it lands; rewrite it to what is left when part of it lands. How the
-model, the archive and the oracle work: `crates/whistle-rust/src/lib.rs`, the `oracle/` script headers. The
-verification bar for every stage: CLAUDE.md "Tolerance policy".
+model, the archive and the oracle work: `crates/whistle-rust/src/lib.rs`, the `oracle/` script
+headers. The verification bar for every stage: CLAUDE.md "Tolerance policy".
 
 ## 6. Performance
 
-Transcription is fast enough for push-to-talk on every target, and the weights stay packed
-(`docs/design/performance.md`: ~41 MB resident after binding natively, ~59 MB on wasm simd128
-with its byte codes; a 3 s clip in ~82 ms natively and ~87 ms on Node simd128 at one beam, one
-thread); what is left.
+Transcription is fast enough for push-to-talk on every target, and the weights stay packed (the
+headers of `kernels/packed.rs` and `tests/transcribe/timing.rs`: ~41 MB resident after binding
+natively, ~59 MB on wasm simd128 with its byte codes; a 3 s clip in ~82 ms natively and ~87 ms on
+Node simd128 at one beam, one thread); what is left.
 
 **Priority: single-threaded wasm32 (simd128).** The browser build has no threads, and phones and
 slower computers on the web are where transcription is slowest, so performance work is chosen
@@ -28,18 +28,23 @@ and measured for one thread on wasm first; native threads are a bonus.
   table on a quiet machine, and measure in the browser through the demo (item 8).
 - The 3 s encoder alone is 5-12% slower than the dense build (it decodes ~19M packed weights per
   call); cut that if the encoder dominates a real workload.
-- Close the gap to the engine (`scripts/bench.sh`, `docs/design/performance.md` "Against the
-  engine"): about 2x slower at one beam and 3.5-7x at the default three before the beams'
+- Close the gap to the engine (`scripts/bench.sh`, whose header holds the comparison
+  with the engine): about 2x slower at one beam and 3.5-7x at the default three before the beams'
   decoder steps were batched (`DecoderState::step_batch`, bit-identical; 20-30% faster at 3-5
   beams on one thread natively, wasm not yet measured cleanly). Next: what a batched step's cost
   is made of, then the encoder (~40 ms on a 3 s clip against the engine's 11-16 ms to first
   token).
+- Smaller wins not yet tried: a persistent thread pool so single-row projections can split; a
+  transposed panel layout or an f32/bf16 copy of the decoder weights (trading memory for time);
+  checking that `kron_apply` vectorises under simd128; reusing the Hadamard MLP's scratch; and
+  finding which clip's wasm text differs from native.
 
 ## 7. Designed decode features
 
-The behaviours only the closed engine has, designed here and held to the engine transcripts.
-Beam search (default 3 beams), keyword biasing, word timestamps, windowing and streaming are in
-(`src/transcribe/search.rs`, `keywords.rs`, `repeat.rs`, `align.rs`, `window.rs`, `stream.rs`); what is left:
+The behaviours only the closed engine has, designed here and held to the engine transcripts. Beam
+search (default 3 beams), keyword biasing, word timestamps, windowing and streaming are in
+(`src/transcribe/search.rs`, `keywords.rs`, `repeat.rs`, `align.rs`, `window.rs`, `stream.rs`);
+what is left:
 
 - Streaming quality: a word committed and then read differently by a later pass stays as
   committed (no retraction), so live text can keep an early misreading ("Q20" for "cube 20",
@@ -77,10 +82,10 @@ Beam search (default 3 beams), keyword biasing, word timestamps, windowing and s
   - macOS permission for a bundled build: an app bundle with `NSMicrophoneUsageDescription` in
     its Info.plist and, if it is signed with the hardened runtime, the
     `com.apple.security.device.audio-input` entitlement. Today a `cargo run` binary borrows the
-    launching terminal's or IDE's permission (`demo/README.md`).
+    launching terminal's or IDE's permission (the header of the demo's `mic.rs`).
   - Falling behind a live microphone: merging queued pushes saves nothing, since `Stream::push`
     runs one pass per second of audio whatever the chunking. At 1 beam one thread on an M5
-    peaks at 446 ms per 1 s step, at 3 beams 965 ms (`docs/design/streaming.md`), so a slower
+    peaks at 446 ms per 1 s step, at 3 beams 965 ms (`tests/streaming/measure.rs`), so a slower
     machine, or 3 beams, can fall behind and lag more the longer the user speaks. Catching up
     needs the library to let a stream skip passes (one pass over all the audio queued, not one
     per second of it); measure on a slow machine first.
