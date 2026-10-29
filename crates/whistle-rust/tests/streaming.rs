@@ -1,4 +1,4 @@
-// Test area: streaming (`whistle::Stream`, docs/design/streaming.md). `run` feeds a stream in
+// Test area: streaming (`whistle::Stream`, `src/transcribe/stream.rs`). `run` feeds a stream in
 // fixed chunks and keeps every update; `clips` pins the contract clips against the offline
 // decode and chunk-size independence; `behaviour` that committed words never change, times are
 // monotonic, silence commits nothing, a long stream stays under 30 s and cancel stops it;

@@ -1,4 +1,4 @@
-// Streams over garbled audio (docs/design/streaming.md "A pass that loops"): de_anna with
+// Streams over garbled audio (a pass that loops, `src/transcribe/stream.rs`): de_anna with
 // 128 ms blocks replayed as a late audio callback replays them (`support::garble`). Its last
 // pass, over the whole clip, ran into a loop ("B" and "ib" 317 times) and, as the stream's
 // final pass, committed all of it. With the repetition guard the pass is rolled back past the

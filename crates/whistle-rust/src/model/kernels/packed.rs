@@ -10,8 +10,9 @@
 //! `k ≡ j (mod 16)` in order from `-0.0`, product rounded then added (no FMA); the lanes reduce
 //! as `v_l = (a_l + a_{4+l}) + (a_{8+l} + a_{12+l})`, then `(v_0 + v_1) + (v_2 + v_3)`; the
 //! output is the sequential sum from `-0.0` over groups of `norm_g · s_g`. This rounds
-//! differently from dequantizing then summing densely, so it is an experiment the token
-//! contract decides (`docs/design/performance.md`). NEON decodes 16 indices with byte shuffles
+//! differently from dequantizing then summing densely; the token contract holds on every clip
+//! with it, and the per-layer decoder bound was set from its measurement
+//! (`tests/model/decoder_stack.rs`). NEON decodes 16 indices with byte shuffles
 //! (`vqtbl1q_u8` / `vqtbl4q_u8` into the codebook's bytes), AVX2 with `_mm256_permutevar8x32_ps`
 //! lookups into the codebook (`packed_x86`), simd128 with `i8x16_swizzle` into its byte planes
 //! (`packed_wasm`); each keeps the scalar order's lanes and reduction, so all agree bit for bit.
@@ -23,6 +24,17 @@
 //! matrix, the decode amortized over every input row, and only the band resident. The rotated
 //! order re-decodes the weights for every 4 input rows, which made the 30 s encoder 3–4×
 //! slower.
+//!
+//! **Why packed.** Every CQ matrix the model projects stays as its record (2- or 4-bit indices
+//! and fp16 norms, plus an f32 copy of the norms as the kernels' per-group scale) instead of
+//! being dequantized: a binding holds about 130 MB less (about 41 MB resident after binding
+//! natively, 59 MB on wasm simd128 with its byte codes), and the decoder step, which streams
+//! every weight once per token, reads 2 or 4 bits per weight instead of 32. The encoder pays one
+//! band decode of its matrices per call (about 19M weights at 0.4–0.6 ns each on NEON): lost in
+//! the noise on 30 s, 5–12% of a 3 s clip's encoder. Packing needs a power-of-two group of at
+//! least 16 (the band decode's butterflies rely on it; `cact` admits no other) and 2 or 4 bits;
+//! the fp16 matrices (stem taps, depthwise kernels, Hadamard factors, the mel filterbank) stay
+//! dense.
 
 use super::{Path, MAX_THREADS, MIN_ROWS_PER_WORKER, PARALLEL_MIN_MACS};
 use crate::quant::{fp16_to_f32, walsh_hadamard, CqRows};
@@ -60,7 +72,10 @@ pub(crate) struct PackedMatrix {
     /// wasm simd128, rotated order only: every index as its own byte, `[rows, in_pad]`, so the
     /// kernel loads 16 codes with one `v128_load` instead of unpacking them (`packed_wasm`).
     /// wasm has no per-lane variable shift, and the unpack was most of the decoder's kernel;
-    /// this costs one byte per weight (`docs/design/performance.md`). Native keeps none.
+    /// this costs one byte per weight, about 18.1 MB for the 72 rotated matrices (18.09M
+    /// weights), and cut a 3 s clip by 17% under Node. Native keeps none: NEON's own unpack is
+    /// four instructions per 16 codes, so byte codes saved only 3.5–4% there for the same 18 MB
+    /// on a binding of about 41 MB.
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     codes: Vec<u8>,
 }

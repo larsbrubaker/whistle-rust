@@ -5,7 +5,8 @@
 // pins the offsets where a pass re-read a committed word with other characters and the stream
 // committed it twice; `sweep_offsets` (ignored, a measurement) prints, per clip, the runs whose
 // committed text differs from the offline decode, those with an extra word, and the word error
-// rate against the engine's stream. The figures in docs/design/streaming.md come from
+// rate against the engine's stream. The re-read case (en_samantha under a faint hiss, 0.01 or
+// 0.02 peak to peak, after leading silence) comes from
 //   SWEEP_CLIP=en_samantha SWEEP_STEP=50 SWEEP_NOISE=0.01 (or 0.02) cargo test -p whistle-rust \
 //     --test streaming sweep_offsets -- --ignored --nocapture
 // (320 offsets); the all-clip comparison from the defaults (SWEEP_STEP=500, every clip) at

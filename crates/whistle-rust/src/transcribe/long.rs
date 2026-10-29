@@ -1,12 +1,29 @@
-//! The windowed decode of audio over 30 s (`docs/design/windowing.md`): each window that
-//! `window::plan` chose is decoded alone by `Whistle::decode_window`, and the results are
-//! stitched into one [`Transcript`]. The first window that keeps at least
-//! [`MIN_LANGUAGE_WORDS`] words fixes the language for the rest (unless it was forced); at a hard
-//! cut each side keeps only its words by midpoint, which needs
-//! the words' times, so a window with a hard cut is always aligned, and its words dropped
-//! afterwards when the caller did not ask for them. Texts join with single spaces (none before
-//! a window that starts with closing punctuation), tokens concatenate, and word times stay in
-//! order across windows.
+//! The windowed decode of audio over 30 s: each window that `window::plan` chose (its header
+//! says where the cuts go) is decoded alone by `Whistle::decode_window`, and the results are
+//! stitched into one [`Transcript`].
+//!
+//! - **Language.** The first window whose kept text has at least [`MIN_LANGUAGE_WORDS`] words
+//!   is detected (unless `Options::language` forces it), and its language is forced on every
+//!   later window, so the transcript has one language, as a caller reading
+//!   `Transcript::language` expects. Earlier windows (no text, or a 1–2 word fragment) are
+//!   decoded with detection and do not fix it; when no window reaches the count, the first
+//!   window with any text labels the transcript. Words rather than seconds, because a window's
+//!   word count is known after its decode without word times and is what the tag was decided
+//!   from. Forcing does not translate: a recording that switches language is decoded in the
+//!   first one, the later part as the decoder's reading of it in that language. A caller that
+//!   needs per-part languages decodes the windows `plan_windows` returns one by one.
+//! - **Hard cuts.** Each side keeps only its words by midpoint, which needs the words' times,
+//!   so a window with a hard cut is always aligned (one extra decoder pass) and its words are
+//!   dropped afterwards when the caller did not ask for them; `text` and `tokens` are the same
+//!   with timings on and off, as for a single pass.
+//! - **Text** joins each window's trimmed text with single spaces, none before a window that
+//!   starts with closing punctuation; empty windows add nothing. **Tokens** concatenate the
+//!   windows' kept text tokens; they may not decode exactly to the text (a window's first token
+//!   is decoded without the space the join adds), so `text` and `words` are authoritative.
+//! - **Words** are timed in the input (the window's start is the alignment's offset), in order
+//!   and never overlapping across windows; the pauses between `GateAndTrim` windows hold none.
+//! - **Cancellation** is checked before each window as well as inside it. No window with text
+//!   gives the empty transcript, with no language.
 
 use super::search::Ranking;
 use super::window::Window;

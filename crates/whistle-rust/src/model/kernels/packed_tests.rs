@@ -250,7 +250,7 @@ fn threads_do_not_change_the_dense_order() {
 /// `cargo test --release --lib band_decode_timing -- --ignored --nocapture`. Measured
 /// 2026-10-24 (Apple M5, load average 10–12): scalar 1.9–2.0 ns per weight, NEON 0.37–0.58.
 #[test]
-#[ignore = "release measurement for docs/design/performance.md"]
+#[ignore = "release measurement of the band decode"]
 fn band_decode_timing() {
     let m = archive_matrices().unwrap();
     let total: usize = m.iter().map(|m| m.rows() * m.cols()).sum();

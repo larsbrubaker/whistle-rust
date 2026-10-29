@@ -1,5 +1,7 @@
 // The per-update compute time of a stream in 1 s steps (ignored: a measurement, run in release
 // with `--ignored --nocapture`): a 3 s clip and a 45 s stream, median and max, at 1 and 3 beams.
+// The wasm column comes from `examples/stream.rs` built for wasm32-wasip1 and run under
+// `scripts/wasm-bench.mjs`.
 
 use std::time::Duration;
 
@@ -19,6 +21,16 @@ fn report(label: &str, times: &[Duration]) {
     );
 }
 
+/// Measured on an M5, one thread, release, with another build running:
+///
+/// | | native, 1 beam | native, 3 beams | wasm (Node, simd128), 1 beam | wasm, 3 beams |
+/// |---|---|---|---|---|
+/// | 3 s clip, median / max | 107 / 158 ms | 204 / 265 ms | 172 / 289 ms | 404 / 605 ms |
+/// | 45 s stream, median / max | 225 / 446 ms | 413 / 965 ms | 361 / 954 ms | 556 / 1456 ms |
+///
+/// The max is a pass over a long utterance near the 30 s cap. At 3 beams a one-thread wasm
+/// update can exceed the 1 s step and fall behind; at 1 beam it stays under it, which is why
+/// `Options::streaming()` uses one beam.
 #[test]
 #[ignore = "measurement; run in release with --nocapture"]
 fn measure_update_cost() {

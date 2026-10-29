@@ -6,7 +6,8 @@ timings out; English, German, French, Spanish, Italian, Dutch and Polish. One li
 macOS, Windows, Linux and the browser (wasm32). First consumer: MatterCAD Rust's voice input.
 Open work is in `PORTING_PLAN.md`. How the model, decoding and transcription fit together is
 in the `whistle` crate's header (`crates/whistle-rust/src/lib.rs`), each stage in the header of
-the file that implements it, and the oracle in the headers of its scripts (`oracle/`).
+the file that implements it, and the oracle in the headers of its scripts (`oracle/`)
+("Documentation" below).
 
 ## Philosophy
 
@@ -68,6 +69,9 @@ Plus the gates that run with net 1:
 - `file_compliance` (`crates/workspace-gates/tests/file_compliance.rs`): every `.rs`, `.wgsl`,
   `.py`, `.sh`, `.ts`, `.js`, `.yml` and `.yaml` file has at most **800 non-empty lines**,
   starts with a header comment, and contains no merge-conflict markers. No exemptions, ever.
+- `markdown_placement` (`crates/workspace-gates/tests/markdown_placement.rs`): Markdown only in
+  the places "Documentation" lists. Both gates walk the repository through
+  `crates/workspace-gates/tests/support/repo_walk.rs`, so they agree on what it is.
 - `cargo clippy --workspace --all-targets -- -D warnings`.
 
 ### Tolerance policy
@@ -116,9 +120,9 @@ modes and under 3e-7 input noise (`relative_l2` in `tests/support/mod.rs`). So:
 crates/
   whistle-rust/        the library (`whistle`): .cact reader, CQ dequant, tokenizer, mel front
                        end, stem, encoder, decoder, decoding; tests/ holds the stage tests
-  workspace-gates/     file_compliance (tests only)
-demo/                  the demo (browser and desktop), its own Cargo workspace (demo/README.md), so the
-                       library never depends on agg-gui:
+  workspace-gates/     file_compliance and markdown_placement (tests only)
+demo/                  the demo (browser and desktop), its own Cargo workspace (how to build and run
+                       it: demo/Cargo.toml's header), so the library never depends on agg-gui:
   whistle-demo/        the agg-gui UI and its state (rlib, tested natively)
   whistle-demo-web/    the UI's wasm (agg-gui-web-shell); empty natively
   whistle-demo-worker/ the transcription Web Worker's wasm (`Engine`, simd128); empty natively
@@ -129,7 +133,6 @@ oracle/                Python (needle-reference + JAX): fixtures, clip synthesis
                        transcripts; never used by the Rust build
 scripts/               fetch-reference.sh, fetch-weights.sh, gates.sh
 test-data/             clips/ (WAV), fixtures/ (committed oracle tier), engine/ (engine JSON)
-docs/design/           performance, streaming, the voice-activity detector and windowing
 ```
 
 The library takes the archive as bytes and never does I/O of its own beyond what a caller
@@ -151,13 +154,22 @@ and cache it themselves.
 - **Copyright:** Lars Brubaker, Apache-2.0 (`LICENSE`), a derivative of Apache-2.0 upstream
   code (`THIRD_PARTY_NOTICES.md`).
 
-## Planning docs
+## Documentation
 
-`PORTING_PLAN.md` is the planning doc: **open work only**, each item saying what a caller would
-notice and what is needed. History lives in git. Update it in the same change that makes it
-stale; delete an item when it is done, rewrite it to what is left when part of it is done.
-How the code and the model work is written in the code's own header and doc comments, kept
-true in the same change; the design docs left in `docs/design/` describe how the code is now.
+Documentation lives in the code: the header comment of the file, module or crate it describes,
+and its doc comments, where whoever works on that code reads it. It says why, in plain terms and
+the present tense, and is kept true in the same change as the code. A rule that spans several
+files goes in the header of the crate that owns it (the `whistle` crate's `src/lib.rs`), and the
+files it governs point there. A measurement goes on the test, bench or script that makes it.
+There are no design docs. Markdown is limited to `README.md`, `CLAUDE.md`,
+`THIRD_PARTY_NOTICES.md` and `PORTING_PLAN.md` at the root, the published crate's
+`crates/whistle-rust/README.md` and `THIRD_PARTY_NOTICES.md`, and `.claude/` (agent
+instructions and skills); `markdown_placement` refuses any other Markdown file.
+
+`PORTING_PLAN.md` is the plan: **open work only**, each item saying what a caller would notice
+and what is needed. History lives in git. Update it in the same change that makes it stale;
+delete an item when it is done, rewrite it to what is left when part of it is done. When work
+is done, its reasons move into the code.
 
 ## Commands
 
@@ -165,7 +177,7 @@ true in the same change; the design docs left in `docs/design/` describe how the
 scripts/gates.sh                              # the full gate: fmt, clippy, nextest, doctests, wasm32, package
 scripts/check-package.sh                      # cargo package, then build, doc and doctest the unpacked crate (< 1 MB)
 cargo nextest run --workspace --test <area>   # one area's tests
-cargo test --workspace --test file_compliance # file compliance
+cargo test --workspace --test file_compliance --test markdown_placement   # the repo gates
 cargo build -p whistle-rust --target wasm32-unknown-unknown
 cargo clippy --workspace --all-targets -- -D warnings
 scripts/fetch-weights.sh [--checkpoint] [--engine]   # models/whistle.cact (+ fp32 checkpoint, engine CLI)

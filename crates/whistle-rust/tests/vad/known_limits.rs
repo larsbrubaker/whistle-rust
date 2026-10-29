@@ -1,7 +1,10 @@
 // Known limitations, pinned so a change that fixes or worsens them is visible: sounds that are
 // neither speech nor steady (intermittent beeps, a typing-like click train, noise modulated at a
-// syllable rate), and that the detector currently calls speech (docs/design/vad.md
-// "Hard to separate"). When one of these starts passing as non-speech, flip its expectation.
+// syllable rate), and that the detector currently calls speech (the limits in `whistle::vad`'s
+// header). Measured: the beep, 150 ms on and 150 ms off, is fully covered with or without a
+// -50 dB noise bed; the click train at about 8 per second 89.5% covered; white noise at 4 Hz
+// amplitude modulation fully covered at full depth (shallower modulation is partly detected).
+// When one of these starts passing as non-speech, flip its expectation.
 
 use whistle::vad::speech_segments;
 
@@ -77,7 +80,7 @@ fn known_limitation_intermittent_beeps_click_trains_and_4_hz_modulated_noise_rea
         let fraction = covered_fraction(&samples);
         assert!(
             fraction > 0.8,
-            "{name}: now {fraction:.3} covered; update docs/design/vad.md"
+            "{name}: now {fraction:.3} covered; update this file's header"
         );
     }
 }

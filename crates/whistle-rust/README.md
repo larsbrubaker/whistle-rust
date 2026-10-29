@@ -54,7 +54,7 @@ can cause) and was rolled back past it: the text holds no loop, but it is a read
 the model could barely hear. A caller with another reading of the same audio (a live stream's
 committed text) may prefer that one ([repeat.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/repeat.rs)).
 Audio over 30 s is split into windows of at most 30 s (`whistle::plan_windows` shows the cuts;
-[windowing.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/windowing.md)):
+[window.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/window.rs)):
 the language detected on the first window with at least 3 words is forced on the rest (set
 `language` to choose it), the texts join with spaces, and word times count from the start of
 the input; over 10 minutes is `Error::Input`.
@@ -85,7 +85,7 @@ it), the language and any audio `dropped` at the 30 s cap; `transcript()` return
 committed so far (its `repeated` set when a pass it committed words from ran into a loop).
 `StreamUpdate` is `#[non_exhaustive]`: later versions may add fields. A
 word commits when two passes one `stream_step` (1 s) apart agree on it, about 1.3 s after it
-ends, or when a pause ends the utterance ([streaming.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/streaming.md)). The stream borrows the `Whistle`, so an app
+ends, or when a pause ends the utterance ([stream.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/stream.rs)). The stream borrows the `Whistle`, so an app
 keeps the model alive beside it.
 
 A microphone at its own rate (44.1 or 48 kHz) goes through `audio::StreamResampler` on the way

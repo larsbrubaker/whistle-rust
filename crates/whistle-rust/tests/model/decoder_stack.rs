@@ -68,6 +68,12 @@ fn every_decoder_layer_matches_from_the_previous_layers_lanes() {
 /// `decoder/out` from `tokens` and `decoder/memory`, worst clip. Measured (2026-10-24):
 /// de_anna 1.55e-2, en_daniel 6.3e-3, en_samantha 8.4e-3, es_monica 1.34e-2, fr_thomas
 /// 1.20e-2, it_alice 1.05e-2, nl_xander 1.20e-2, pl_zosia 1.65e-2 (worst), silence 6.0e-7.
+/// With the packed weights (`kernels::packed`, measured 2026-10-24): pl_zosia 1.76e-2 (worst),
+/// silence 1.30e-2. Silence's move is one flipped A8 step: run layer by layer on its own lanes
+/// (7 positions, "Thank you."), layer 0 differs by f32 rounding (3–6e-7), a single jump appears
+/// at layer 1 on the start token (4.8e-7 to 1.2e-4), and self-attention spreads it to every
+/// later position (1.4e-3 to 1.5e-2 by layer 6). Its memory matches the reference to 4.5e-8,
+/// so it is not a zero-row effect; the dense order simply happened to flip nothing there.
 /// Per layer the port is at most 1.4e-4 from the reference, and each flipped A8 step moves
 /// every later layer's inputs, so flips compound over 8 layers, as the encoder's do (2-3%).
 const OUT_BOUND: f64 = 3e-2;

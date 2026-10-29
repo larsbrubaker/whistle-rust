@@ -13,6 +13,15 @@
 //!
 //! The thread starts by loading the model (`model.rs`: a path, the checkout's copy, the cache or
 //! a download), reporting progress, then serves messages until its inbox closes.
+//!
+//! **Falling behind a live microphone.** Each `Stream::push` runs one pass per second of audio
+//! it completes (`Options::stream_step`), so merging pushes queued while a pass ran would save
+//! no passes: the engine, like the browser's worker, answers every push in order. One pass costs
+//! 225 / 446 ms median / max at 1 beam and 413 / 965 ms at 3 beams on one M5 thread over a 45 s
+//! stream (`crates/whistle-rust/tests/streaming/measure.rs`), and the desktop runs up to 4
+//! threads. So at 1 beam a machine about twice as slow per thread, and at 3 beams one barely
+//! slower, falls behind and its text lags more the longer the user speaks; catching up would
+//! need the stream to skip passes, which `Stream` does not offer.
 
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;

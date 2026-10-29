@@ -1,6 +1,8 @@
-// How far each default threshold sits from flipping a case. `defaults_hold_their_measured_margins`
-// pins part of the margin docs/design/vad.md reports; `threshold_flip_points` is the measurement
-// itself (ignored: `cargo test --test vad threshold_flip_points -- --ignored --nocapture`).
+// How far each default threshold sits from flipping a case. `threshold_flip_points` is the
+// measurement, its table on the test (ignored: `cargo test --test vad threshold_flip_points --
+// --ignored --nocapture`); `defaults_hold_their_measured_margins` and
+// `min_modulation_db_sits_between_fan_noise_and_noisy_speech` pin parts of it, so a deliberate
+// change to the features does not flip a clip unnoticed.
 
 use whistle::vad::{speech_segments_with, VadConfig};
 
@@ -139,6 +141,23 @@ fn min_modulation_db_sits_between_fan_noise_and_noisy_speech() {
     assert_eq!(all_pass(&strict, &cases, true), Vec::<String>::new());
 }
 
+/// Sweeps one threshold at a time from the defaults and prints every value at which a case
+/// flips. Measured with the defaults as shipped (each sweep's step in brackets):
+///
+/// | threshold | non-speech is rejected | speech is found | default |
+/// | --- | --- | --- | --- |
+/// | `margin_on_db` [0.5] | from 10.5 with modulation off (brown fan); at any value with it on | up to 23.5 (es_monica, 10 dB SNR) | 15 |
+/// | `margin_off_db` [0.375] | at any value | up to 5.25 (nl_xander, 10 dB SNR) | 3 |
+/// | `min_modulation_db` [0.25] | from 2.0 with the energy margins off (brown fan); at any value with them on | up to 3.0 (en_samantha, 10 dB SNR) | 2.5 |
+/// | `absolute_floor_db` [1.5] | at any value | up to −67 (nl_xander, 30 dB quieter) | −75 |
+/// | `min_modulation_span_s` [0.006] | at any value | up to 0.38 (it_alice, 30 dB quieter) | 0.1 |
+/// | `merge_gap_s` [0.0125] | at any value | at any value in 0–1 s | 0.3 |
+///
+/// Non-speech is rejected by two independent gates (rise and modulation), so a row whose
+/// non-speech column names a flip point measured it with the other gate switched off. The
+/// thinnest margin is modulation alone: fan noise is rejected from 2.0 dB and speech at 10 dB
+/// SNR found up to 3.0 dB, so the default sits midway and the rise gate carries most of the
+/// work.
 #[test]
 #[ignore]
 fn threshold_flip_points() {

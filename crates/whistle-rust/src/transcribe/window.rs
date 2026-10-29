@@ -1,10 +1,40 @@
-//! Windowing (`docs/design/windowing.md`): audio longer than the encoder's 30 s training window
-//! is split into windows of at most [`MAX_SAMPLES`], each decoded alone by
-//! `Whistle::decode_window` and stitched by `long`. This module only plans the cuts. With the
-//! voice-activity detector on, windows are packed from its speech segments and cut in the
-//! middle of a pause; a stretch of speech with no usable pause, and every cut with the detector
-//! off, is a hard cut: the two windows overlap by [`OVERLAP_SAMPLES`] each side of the cut, and
-//! each keeps only the words whose midpoint lies on its side.
+//! Windowing: audio longer than the encoder's 30 s training window is split into windows of at
+//! most [`MAX_SAMPLES`], each decoded alone by `Whistle::decode_window` and stitched by `long`.
+//! This module only plans the cuts. The engine documents only "one pass up to 30 seconds,
+//! windowed beyond that", so how to window is designed here.
+//!
+//! The span one pass would decode is the trimmed span (first segment's start to last segment's
+//! end) with [`VadMode::GateAndTrim`], the whole clip with `Gate` or `Off`. When that span fits
+//! in 30 s it is one window and the call is exactly the single pass (`tests/windowing/limits.rs`
+//! pins that every contract clip plans so); only longer spans are windowed.
+//!
+//! **With the detector on**, windows are packed from its speech segments and cut in a pause, so
+//! no word is split and no overlap is needed. Every pause that starts after the window's start
+//! and before its 30 s limit is a candidate; the cut is the pause's middle, or the limit when
+//! the middle lies past it (a pause crossing the limit is still a pause). The longest candidate
+//! wins, the later on a tie, and candidates that leave the window at least half full are
+//! preferred, so one long pause near the start does not make a run of short windows. Segments
+//! are always more than the detector's `merge_gap_s` (0.3 s) apart, so every candidate is a real
+//! pause. The next window starts where the pause ends, so its 30 s go to speech and the rest of
+//! a long pause is never decoded. `GateAndTrim` decodes only each window's speech, so silence
+//! between windows produces nothing. `Gate` keeps its meaning, "decode everything the gate
+//! passes", as far as windows can: they tile the clip, each half of a pause cut in its middle
+//! going to the window beside it, and of a pause crossing the limit the window before decodes
+//! up to the limit and the rest is skipped.
+//!
+//! **Hard cuts.** With no pause in reach (talking for more than 30 s without a break), the cut
+//! falls inside speech, at the middle of the quietest 80 ms frame (one encoder frame) in the 4 s
+//! before the latest possible cut: the quietest moment is the likeliest gap between words or a
+//! stop closure. Each side decodes [`OVERLAP_SAMPLES`] (1 s) past the cut `c`: the earlier
+//! window ends at `c + 1 s` and the later starts at `c − 1 s`, so the latest cut is 29 s after a
+//! window's start and every window stays within 30 s. Each window keeps only the words whose
+//! midpoint lies on its side; a word both heard has its midpoint on one side in both timings
+//! (they agree to about a frame), so it is kept once. **With the detector off** every cut is
+//! such a hard cut at the latest place, 29 s after the window's start: windows decode 0–30 s,
+//! 28–58 s, 56–86 s, and so on.
+//!
+//! [`plan_windows`] returns the plan a call will decode, so callers can show or check the cuts
+//! and the tests can build exact expectations.
 
 use std::ops::Range;
 
@@ -37,8 +67,8 @@ pub struct Window {
 
 /// The windows `Whistle::transcribe` decodes for 16 kHz mono `samples` under `vad`: empty when
 /// the gate finds no speech (or there are no samples); one window, exactly the span a single
-/// pass decodes, when that span fits in [`MAX_SAMPLES`]; otherwise windows as
-/// `docs/design/windowing.md` describes.
+/// pass decodes, when that span fits in [`MAX_SAMPLES`]; otherwise windows cut as this
+/// module's header describes.
 pub fn plan_windows(samples: &[f32], vad: VadMode) -> Vec<Window> {
     match vad {
         VadMode::Off => plan(samples, None, false),
@@ -91,7 +121,7 @@ pub(crate) fn plan(samples: &[f32], segments: Option<&[Range<usize>]>, trim: boo
             None => {
                 let latest = limit - OVERLAP_SAMPLES;
                 let cut = if segments.is_empty() {
-                    // The detector off: fixed cuts, as the brief's "no VAD" asks.
+                    // The detector off: no pauses are known, so every cut is a fixed hard cut.
                     latest
                 } else {
                     quietest_frame(samples, latest.saturating_sub(HARD_CUT_SEARCH), latest)

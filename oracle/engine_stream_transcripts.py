@@ -4,7 +4,8 @@ its documented `--audio-stream` mode (default 1 s chunks, one thread) over every
 and writes test-data/engine-stream/<clip>.json: the list of updates it printed (committed `text`,
 `words` with times from stream start, `pending`, `language`, `received` seconds), the
 nondeterministic `pass_ms` dropped. A black-box reference for the streaming we design ourselves
-(docs/design/streaming.md): the final committed text and the commit latency."""
+(crates/whistle-rust/src/transcribe/stream.rs; compared in tests/streaming/engine.rs): the final
+committed text and the commit latency."""
 import glob
 import json
 import os

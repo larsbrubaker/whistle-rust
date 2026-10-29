@@ -1,8 +1,9 @@
-# workspace-gates: repo-wide gates that are tests only (file_compliance). The library is empty;
-# the gates live in tests/ and read the whole workspace from its root.
+# workspace-gates: repo-wide gates that are tests only (file_compliance, markdown_placement and
+# the others in tests/). The library is empty; the gates live in tests/ and read the whole
+# workspace from its root.
 [package]
 name = "workspace-gates"
-description = "Repo-wide gates for whistle-rust (file compliance), tests only"
+description = "Repo-wide gates for whistle-rust (file compliance, Markdown placement), tests only"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

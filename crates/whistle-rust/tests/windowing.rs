@@ -1,4 +1,5 @@
-// Test area: windowing past 30 s (`whistle::plan_windows`, docs/design/windowing.md). `shared`
+// Test area: windowing past 30 s (`whistle::plan_windows`; the cuts in `src/transcribe/window.rs`,
+// the stitch in `long.rs`). `shared`
 // binds the model and builds long inputs from the clips; `pauses` pins that a long input with
 // pauses is cut inside them and decodes as its windows do alone, with word times offset into the
 // input; `hard_cut` the fallback for speech with no pause (overlapping windows, words kept by

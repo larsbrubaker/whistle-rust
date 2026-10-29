@@ -1,13 +1,16 @@
 // The cost of one transcription: the encoder, the cached decoder per token and the whole call
 // on en_samantha, and the stem and each encoder layer on 30 s, each on one worker thread and on
-// the default count (`whistle::model::with_threads`, per calling thread), printed for
-// `docs/design/performance.md`. Run in release for the real numbers:
+// the default count (`whistle::model::with_threads`, per calling thread). Run in release for the
+// real numbers, on an idle machine before quoting a ratio (thread scaling suffers most under
+// load):
 // `cargo test --release --test transcribe timing -- --include-ignored --nocapture --test-threads=1`.
 // It asserts nothing about speed; it only checks the clip still transcribes. Measured
 // 2026-10-24 on en_samantha (3.09 s), release, Apple Silicon, default threads: the encoder
 // 31 ms, the decoder setup (cross-attention memory for 8 layers) 3.4 ms, then about 2.7 ms per
 // decoder token (one thread whatever the setting: the few-row kernel path), the whole one-beam
-// call (trimmed to the speech span) 81–87 ms.
+// call (trimmed to the speech span) 81–87 ms. Its process binds the model twice (as a
+// `Whistle` and as bare `Weights`), so its peak resident set (`/usr/bin/time -l`, 163–179 MB) is
+// two bindings plus the decode.
 
 use std::time::Instant;
 

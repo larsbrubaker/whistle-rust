@@ -73,8 +73,7 @@ pub const DEFAULT_BEAMS: usize = 3;
 pub const LANGUAGES: [&str; 7] = ["en", "de", "fr", "es", "it", "nl", "pl"];
 
 /// The longest audio one decoder pass sees, in 16 kHz samples (30 s, the encoder's training
-/// window): longer audio is split into windows of at most this ([`plan_windows`],
-/// `docs/design/windowing.md`).
+/// window): longer audio is split into windows of at most this ([`plan_windows`]).
 pub const MAX_SAMPLES: usize = 30 * SAMPLE_RATE as usize;
 
 /// The most audio one call accepts, in 16 kHz samples (10 minutes), checked before resampling
@@ -188,7 +187,7 @@ pub struct Options {
     /// the final tokens. Off by default.
     pub word_timestamps: bool,
     /// Seconds of new audio a [`Stream`] waits for before it decodes its buffer again
-    /// ([`DEFAULT_STREAM_STEP`], 1 s, by default; `docs/design/streaming.md`). Only streams use
+    /// ([`DEFAULT_STREAM_STEP`], 1 s, by default; [`Whistle::stream`]). Only streams use
     /// it; it must be finite and 0.1 to 10 s.
     pub stream_step: f32,
 }
@@ -197,7 +196,8 @@ impl Options {
     /// The setting for live input ([`Whistle::stream`]): the defaults with `beams: 1`. At the
     /// default 3 beams a one-thread wasm update can take longer than the 1 s step (up to
     /// 1.46 s measured on a 45 s stream) and fall behind the audio; one beam stays under it
-    /// (`docs/design/streaming.md`).
+    /// (954 ms; `tests/streaming/measure.rs`), and its stream already matches the engine's
+    /// 3-beam stream on 7 of the 8 contract clips (`tests/streaming/engine.rs`).
     pub fn streaming() -> Options {
         Options {
             beams: 1,

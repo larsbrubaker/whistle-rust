@@ -13,6 +13,15 @@
 //! so a start waiting on one outlives its stop; until it ends, a new start is refused with
 //! [`STILL_STARTING_MESSAGE`], which says what to do, rather than agg-mic's "already
 //! recording".
+//!
+//! **macOS permission.** A bare `cargo run` binary is not an app bundle, so macOS attributes
+//! its microphone use to the app that launched it (Terminal, iTerm, VS Code or another IDE):
+//! the first Record asks for, or uses, that app's permission, which every program it starts then
+//! shares, and turning it off is under System Settings > Privacy & Security > Microphone for that
+//! app. If the launching app's Info.plist lacks `NSMicrophoneUsageDescription`, macOS may end
+//! the process at Record instead of prompting. A bundled build would need that key in its own
+//! Info.plist and, under the hardened runtime, the `com.apple.security.device.audio-input`
+//! entitlement (without it the process gets silence and no prompt).
 
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::JoinHandle;

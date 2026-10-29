@@ -1,6 +1,7 @@
-# The whistle-rust demo (browser and desktop): its own Cargo workspace, so the library's
-# workspace, CI test job and package never depend on the GUI toolkit (see CLAUDE.md,
-# demo/README.md).
+# The whistle-rust demo (browser and desktop): live speech-to-text on the library. Press Record
+# and speak, or pick or drop a WAV file. Deployed at https://larsbrubaker.github.io/whistle-rust/.
+# Its own Cargo workspace, so the library's workspace, CI test job and package never depend on
+# the GUI toolkit.
 #
 # - whistle-demo        (rlib)   the agg-gui UI and its state, tested natively
 # - whistle-demo-web    (cdylib) the UI's wasm on agg-gui-web-shell; empty natively
@@ -12,6 +13,17 @@
 # agg-gui-shell and agg-mic (the desktop build's microphone) come from the sibling agg-gui
 # checkout (../../agg-gui from here), which needs the agg-rust and tess2-rust checkouts beside
 # it; CI's demo job clones all three.
+#
+# In the browser the model runs only in the worker, one thread, so the UI never blocks; the
+# worker's wasm holds no GUI code (about 450 KB). Build and run, from the repository root (the
+# browser build also needs wasm-pack and bun):
+#
+#   scripts/fetch-weights.sh                                  # models/whistle.cact
+#   ln -sf ../../../models/whistle.cact demo/web/public/whistle.cact
+#   demo/web/build-wasm.sh                                    # demo/web/pkg/ui and pkg/worker
+#   (cd demo/web && bun install && bun run dev)
+#   (cd demo && cargo run -p whistle-demo-native --release -- [file.wav] [--help])
+#   scripts/demo-gates.sh                                     # the demo's full check
 [workspace]
 resolver = "2"
 members = ["whistle-demo", "whistle-demo-web", "whistle-demo-worker", "whistle-demo-native"]

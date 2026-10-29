@@ -1,10 +1,21 @@
-//! Where a stream's committed text ends in a new pass (`docs/design/streaming.md`, "Aligning a
-//! pass"): a character-level semi-global alignment of everything the stream committed in the
+//! Where a stream's committed text ends in a new pass: a character-level semi-global alignment of everything the stream committed in the
 //! utterance against a prefix of the pass's words, both normalized (`super::normalize`: lower
 //! case, letters and digits, no spaces). `stream.rs` takes the words after the cut as the pass's
 //! new words, less those that re-read, in other words, committed words the alignment could not
 //! match (`re_read`, by time); the tests in `tests.rs` pin the cases that word-level matching
 //! got wrong.
+//!
+//! Characters, because consecutive passes split, join and time words differently, so neither
+//! time nor word-by-word matching says where the committed text ends. Measured failures of both:
+//! "matter" committed and the next pass reading "Matterhak" over the same time made a midpoint
+//! rule commit "matter Matterhackers"; a prefix match on the last words consumed "Matterhak"
+//! whole and lost "hackers"; a one-word match on a short word ("a", "the") reached a later copy;
+//! a time fallback committed a re-read word twice ("Creeche Krishtov"); a punctuation-only word
+//! ("Bonjour !") was committed twice. When even the best alignment changes more than half the
+//! committed characters, the stream restarts the utterance at the commit point instead.
+//!
+//! The table is |C|·|P| cells, at most about 500 × 500 characters for a 30 s buffer: about
+//! 0.5 ms natively.
 
 /// Where the committed text ends in a pass's words.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

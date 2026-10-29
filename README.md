@@ -6,13 +6,13 @@ out; English, German, French, Spanish, Italian, Dutch and Polish. One library fo
 Windows, Linux and the browser (wasm32), with no native code and no runtime dependencies.
 
 **Status: in progress.** Transcription of up to 10 minutes of audio works, in one pass up to
-30 s and in windows beyond that (`docs/design/windowing.md`): cut inside the detector's
+30 s and in windows beyond that (`crates/whistle-rust/src/transcribe/window.rs`): cut inside the detector's
 pauses, with a hard cut and a 1 s overlap only in speech with no pause, and at fixed places
 with the detector off. Greedy (`beams: 1`) reproduces the reference decode on every test
 clip, the default 3-beam search reproduces the engine's transcripts, keyword biasing favours
 the names and jargon you list, and word timestamps give each word's start, end and
 probability. Live audio streams through `Whistle::stream` with the live preset
-`Options::streaming()` (`docs/design/streaming.md`), and the [live demo](#live-demo) runs all of
+`Options::streaming()` (`crates/whistle-rust/src/transcribe/stream.rs`), and the [live demo](#live-demo) runs all of
 it in a web page. Open work is in `PORTING_PLAN.md`.
 
 The crate's own README, [`crates/whistle-rust/README.md`](crates/whistle-rust/README.md), is
@@ -38,8 +38,9 @@ whistle-demo-native --release`): press Record and speak, or pick, drop or name a
 and it is transcribed on an engine thread, with the model from `models/whistle.cact` or a
 checked download. The microphone is agg-mic's, pure Rust on all three.
 
-The demo is its own Cargo workspace in [`demo/`](demo/README.md), so the library and its CI
-never depend on the GUI toolkit; how to build and run both builds is there.
+The demo is its own Cargo workspace in [`demo/`](demo/), so the library and its CI never
+depend on the GUI toolkit; how to build and run both builds is in the header of
+[`demo/Cargo.toml`](demo/Cargo.toml).
 `.github/workflows/deploy-demo.yml` deploys it, with `whistle.cact`, to GitHub Pages on every
 push to `main`. Pages must be enabled in the repository settings (Pages, Source: GitHub
 Actions).
@@ -59,7 +60,7 @@ let transcript = whistle.transcribe_wav(&std::fs::read("speech.wav")?, &Options:
 The package is `whistle-rust`; the library is imported as `whistle`. See the crate README for
 the options (language, voice-activity gating, beams, keywords, word timestamps, cancelling) and how
 audio over 30 s is windowed. Live audio streams through `Whistle::stream` with the
-`Options::streaming()` preset (the crate README and `docs/design/streaming.md`).
+`Options::streaming()` preset (the crate README and `crates/whistle-rust/src/transcribe/stream.rs`).
 
 ## Getting the model
 

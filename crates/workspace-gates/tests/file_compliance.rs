@@ -7,86 +7,24 @@
 //   (c) no merge-conflict markers — in every UTF-8 text file, Markdown included.
 //
 // No exemption list, ever: a file over the limit is split by responsibility (the
-// `file-size-refactoring` skill), never squeezed. Skipped trees are build output, VCS data
-// and third-party material that is not ours: every Cargo target directory (any directory
-// holding the `CACHEDIR.TAG` Cargo writes into each one, wherever CARGO_TARGET_DIR pointed),
-// target/ next to a Cargo.toml or anywhere under .claude/, .git/, node_modules/, demo/web/pkg/,
-// demo/web/dist/, .claude/worktrees/, and the downloaded or generated trees: needle-reference/
-// (upstream's code), models/ (weights), oracle/.venv/ and oracle/.engine/ (the oracle's Python
-// and the engine binary) and test-data/fixtures-local/ (regenerated tensors). A `target`
-// directory elsewhere is source and is checked, as are real sources under .claude/.
+// `file-size-refactoring` skill), never squeezed. The files are those `support/repo_walk.rs`
+// walks, the same as `markdown_placement.rs`'s; its header lists the trees it skips.
 //
 // A file with a checked source extension that cannot be read or is not UTF-8 fails the scan
 // rather than being skipped; other non-UTF-8 files (images, fonts) are binary and ignored.
 
+#[path = "support/repo_walk.rs"]
+mod repo_walk;
+
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+
+use repo_walk::{is_skipped_dir, repo_files, workspace_root, TempTree};
 
 const MAX_NON_EMPTY_LINES: usize = 800;
 const SOURCE_EXTENSIONS: [&str; 8] = ["rs", "wgsl", "py", "sh", "ts", "js", "yml", "yaml"];
 const REFACTOR_HINT: &str =
     "Split each file by responsibility; see the `file-size-refactoring` skill. No exemptions.";
-
-fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("crates/workspace-gates sits two levels below the workspace root")
-        .to_path_buf()
-}
-
-/// True for a directory (relative to the root, `/`-separated) that the walk skips by name.
-/// `beside_cargo_toml` says whether its parent directory holds a `Cargo.toml`: there, and
-/// anywhere under `.claude/` (agent tooling, where a stray `CARGO_TARGET_DIR` build lands and
-/// no source is called `target`), a `target` directory is Cargo's build output rather than a
-/// source directory that happens to be called `target`.
-fn is_skipped_dir(relative: &str, beside_cargo_toml: bool) -> bool {
-    let name = relative.rsplit('/').next().unwrap_or(relative);
-    (name == "target" && (beside_cargo_toml || relative.starts_with(".claude/")))
-        || matches!(name, ".git" | "node_modules")
-        || matches!(
-            relative,
-            "demo/web/pkg"
-                | "demo/web/dist"
-                | ".claude/worktrees"
-                | "needle-reference"
-                | "models"
-                | "oracle/.venv"
-                | "oracle/.engine"
-                | "test-data/fixtures-local"
-        )
-}
-
-/// True for a Cargo target directory, whatever it is called and wherever it sits: Cargo writes
-/// a `CACHEDIR.TAG` into every target directory it builds into.
-fn holds_cachedir_tag(dir: &Path) -> bool {
-    dir.join("CACHEDIR.TAG").is_file()
-}
-
-fn collect_files(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
-    let entries = fs::read_dir(dir).unwrap_or_else(|e| panic!("read {}: {e}", dir.display()));
-    for entry in entries {
-        let path = entry.expect("directory entry").path();
-        let file_type = fs::symlink_metadata(&path).expect("metadata").file_type();
-        if file_type.is_dir() {
-            let beside_cargo_toml = dir.join("Cargo.toml").is_file();
-            if !is_skipped_dir(&relative(root, &path), beside_cargo_toml)
-                && !holds_cachedir_tag(&path)
-            {
-                collect_files(root, &path, out);
-            }
-        } else if file_type.is_file() {
-            out.push(path);
-        }
-    }
-}
-
-fn relative(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .expect("under the root")
-        .to_string_lossy()
-        .replace('\\', "/")
-}
 
 fn extension(path: &Path) -> &str {
     path.extension().and_then(|e| e.to_str()).unwrap_or("")
@@ -138,13 +76,10 @@ fn load_text(ext: &str, bytes: std::io::Result<Vec<u8>>) -> Result<Option<String
 
 fn scan() -> Scan {
     let root = workspace_root();
-    let mut paths = Vec::new();
-    collect_files(&root, &root, &mut paths);
-    paths.sort();
     let mut files = Vec::new();
     let mut failures = Vec::new();
-    for p in paths {
-        let path = relative(&root, &p);
+    for path in repo_files(&root) {
+        let p = root.join(&path);
         match load_text(extension(&p), fs::read(&p)) {
             Ok(Some(text)) => files.push((path, text)),
             Ok(None) => {}
@@ -284,36 +219,6 @@ fn compliance_only_skips_target_beside_cargo_toml() {
     assert!(!is_skipped_dir("web/tests/target", false));
 }
 
-/// A scratch directory tree under the system temp folder, removed when dropped.
-struct TempTree(PathBuf);
-
-impl TempTree {
-    fn new(label: &str) -> Self {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-        let dir = std::env::temp_dir().join(format!(
-            "workspace-gates-{label}-{}-{nanos}",
-            std::process::id()
-        ));
-        fs::create_dir_all(&dir).expect("create the temp tree");
-        TempTree(dir)
-    }
-
-    fn write(&self, relative: &str, text: &str) {
-        let path = self.0.join(relative);
-        fs::create_dir_all(path.parent().expect("a parent")).expect("create the parent");
-        fs::write(&path, text).expect("write the file");
-    }
-}
-
-impl Drop for TempTree {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
 #[test]
 fn compliance_walk_skips_cargo_build_output() {
     // A coverage run once built into `.claude/target`, and the scan then failed on the generated
@@ -344,10 +249,7 @@ fn compliance_walk_skips_cargo_build_output() {
     // too: nothing named `target` there is ours.
     tree.write(".claude/y/target/release/generated.rs", "no header\n");
 
-    let mut paths = Vec::new();
-    collect_files(&tree.0, &tree.0, &mut paths);
-    let mut found: Vec<String> = paths.iter().map(|p| relative(&tree.0, p)).collect();
-    found.sort();
+    let found = repo_files(&tree.0);
     let mut expected: Vec<String> = checked.iter().map(|p| p.to_string()).collect();
     expected.sort();
     assert_eq!(found, expected);

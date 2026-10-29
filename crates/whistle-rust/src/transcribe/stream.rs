@@ -1,4 +1,4 @@
-//! Streaming transcription (`docs/design/streaming.md`): [`Whistle::stream`] opens a [`Stream`]
+//! Streaming transcription: [`Whistle::stream`] opens a [`Stream`]
 //! that takes live 16 kHz mono audio in chunks of any size and commits the words two
 //! consecutive passes agree on (local agreement). Every [`Options::stream_step`] of new audio it
 //! runs the detector (`vad`) over its buffer and, if there is speech after the commit point,
@@ -10,6 +10,36 @@
 //! words are never retracted; the stitching (`long::join`, `long::append_in_order`) and language
 //! (`long::MIN_LANGUAGE_WORDS`) rules are the windowed decode's. Stream positions are `u64`
 //! samples, so a stream runs indefinitely on every target.
+//!
+//! The engine documents its streaming only as "live audio streams indefinitely and commits words
+//! that two passes agree on", so the policy is designed here; the engine's `--audio-stream`
+//! output on the contract clips (`test-data/engine-stream/`, `oracle/engine_stream_transcripts.py`)
+//! is a black-box comparison (`tests/streaming/engine.rs`).
+//!
+//! **Why a pass decodes from the utterance's start, not the commit point.** Decoding from inside
+//! a sentence wrecks the rest of it: trimmed to the last committed word, de_anna streamed as
+//! "Bitte macht in Wilfitzweit Centimeta Huya" (word error rate 0.71 against the offline
+//! decode). From the pause before the utterance, the way windowing cuts in pauses, the decoder
+//! has the context the offline decode has, and every contract clip streams to exactly the
+//! offline text. The cost is that a pass decodes the whole utterance so far, at most 30 s.
+//!
+//! **A committed word is final.** When a later pass reads it differently, the committed text
+//! keeps the earlier reading and continues from the aligned point, so a stream can read a word
+//! otherwise than one pass over the same audio would. What the tests pin instead is that the
+//! committed text stays within a small character edit distance of the offline decode, with no
+//! word committed twice (`tests/streaming/behaviour.rs`, with the measured distances).
+//!
+//! **With the detector off** there are no pauses: no endpoint, no utterance start, and silence
+//! is decoded (and may be hallucinated, as offline). Each pass starts a lead-in before the
+//! commit point and the buffer is trimmed there, so the stream holds a few seconds instead of
+//! re-decoding up to 30 s every step; it relies on agreement and the force rule alone and reads
+//! worse, since every pass starts inside a word.
+//!
+//! A pass whose decode the repetition guard rolled back past a loop still has words for the
+//! audio after the loop, and they take part in agreement as any pass's do
+//! (`tests/streaming/garbled.rs`); a word committed from such a pass sets
+//! `Stream::transcript().repeated`. The guard sees one pass's tokens, not the committed text, so
+//! a loop built up across passes that each repeat a phrase a few times would not be caught.
 
 use super::long::{append_in_order, join, MIN_LANGUAGE_WORDS};
 use super::search::Ranking;
@@ -155,7 +185,7 @@ pub struct Stream<'a> {
 }
 
 impl Whistle {
-    /// Opens a live transcription with `options` (`docs/design/streaming.md`). The options are
+    /// Opens a live transcription with `options` (this module's header). The options are
     /// checked as [`Whistle::transcribe`] checks them, plus [`Options::stream_step`]; the words
     /// are always aligned, whatever [`Options::word_timestamps`] says, since agreement and
     /// trimming need their times.

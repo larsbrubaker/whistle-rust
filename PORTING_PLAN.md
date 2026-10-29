@@ -2,7 +2,7 @@
 
 Open work only, in landing order. Each item says what a caller can do once it lands and what it
 needs. Delete an item when it lands; rewrite it to what is left when part of it lands. How the
-model, the archive and the oracle work: `docs/design/model.md`, `docs/design/oracle.md`. The
+model, the archive and the oracle work: `crates/whistle-rust/src/lib.rs`, the `oracle/` script headers. The
 verification bar for every stage: CLAUDE.md "Tolerance policy".
 
 ## 6. Performance
@@ -39,7 +39,7 @@ and measured for one thread on wasm first; native threads are a bonus.
 
 The behaviours only the closed engine has, designed here and held to the engine transcripts.
 Beam search (default 3 beams), keyword biasing, word timestamps, windowing and streaming are in
-(`docs/design/decoding.md`, `timestamps.md`, `windowing.md`, `streaming.md`); what is left:
+(`src/transcribe/search.rs`, `keywords.rs`, `repeat.rs`, `align.rs`, `window.rs`, `stream.rs`); what is left:
 
 - Streaming quality: a word committed and then read differently by a later pass stays as
   committed (no retraction), so live text can keep an early misreading ("Q20" for "cube 20",

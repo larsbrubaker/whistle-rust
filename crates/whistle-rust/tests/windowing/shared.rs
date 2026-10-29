@@ -22,9 +22,12 @@ pub fn whistle() -> &'static Whistle {
     WHISTLE.get_or_init(|| Whistle::from_cact(&model_bytes()).expect("whistle.cact loads"))
 }
 
-/// The five English clips. Long inputs cycle through all five: the same one or two sentences
-/// repeated many times in one 30 s window make the decoder skip repeats (measured while
-/// designing this; docs/design/windowing.md), which no real recording does.
+/// The five English clips. Long inputs cycle through all five: a 30 s window holding the same
+/// two sentences 4–5 times decodes only about two thirds of them (the decoder skips exact
+/// repeats, and the word times then stretch over the skipped speech), while five different
+/// sentences cycled, each at most twice per window, decode through the window's end with and
+/// without pauses. Real recordings rarely repeat themselves this way, but a long recording of
+/// one phrase said over and over would lose repeats.
 pub const ENGLISH: [&str; 5] = ["en_samantha", "en_daniel", "en_names", "en_petg", "en_cura"];
 
 /// `clip`'s samples (every clip is 16 kHz mono), from test-data/clips/ or test-data/clips-extra/.

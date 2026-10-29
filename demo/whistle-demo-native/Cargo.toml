@@ -4,7 +4,10 @@
 # the command line, or a checked download into the cache (src/model.rs). Live audio comes in
 # through the `Capture` seam (src/capture.rs): the system microphone (agg-mic, src/mic.rs) or
 # a WAV played in real time. `cargo run -p whistle-demo-native --release` from demo/
-# (README.md).
+# (`--help` lists the options; .claude/launch.json has it as whistle-demo-native).
+#
+# Licenses: a shipped copy of this binary carries agg-mic's notices (below); the library's own
+# THIRD_PARTY_NOTICES.md covers only the library, which depends on none of these crates.
 [package]
 name = "whistle-demo-native"
 version.workspace = true
@@ -28,7 +31,7 @@ agg-gui-shell = { workspace = true }
 # The system microphone, pure Rust with no -sys crates or build scripts: AVFoundation through
 # objc2 on macOS, WASAPI through `windows` on Windows, the PulseAudio protocol (`pulseaudio`)
 # on Linux, so the Linux build needs no audio packages. MIT; its platform crates' notices are
-# in agg-gui's agg-mic/THIRD_PARTY_NOTICES.md (demo/README.md).
+# in agg-gui's agg-mic/THIRD_PARTY_NOTICES.md.
 agg-mic = { workspace = true }
 # The model's SHA-256 (the browser has SubtleCrypto). MIT OR Apache-2.0.
 sha2 = "0.10"

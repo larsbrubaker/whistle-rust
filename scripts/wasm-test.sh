@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the whistle-rust test suite (unit and integration tests, release build) on wasm32-wasip1
 # under wasmtime, once with simd128 and once scalar, so the token contract and every stage bound
-# are checked on the code the browser runs (docs/design/performance.md "Single-threaded wasm").
+# are checked on the code the browser runs (single-threaded wasm, timed by scripts/wasm-bench.sh).
 #
 #   scripts/wasm-test.sh             both builds
 #   scripts/wasm-test.sh simd128     one build (simd128 or scalar); extra args go to the test

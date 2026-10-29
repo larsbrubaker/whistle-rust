@@ -5,8 +5,33 @@
 //! `features` measures 25 ms frames at a 10 ms hop (energy in six sub-bands above the rumble
 //! band); `decide` turns them into segments with an adaptive noise floor, a syllable-rate
 //! modulation test, hysteresis, gap merging, a minimum duration and a hangover. The detector is
-//! deterministic and designed here from the engine's documented behaviour
-//! (`docs/design/vad.md` gives the measured margins of every default).
+//! designed here from the engine's documented behaviour (an empty transcript for silence and
+//! steady noise); there is no reference for it.
+//!
+//! Non-speech is rejected by two independent gates: the rise over each band's own noise floor
+//! (steady sound is its own floor) and the syllable-rate modulation of the energy (steady sound
+//! is flat). Relaxing one threshold alone never lets steady sound through; the margin each
+//! default keeps from flipping a test case is measured by `threshold_flip_points` in
+//! `tests/vad/margins.rs`, which carries the table.
+//!
+//! Results are bit-identical on every platform: the window, the band powers and the dB
+//! conversions use the library's own deterministic `cos`, `pow` and `log10` (`crate::math`),
+//! not the platform's libm, so a case sitting right at a threshold comes out the same on macOS,
+//! Linux, Windows and wasm32. The detector allocates only per-frame buffers, sized by the input.
+//!
+//! Limits a caller should know:
+//! - Sounds that are loud, unsteady and rise and fall like syllables read as speech: an
+//!   intermittent beep, a typing-like click train, noise modulated at a few hertz
+//!   (`tests/vad/known_limits.rs` pins how much of each is covered). Music and babble are not
+//!   tested and will often read as speech, so an always-on microphone still wants a wake word
+//!   or a push-to-talk in front of it.
+//! - The tests run on clean synthesised speech with added noise; real microphones and rooms
+//!   are not covered.
+//! - The decode is sensitive to the lead-in the trim leaves. A clip whose speech starts at its
+//!   first sample keeps all of it, while the same clip after silence keeps about 0.12 s of
+//!   lead-in (the pad plus frame rounding), and that can change the transcript (pl_zosia flips
+//!   with 160, 320 or 1280 leading zeros, `tests/timestamps/options.rs`): different, not
+//!   worse, and word times stay exact relative to the trimmed audio.
 
 mod decide;
 mod features;
@@ -14,7 +39,7 @@ mod features;
 use std::ops::Range;
 
 /// The detector's tunable thresholds. `Default` is the setting the tests and the measured
-/// margins in `docs/design/vad.md` are for.
+/// margins in `tests/vad/margins.rs` are for.
 ///
 /// Every value is accepted and the detector never panics or allocates beyond the input's size:
 /// a NaN field is replaced by its default; a duration (`*_s`) below zero counts as 0 and one
