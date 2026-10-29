@@ -41,17 +41,18 @@ stops a transcription from another thread with `Error::Cancelled`, runs a beam s
 3 by default, the smallest count that reproduced every engine transcript on the test clips, for
 about +195 ms on a 3.3 s clip; `beams: 1` is the greedy decode; up to 16), and favours names,
 places and jargon you list (`keywords: vec!["PETG".into()]`, strength `keyword_bonus`; see
-[decoding.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/decoding.md)).
+[search.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/search.rs) and
+[keywords.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/keywords.rs)).
 `word_timestamps: true` fills `transcript.words` with each word's `start` and `end` in seconds
 from the start of the input and its `probability`, aligned from the decoder's cross-attention
 (within one 80 ms frame of the engine's on the test clips, for about +55 ms on a 3.4 s clip;
-[timestamps.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/timestamps.md)).
+[align.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/align.rs)).
 `Transcript` is `PartialEq` but not `Eq` (the times are f32).
 `transcript.repeated` is true when the decoder ran into a repetition loop (a token or phrase
 repeated over and over, which garbled audio, noise or a language the model was not trained on
 can cause) and was rolled back past it: the text holds no loop, but it is a reading of audio
 the model could barely hear. A caller with another reading of the same audio (a live stream's
-committed text) may prefer that one ([decoding.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/decoding.md), "Repetition guard").
+committed text) may prefer that one ([repeat.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/repeat.rs)).
 Audio over 30 s is split into windows of at most 30 s (`whistle::plan_windows` shows the cuts;
 [windowing.md](https://github.com/larsbrubaker/whistle-rust/blob/main/docs/design/windowing.md)):
 the language detected on the first window with at least 3 words is forced on the rest (set

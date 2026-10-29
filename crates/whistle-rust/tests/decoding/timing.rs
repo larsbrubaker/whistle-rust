@@ -1,7 +1,9 @@
-// The cost of the beam search per beam count on en_daniel (3.3 s), printed for
-// docs/design/decoding.md. Run it in release:
-// `cargo test --release --test decoding -- --ignored --nocapture`. It asserts nothing about
-// speed; it only checks every count transcribes.
+// The cost of the beam search per beam count on en_daniel (3.3 s, 16 text tokens). Run it in
+// release: `cargo test --release --test decoding -- --ignored --nocapture`. It asserts nothing
+// about speed; it only checks every count transcribes. Measured 2026-10-24, release, Apple
+// Silicon, one thread, ms per call (extra over greedy): 1 beam 207; 2 beams 305 (+98); 3 beams
+// 402 (+195); 5 beams 670 (+463); 8 beams 894 (+687); 16 beams 1347 (+1140); 5 beams with 3
+// keywords 442 (+235).
 
 use std::time::Instant;
 
@@ -10,7 +12,7 @@ use whistle::Options;
 use crate::clips::{beams, contract_clips, transcribe, whistle};
 
 #[test]
-#[ignore = "release measurement for docs/design/decoding.md"]
+#[ignore = "release measurement of the cost per beam count"]
 fn timing_per_beam_count() {
     let clips = contract_clips();
     let clip = clips.iter().find(|c| c.name == "en_daniel").unwrap();

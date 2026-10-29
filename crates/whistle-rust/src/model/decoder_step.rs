@@ -5,7 +5,10 @@
 //! after norm, RoPE and the KV path, the values after the KV path); each Engram site keeps its
 //! projected values for the value conv (`engram`). Every step runs the same functions the full
 //! pass does on the new row only (the block core, the mHC step, the final norm and the head),
-//! so its logits equal [`super::Decoder::forward`]'s row for that position. A state is
+//! so its logits equal [`super::Decoder::forward`]'s row for that position, bit for bit: only
+//! the taps, the Engram value conv and attention read earlier positions, the first two read the
+//! same cached rows in the same order, and the keys the full pass masks take a large finite
+//! negative logit whose `exp` is exactly 0, adding nothing to the softmax. A state is
 //! [`Clone`] so a beam search can fork a hypothesis: the RoPE table and the cross-attention
 //! memory are fixed for the decode and shared (`Arc`); only the growing caches are copied.
 //! [`DecoderState::step_batch`] advances several such forks by one token each in one pass: every

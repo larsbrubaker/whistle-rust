@@ -5,8 +5,8 @@
 // `beams` (determinism, the measured score against greedy, the pinned WER) and `keywords`
 // (biasing on the extra clips, irrelevant keywords harmless), `repeat` (the repetition guard on
 // garbled audio). The slow measurements (the bonus
-// sweep, the score check at every beam count, timing) are `#[ignore]` tests that print the
-// tables in docs/design/decoding.md; the WER table per ranking is `src/transcribe/tests.rs`.
+// sweep, the score check at every beam count, timing) are `#[ignore]` tests whose doc comments
+// hold the measured tables; the WER table per ranking is `src/transcribe/tests.rs`.
 
 #[path = "support/mod.rs"]
 mod support;

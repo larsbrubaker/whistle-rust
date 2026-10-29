@@ -7,9 +7,29 @@
 //! [`Whistle::stream`] transcribes live audio as it arrives ([`Stream`]).
 //!
 //! The library takes the model archive (`whistle.cact`) as bytes and never fetches anything, so
-//! the same code runs natively and in the browser. The port follows upstream's Apache-2.0 JAX
-//! reference (`needle-reference/`, pinned in `REFERENCE`); `docs/design/` describes the model
-//! and `PORTING_PLAN.md` the open work.
+//! the same code runs natively and in the browser. `PORTING_PLAN.md` holds the open work.
+//!
+//! # How the pieces fit
+//!
+//! A call runs, in order: the input checks and resampling ([`audio`]), the voice-activity gate
+//! ([`vad`]), the windows (one up to 30 s, more beyond), and per window the log-mel features
+//! ([`audio::features`]), the encoder ([`model::Encoder`]: the convolutional stem, eight blocks
+//! in an mHC lane stack, the final norm), the decoder memory, and the decode over the decoder's
+//! KV cache ([`model::DecoderState`]): a language tag at step 0, then text tokens by beam search
+//! with optional keyword biasing and a repetition guard, until EOS. Word times, when asked for,
+//! come from one more decoder pass whose cross-attention is aligned to the audio frames. The
+//! transcription module's header (`src/transcribe/mod.rs`) walks through the call; each model
+//! module's header gives its stage's formula.
+//!
+//! The model itself (archive format, front end, every layer, the greedy decode) is a port of
+//! upstream's Apache-2.0 JAX reference (`needle/model/whistle.py`, `architecture.py`,
+//! `quantize.py`, `export.py` in `needle-reference/`, pinned in `REFERENCE`), run on the
+//! Apache-2.0 `whistle.cact` weights, and is tested stage by stage against fixtures that
+//! reference writes (`oracle/dump.py`). Everything the reference does not define is designed
+//! here from the Needle engine's documented behaviour and measured against its transcripts as
+//! black-box data: beam search, keyword biasing, word timestamps aligned from decoder
+//! cross-attention, windowing past 30 s, streaming (committing the words two passes agree on),
+//! the silence gate (silence and steady noise give an empty transcript) and the KV cache.
 //!
 //! [`cact::Archive::parse`] reads the archive's geometry and tensor directory,
 //! [`cact::Tensor::to_f32`] dequantizes any tensor, [`tokenizer::Tokenizer`] encodes and decodes

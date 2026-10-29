@@ -1,4 +1,4 @@
-// Garbled audio for the repetition-guard tests (docs/design/decoding.md "Repetition guard"):
+// Garbled audio for the repetition-guard tests (`src/transcribe/repeat.rs`):
 // a clip delivered the way a late audio callback (a browser ScriptProcessor on a busy main
 // thread) delivers it, with blocks replayed, and a brute-force measure of the longest
 // repetition in a token sequence that the tests check transcripts against, independent of the

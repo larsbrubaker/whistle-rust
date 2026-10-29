@@ -1,10 +1,19 @@
-//! Word timestamps from decoder cross-attention (`docs/design/timestamps.md`): after the search,
+//! Word timestamps from decoder cross-attention: after the search,
 //! `transcribe` runs one teacher-forced decoder pass over the final tokens
 //! (`model::Decoder::forward_with_cross_attention`); this module turns the chosen alignment
 //! heads' token-to-frame probabilities into a monotonic token-to-frame path (normalise each
 //! head, median-filter over frames, average, dynamic time warping on the negated weights), groups
 //! the text tokens into words at `▁` boundaries, and gives each word contiguous start and end
 //! times and a probability from the pass's logits.
+//!
+//! The engine documents its word timestamps only as "start, end, and probability per word,
+//! aligned from decoder attention", so this design is our own; the engine's words are data to
+//! measure against and to pick the heads by. Words are contiguous, as the engine's are: each
+//! ends where the next starts, the last where EOS takes over, clamped to the decoded audio.
+//! Times count from the start of the input, the detector's trim added back, and are exact
+//! relative to the audio the decoder saw; a different lead-in can decode to slightly different
+//! tokens and times. A word's probability is close to the engine's (mean 0.888 against 0.895
+//! on the contract clips' 73 words, mean |difference| 0.013), so no other calibration is used.
 
 use crate::model::{CrossAttentionWeights, Logits};
 use crate::tokenizer::{PieceType, Tokenizer};
@@ -14,16 +23,24 @@ use crate::tokenizer::{PieceType, Tokenizer};
 pub const FRAME_SECONDS: f32 = 0.08;
 
 /// The (layer, head) pairs whose cross-attention follows the speech, chosen by measurement on
-/// the contract clips (`docs/design/timestamps.md` has the per-head scores).
+/// the contract clips (`alignment_head_sweep` in `align/tests.rs` has the per-head scores):
+/// the best three single heads by mean start error against the engine. Sharpness and
+/// monotonicity alone do not pick good heads (some sharp, monotonic heads are 13–16 frames
+/// off); matching the engine does. On the held-out extra clips, never used in the choice, 69 of
+/// 70 times land within one frame of the engine's and one 2 frames off.
 pub(crate) const ALIGNMENT_HEADS: &[(usize, usize)] = &[(7, 3), (4, 1), (5, 4)];
 
 /// The pass row that predicts text token 0 (the tag's input row, after BOS's): text token `i`
 /// is aligned and scored by row `TEXT_ROW + i`, whose output chooses it. Its attention aligned
-/// better than the token's own input row (`docs/design/timestamps.md`). Row 0 (BOS's, which
-/// predicts the tag) and the row that predicts EOS bracket the text as anchors.
+/// better than the token's own input row on every count (its best single head 0.52 frames off
+/// on average, worst 4; no set beat 0.49). Row 0 (BOS's, which predicts the tag) and the row
+/// that predicts EOS bracket the text as anchors: without them three last-word ends were 2
+/// frames late; with both every time is within one frame.
 pub(crate) const TEXT_ROW: usize = 1;
 
-/// The median filter's width over frames (odd), smoothing single-frame spikes in a head.
+/// The median filter's width over frames (odd), smoothing single-frame spikes in a head. Words
+/// last 2–6 frames, so a wider filter smears neighbours together: measured without the
+/// anchors, width 1 gave 0.27–0.29 frames of mean start error, 3 gave 0.23, 7 0.82–1.04.
 pub(crate) const MEDIAN_WIDTH: usize = 3;
 
 /// A word of the transcript with its time in the input audio and its probability.

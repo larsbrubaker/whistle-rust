@@ -2,15 +2,21 @@
 //! and the per-hypothesis matcher that adds `Options::keyword_bonus` to every token that
 //! extends a keyword prefix the hypothesis is inside, or that starts a keyword at a word
 //! boundary, and retracts the bonus collected for a partial keyword when the hypothesis leaves
-//! it unfinished. Only a completed keyword followed by a word boundary keeps its bonus.
-//! `docs/design/decoding.md` describes the design and its measurements.
+//! it unfinished, or a completed one continued by more letters ("Cura" + "tor"). Only a
+//! completed keyword followed by a word boundary or EOS keeps its bonus; a hypothesis cut at
+//! the length limit has its pending bonus retracted. One beam cannot take a token back, so
+//! `search` checkpoints where a bonus overturned the model's pick and returns there when that
+//! keyword is abandoned. The measurements are in the decoding test area
+//! (`tests/decoding/keywords.rs`).
 
 use std::collections::HashMap;
 
 use crate::tokenizer::{PieceType, Tokenizer};
 
-/// The default [`super::Options::keyword_bonus`], in nats per keyword token (measured on the
-/// extra clips, `docs/design/decoding.md`).
+/// The default [`super::Options::keyword_bonus`], in nats per keyword token: the bonus that
+/// found the most keywords on the extra clips at every beam count while leaving every contract
+/// clip unchanged by irrelevant keywords; 4 already changed one at 5 beams
+/// (`keyword_bonus_sweep` in `tests/decoding/keywords.rs`).
 pub const DEFAULT_KEYWORD_BONUS: f32 = 3.0;
 
 /// The first and last character of text id `id`'s piece, `▁` read as a space. A byte piece

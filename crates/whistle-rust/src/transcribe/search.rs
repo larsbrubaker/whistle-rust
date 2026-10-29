@@ -4,8 +4,19 @@
 //! decode `whistle_finetune._score_quantised` defines (each step's pick is the argmax of the
 //! raw text scores, ties to the lowest id), plus the keyword adjustment when there is one.
 //! Every hypothesis is checked after each step by the repetition guard (`repeat`), which stops
-//! one that has run into a loop. `docs/design/decoding.md` describes the scoring, the stopping
-//! rule, the guard and the measurements.
+//! one that has run into a loop.
+//!
+//! Step 0 (the language tag) is the caller's, so every hypothesis shares one language. Each
+//! step log-softmaxes the text ids only, in f64, so the tags take no probability mass after
+//! step 0; a hypothesis ranks by its cumulative log-probability plus its keyword adjustments
+//! during the search, and the finished ones by their mean score per token at the end
+//! ([`Ranking`]). Forking is cheap enough that the search needs no prefix sharing: a hypothesis
+//! owns a `DecoderState` whose per-position self-attention and Engram caches are about 8 KiB
+//! (8 layers × 2 KV heads × (64 + 64) f32), about 2.5 MiB at the 320-token limit, while the RoPE
+//! table and the cross-attention memory are shared. Each parent's last chosen child takes its
+//! state without a copy; only its other children clone it. `ranking_word_error_rates`
+//! (`src/transcribe/tests.rs`) and the decoding test area (`tests/decoding.rs`) hold the
+//! measurements.
 
 use crate::error::Error;
 use crate::model::DecoderState;
@@ -74,7 +85,10 @@ pub(crate) struct Search<'a> {
 /// How the finished hypotheses are ranked for the final choice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Ranking {
-    /// The mean score per token (the default, `docs/design/decoding.md`).
+    /// The mean score per token (the default). Against the plain sum on the contract clips
+    /// both gain two edits over greedy against the true texts, but the mean keeps fr_thomas as
+    /// greedy and the engine read it and recovers pl_zosia's ending, and from 3 beams on it
+    /// reproduces every engine transcript word for word, where the sum does not.
     Mean,
     /// The plain sum, kept for the measurement that compares it.
     #[cfg(test)]
@@ -130,7 +144,7 @@ pub(crate) struct Finished {
 
 impl Finished {
     /// The final ranking: the mean score per token, EOS counted when there is one. The plain
-    /// sum favours short hypotheses (`docs/design/decoding.md` measures both).
+    /// sum favours short hypotheses (`ranking_word_error_rates` measures both).
     pub(crate) fn ranked(&self, ranking: Ranking) -> f64 {
         match ranking {
             Ranking::Mean => {

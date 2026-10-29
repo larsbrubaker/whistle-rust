@@ -7,6 +7,18 @@
 //! The decoder's inputs (`decoder_input`: embedding, memory) and its Engram sites (`engram`)
 //! feed the decoder (`decoder`: causal self-attention, `cross_attention`, the stack and the
 //! output head); `decoder_step` runs it one token at a time over a KV cache (`DecoderState`).
+//!
+//! Whistle's geometry, read from the archive header (`cact::Geometry`) and checked by `bind`:
+//! a text vocabulary of 8192 ids then the 7 language tags (`en de fr es it nl pl`, 8192–8198);
+//! width 512; 8 query heads over 2 KV heads (8 over 8 in cross-attention), q and k 48 wide,
+//! v 64; 8 encoder and 8 decoder layers in 4 mHC lanes; encoder conv kernel 9; 3 decoder QKV
+//! taps; Engram at decoder layers 3 and 7 (n-gram orders 2 and 3, two hash heads each, 18,432
+//! slots of 128-wide rows, 4 value taps at dilation 3); a 128-channel, 3-stage stem; RoPE θ 1e5;
+//! 80 mels at 16 kHz; at most 320 decoder tokens; pad 0, EOS 1, BOS 2.
+//!
+//! Every pass runs in the reference's deployment numerics: weights dequantized from the
+//! archive, activations fake-quantized to A8 (`ops::a8`) and the attention KV path at the
+//! archive's `kv_bits`.
 
 mod attention;
 mod bind;

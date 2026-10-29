@@ -3,7 +3,11 @@
 // the default count (`whistle::model::with_threads`, per calling thread), printed for
 // `docs/design/performance.md`. Run in release for the real numbers:
 // `cargo test --release --test transcribe timing -- --include-ignored --nocapture --test-threads=1`.
-// It asserts nothing about speed; it only checks the clip still transcribes.
+// It asserts nothing about speed; it only checks the clip still transcribes. Measured
+// 2026-10-24 on en_samantha (3.09 s), release, Apple Silicon, default threads: the encoder
+// 31 ms, the decoder setup (cross-attention memory for 8 layers) 3.4 ms, then about 2.7 ms per
+// decoder token (one thread whatever the setting: the few-row kernel path), the whole one-beam
+// call (trimmed to the speech span) 81–87 ms.
 
 use std::time::Instant;
 
@@ -67,7 +71,7 @@ fn one_clip() {
 /// between two checks: the front end, the stem before the first encoder layer, and each encoder
 /// layer. Run in release: `cargo test --release --test transcribe -- --ignored --nocapture`.
 #[test]
-#[ignore = "release measurement for docs/design/transcribe.md"]
+#[ignore = "release measurement of the cancellation latency"]
 fn the_longest_gap_between_cancellation_checks_on_thirty_seconds() {
     for threads in [1, 0] {
         whistle::model::with_threads(threads, thirty_seconds);

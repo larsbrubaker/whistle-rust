@@ -205,7 +205,7 @@ What has run and what has not:
 
 The per-layer decoder measurement moved past its bound, from one flipped A8 step on
 en_samantha layer 3. 1.08e-3 is under the reference's own 2.6–2.8e-3 for one block between
-execution modes (`oracle.md`), so the bound was re-set to 2e-3 with the measurement beside it.
+execution modes (`relative_l2` in `crates/whistle-rust/tests/support/mod.rs`), so the bound was re-set to 2e-3 with the measurement beside it.
 That move was pre-approved for a contract that holds. The exact-stage projection tests stay
 ≤ 1e-6 on the packed path. **Token contract:** identical tokens, text and language on all 8
 speech clips with the VAD off and with the default gate and trim. Silence and empty audio give
@@ -312,7 +312,7 @@ own `ttft_ms`/`decode_tps` at 1 thread, from its last invocation):
 **Which of our settings matches its text.** The engine CLI's default beam count is not
 documented, and it was not varied here (the CLI exposes no beam option). Its text equals ours at
 beams 3 on 8 of the 9 clips and at beams 1 on 7 of 9 (the engine at 1 thread, default options;
-which clips differ was not recorded), consistent with `decoding.md`: 3 beams is the smallest
+which clips differ was not recorded), consistent with `whistle::DEFAULT_BEAMS`: 3 beams is the smallest
 count that reproduced the engine on the test clips. So the fair speed comparison against the
 engine's text is ours at beams 3, and that gap is 3.5-4× on short clips and 7× on 30 s; the
 greedy 2× is the gap to an engine whose work we would only be guessing at. If the engine's

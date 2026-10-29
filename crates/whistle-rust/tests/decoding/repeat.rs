@@ -1,10 +1,20 @@
-// The repetition guard on real garbled audio (docs/design/decoding.md "Repetition guard"):
+// The repetition guard (`src/transcribe/repeat.rs`) on real garbled audio:
 // de_anna with 128 ms blocks replayed as a late audio callback replays them
 // (`support::garble::replayed_blocks`, seed 2) made the decoder read "B" and then "ib" 317
 // times, to the 320-token limit, at one beam and at three. With the guard the decode is rolled
 // back to the loop's first copy, the token that started the second is banned there, and it
 // reads on to the end of the sentence; `Transcript::repeated` says the guard fired. On the
 // contract clips it never fires.
+//
+// Measured: de_anna garbled this way reads "Biby Biby macht den Würfetz zweit Senti Mimi eta
+// Höhe." at one beam (one roll-back, EOS after 31 tokens) and "Bibby Bibby macht den Würfetz
+// zwei Zentimeter höher." at three (one roll-back, about 63 batched steps against 318
+// without the guard). A one-beam scan of 288 garbled variants of the contract clips (blocks
+// replayed, repeated, skipped back or shuffled; four seeds; 64, 128 and 250 ms blocks; the
+// detector on and off: 576 decodes) had 5 decodes run to the length limit and 6 repeat a
+// phrase until EOS without the guard; with it the guard fires on exactly those 11, none runs to
+// the limit, and the other 565 decodes are unchanged, including repetitions below the
+// thresholds ("He's the breakfast." five times, "drie" six).
 
 use whistle::audio::read_wav;
 use whistle::Options;

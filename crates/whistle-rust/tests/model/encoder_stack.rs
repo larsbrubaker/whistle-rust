@@ -3,7 +3,7 @@
 // from every clip's `features` to `encoder/out`. Both are quantized stages (CLAUDE.md
 // "Tolerance policy"); the per-layer bound is set from the error measured when they landed, and
 // the end-to-end bound is loose because upstream itself moves about 2% between execution modes
-// (docs/design/oracle.md).
+// (`relative_l2` in tests/support/mod.rs).
 
 use whistle::audio::Features;
 use whistle::model::{Encoder, EncoderContext, Lanes};

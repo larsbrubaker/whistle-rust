@@ -4,6 +4,15 @@
 // restricted argmax (step 0 over the language tags, later steps over the text ids) must be the
 // reference's next token, except the near-ties listed in test-data/near_ties.json. The
 // free-running snapshot of the port's own output (test-data/snapshots/) is pinned here too.
+//
+// Neither file is reference output. A near-tie is a position where the reference's token wins
+// by a margin a last-bit difference in `exp` can flip (the reference ran XLA's `exp`, the port
+// runs `src/math`); each entry gives the clip, VAD modes, manifest position, reference and port
+// tokens, and the margin under Apple's libm and under the deterministic math. Any unlisted
+// divergence fails, and so does a listed one whose margin has grown to 0.05 or more. The
+// snapshots (greedy.json at one beam, default.json at the default options) pin the port's own
+// output bit for bit on every target; only the ignored `regenerate_snapshots`
+// (`tests/decoding/greedy.rs`) rewrites them, with a change that deliberately moves the output.
 
 use std::collections::BTreeMap;
 

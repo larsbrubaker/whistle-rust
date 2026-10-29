@@ -88,7 +88,7 @@ fn the_default_is_three_beams_without_keywords() {
 }
 
 /// The default (three beams, measured 2026-10-24) reproduces the engine's transcript on every
-/// contract clip, the measurement that chose it (docs/design/decoding.md).
+/// contract clip, the measurement that chose it (`whistle::DEFAULT_BEAMS`).
 #[test]
 fn the_default_options_give_the_engine_transcript_on_every_clip() {
     for clip in contract_clips() {

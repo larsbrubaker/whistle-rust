@@ -3,7 +3,7 @@
 // clips and the engine's words; `engine` holds the words and their times to the engine's on the
 // contract clips and on the held-out extra clips; `options` pins that timings off change nothing,
 // that silence has no words, and that the detector's trim is added back exactly; `measure`
-// (ignored) prints the cost and the probability comparison in docs/design/timestamps.md.
+// (ignored) prints the cost and the probability comparison.
 
 #[path = "support/mod.rs"]
 mod support;

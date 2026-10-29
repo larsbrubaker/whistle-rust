@@ -3,6 +3,12 @@
 //! [`Lanes`], picks its block input from them, runs the block (a closure, so either stack's block
 //! fits), and writes the update back through Sinkhorn-mixed lanes. Parameters are the [`Mhc`]
 //! bound in `weights`.
+//!
+//! Per layer and token, with `nx = A8(rms_unit(lanes flattened))`: pre-mix weights
+//! `σ(a_pre · nx·φ_pre + b_pre + pre_off)` pick the block input `u` from the lanes; the update
+//! `block(u) − u` goes back with post weights `2σ(a_post · nx·φ_post + b_post + post_off)`; and
+//! the lanes mix through the doubly stochastic matrix 20 Sinkhorn rounds make of
+//! `a_res · nx·φ_res + b_res`.
 
 use crate::error::Error;
 

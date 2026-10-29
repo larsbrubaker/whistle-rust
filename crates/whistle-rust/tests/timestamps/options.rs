@@ -43,8 +43,10 @@ fn silence_has_no_words() {
 }
 
 /// 1 s of zeros before a clip: the detector keeps `b0..b1` (its segment start pads into the
-/// zeros, so the decode sees a lead-in the clean clip lacks and may decode differently,
-/// `docs/design/timestamps.md`). Whatever it decodes, the times must be those of decoding
+/// zeros, about 0.12 s with its pad and frame rounding, so the decode sees a lead-in the clean
+/// clip lacks and may decode differently: pl_zosia's tokens flip with 160, 320 or 1280 leading
+/// zeros, and 3 of the 8 contract clips decode to different, not worse, tokens with this
+/// padding). Whatever it decodes, the times must be those of decoding
 /// `b0..b1` with the detector off, plus `b0` samples, exactly.
 #[test]
 fn the_trim_is_added_back_to_every_time_exactly() {

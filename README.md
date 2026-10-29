@@ -76,8 +76,10 @@ Cactus Compute, Inc.: an application that ships it includes the Apache-2.0 licen
 
 The port follows upstream's Apache-2.0 JAX model code
 ([cactus-compute/needle](https://github.com/cactus-compute/needle)) and is tested stage by
-stage against that code running on the same weights (`docs/design/oracle.md`). The model is
-described in `docs/design/model.md`.
+stage against that code running on the same weights: the fixtures come from the scripts in
+`oracle/`, whose headers say what each writes. How the pieces fit is in the library's crate
+header (`crates/whistle-rust/src/lib.rs`), and each stage is described in the header of the
+file that implements it.
 
 ```bash
 scripts/fetch-weights.sh        # models/whistle.cact (Apache-2.0, 16.9 MB)

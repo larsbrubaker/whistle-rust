@@ -7,7 +7,8 @@ use crate::clips::{beams, contract_clips, log_probability, transcribe, whole_cli
 use crate::wer::{normalize, raw_wer, wer};
 
 /// The normalized corpus WER against the true texts measured 2026-10-24 (72 words; see
-/// docs/design/decoding.md), a bound so an improvement passes: one beam 14 edits, three 12.
+/// `ranking_word_error_rates` in `src/transcribe/tests.rs`), a bound so an improvement passes:
+/// one beam 14 edits, three 12.
 const PINNED: [(usize, f64); 2] = [(1, 14.0 / 72.0), (3, 12.0 / 72.0)];
 
 #[test]
@@ -50,7 +51,7 @@ fn three_beams_scored_no_lower_than_greedy_on_the_clips_where_they_differ() {
 }
 
 #[test]
-#[ignore = "measurement for docs/design/decoding.md"]
+#[ignore = "measurement: every beam count against greedy"]
 fn every_beam_count_scored_no_lower_than_greedy_on_every_clip() {
     scored_no_lower_than_greedy(&contract_clips(), &[2, 3, 5, 8]);
 }

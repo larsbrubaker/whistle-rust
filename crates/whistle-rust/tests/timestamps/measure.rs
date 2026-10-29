@@ -1,4 +1,4 @@
-// Ignored measurements behind docs/design/timestamps.md: the release cost of
+// Ignored measurements behind word timestamps (`src/transcribe/align.rs`): the release cost of
 // `word_timestamps: true` on one clip, each clip's timing errors against the engine, and our
 // word probabilities beside the engine's.
 

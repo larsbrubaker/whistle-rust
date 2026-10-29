@@ -7,7 +7,15 @@ The tensor order and each tensor's name come from upstream's own `export._tensor
 its packers stubbed out), so this file only supplies the inverse of each export transform.
 `verify` checks the rebuild against the fp32 checkpoint: every fp16 tensor must equal the
 checkpoint value rounded to fp16, and every CQ tensor must equal upstream's `cq_quantize` of the
-checkpoint value at the width the archive records. A wrong transpose or reshape fails loudly.
+checkpoint value at the width the archive records, except nearest-codeword ties that float
+noise flips (at most 0.02% of 128-wide groups may differ; a wrong transpose makes nearly all
+differ); and the Hadamard permutations and mel matrix stored in the archive must equal
+upstream's. A wrong transpose or reshape fails loudly.
+
+The archive mixes widths: 145 CQ2 matrices, 7 CQ4 (the embedding and the mHC `phi`
+projections), 524 fp16 vectors, 4 fp32 (permutations, mel) and the raw tokenizer. Upstream's
+public exporter writes only CQ4, so it did not produce this file; the format and `read_export`
+handle every width, and the checkpoint supplies only the tree's shape and the config.
 """
 import os
 import struct

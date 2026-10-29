@@ -5,7 +5,10 @@
 //! Engram add at its site layers, gated causal self-attention (`attention`), gated
 //! cross-attention (`cross_attention`) and a full-step Hadamard MLP (`hadamard`). The sub-steps
 //! are public so each can be tested on its own; positions start at 0 here, and the pieces take
-//! explicit history and positions so an incremental step can reuse them.
+//! explicit history and positions so an incremental step can reuse them. Every part looks
+//! back only (self-attention, the QKV taps, the Engram n-grams and value conv), so a position's
+//! logits never depend on later tokens: that is what lets `decoder_step` score one new
+//! position at a time over cached history.
 
 use crate::error::Error;
 

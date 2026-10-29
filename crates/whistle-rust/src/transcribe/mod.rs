@@ -10,10 +10,21 @@
 //! (`keywords`), until EOS or `max_seq_len` tokens, with every hypothesis rolled back past any
 //! repetition loop it runs into (`repeat`). A [`Cancel`] handle is checked between the stages,
 //! between windows, between encoder layers and between decoder steps.
-//! `docs/design/transcribe.md` describes the call, `docs/design/windowing.md` the windows and
-//! `docs/design/decoding.md` the search. Live audio goes through [`Whistle::stream`] (`stream`,
-//! `docs/design/streaming.md`), which decodes a growing buffer with `decode_window` and commits
-//! the words two passes agree on.
+//!
+//! The call, in order (`Whistle::run_full`): the options are checked (language, beams,
+//! keyword bonus); a non-finite sample is rejected; the length at 16 kHz is checked against
+//! [`MAX_INPUT_SAMPLES`] before anything costly; a WAV at another rate is resampled; the
+//! detector gates (and by default trims to the span from the first speech segment's start to
+//! the last one's end, gaps kept so the decoder sees the utterance whole); the windows are
+//! planned; each window is decoded; the windows' results are stitched. One window is exactly
+//! the single pass. In a window, step 0 picks among the language tags only (the reference masks
+//! every other id), and later steps among the text ids only, so a tag is never emitted after
+//! step 0; the decode stops at EOS or at `max_seq_len` tokens. With word timestamps on, one
+//! more decoder pass over BOS, the tag, the text and EOS captures the cross-attention for
+//! `align`; nothing on the decode path changes, so the text is the same either way.
+//! `search`'s header describes the beam search and its stopping rule, `window`'s and `long`'s
+//! the windows. Live audio goes through [`Whistle::stream`] (`stream`), which decodes a growing
+//! buffer with `decode_window` and commits the words two passes agree on.
 
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -47,10 +58,15 @@ use repeat::Pieces;
 use search::{Ranking, Search};
 
 /// The most beams [`Options::beams`] accepts: each beam is a decoder state stepped every
-/// position, so the cost grows linearly (`docs/design/decoding.md`).
+/// position, so the cost grows linearly (measured in `tests/decoding/timing.rs`).
 pub const MAX_BEAMS: usize = 16;
 
-/// The default [`Options::beams`]: a 3-beam search (measured in `docs/design/decoding.md`).
+/// The default [`Options::beams`]: a 3-beam search, the smallest count that reproduces the
+/// engine's transcript on every contract clip, with the best word error rate against the true
+/// texts (12/72 words against greedy's 14/72), for about +195 ms on a 3.3 s clip. 5 beams (the
+/// engine's benchmark count) give the same text on those clips for more than twice the extra
+/// cost. The measurements are in `ranking_word_error_rates` (`src/transcribe/tests.rs`) and
+/// `tests/decoding/timing.rs`.
 pub const DEFAULT_BEAMS: usize = 3;
 
 /// The language codes Whistle transcribes, in tag order.
@@ -112,7 +128,11 @@ pub enum VadMode {
 }
 
 /// A cloneable cancellation handle: [`Cancel::cancel`] from any thread makes a transcription
-/// using it (or any clone of it) return [`Error::Cancelled`] at its next check.
+/// using it (or any clone of it) return [`Error::Cancelled`] at its next check. The latency is
+/// the longest gap between two checks: on 30 s of audio (release, Apple Silicon) the features
+/// take about 50 ms, the detector 13 ms, the stem before the first encoder layer's check
+/// 28–46 ms and each encoder layer 40–55 ms, so a cancel returns within about 0.07 s; a decoder
+/// step is about 2.7 ms.
 #[derive(Debug, Clone, Default)]
 pub struct Cancel {
     flag: Arc<AtomicBool>,
@@ -136,7 +156,9 @@ impl Cancel {
 /// What one transcription does beyond the defaults.
 #[derive(Debug, Clone)]
 pub struct Options {
-    /// Force the language (one of [`LANGUAGES`]); `None` lets the model detect it. Audio over
+    /// Force the language (one of [`LANGUAGES`]); `None` lets the model detect it. Forcing feeds
+    /// that language's tag; it does not translate (English audio forced to `fr` still comes out
+    /// in English, labelled `fr`). Audio over
     /// 30 s is decoded in windows, and a long recording is labelled with and decoded in one
     /// language: the one detected on the first window that keeps at least 3 words, forced on
     /// every window after it (a recording that switches language part way comes out in the
@@ -152,7 +174,7 @@ pub struct Options {
     /// Hypotheses the decode keeps, 1 to [`MAX_BEAMS`]. The default, [`DEFAULT_BEAMS`] (3), is
     /// the smallest count that reproduced every engine transcript on the test clips, with the
     /// best word error rate against the true texts, for about +195 ms on a 3.3 s clip
-    /// (`docs/design/decoding.md`). `beams: 1` is the greedy decode the reference defines.
+    /// ([`DEFAULT_BEAMS`] says why). `beams: 1` is the greedy decode the reference defines.
     /// 0 or more than [`MAX_BEAMS`] is [`Error::Input`].
     pub beams: usize,
     /// Words and phrases to favour during the search (names, places, product words, jargon);
@@ -162,7 +184,7 @@ pub struct Options {
     /// it must be finite and not negative.
     pub keyword_bonus: f32,
     /// Fill [`Transcript::words`] with each word's start, end and probability, aligned from
-    /// the decoder's cross-attention (`docs/design/timestamps.md`); one extra decoder pass over
+    /// the decoder's cross-attention (`align`); one extra decoder pass over
     /// the final tokens. Off by default.
     pub word_timestamps: bool,
     /// Seconds of new audio a [`Stream`] waits for before it decodes its buffer again
@@ -219,7 +241,7 @@ pub struct Transcript {
     /// token or phrase, and was rolled back past it (or, after three loops, cut at it). The
     /// text holds no loop, but the audio was likely garbled, noise or not speech: a caller
     /// with another reading of the same audio (a live stream's) may prefer that one
-    /// (`docs/design/decoding.md` "Repetition guard").
+    /// (the guard is `repeat`).
     pub repeated: bool,
     /// The words of `text` with their times in the input, when [`Options::word_timestamps`] is
     /// set (empty otherwise, and for an empty transcript). In order and non-overlapping; within
@@ -638,7 +660,9 @@ impl Whistle {
     }
 }
 
-/// [`Error::Input`] naming the first non-finite sample, if any.
+/// [`Error::Input`] naming the first non-finite sample, if any. Checked before anything else
+/// runs: one NaN would poison the features, and the decoder would write a full-length stream of
+/// nonsense.
 fn check_finite(samples: &[f32]) -> Result<(), Error> {
     match samples.iter().position(|v| !v.is_finite()) {
         Some(i) => Err(Error::Input(format!(

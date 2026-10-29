@@ -196,6 +196,27 @@ fn shape(passes: &[Pass], l: usize, h: usize) -> (f32, f32) {
     (mono as f32 / n as f32, peak / n as f32)
 }
 
+/// Each of the 64 heads alone through the whole pipeline on the 8 contract clips at 3 beams,
+/// with the anchor rows: "start error" is the mean |our start − engine start| in frames over
+/// the 73 words, "monotonic" the share of text rows whose argmax frame does not go back, "peak"
+/// the mean peak probability. The top ten, measured 2026-10-24:
+///
+/// | head (L, H) | start error | worst | monotonic | peak |
+/// |---|---|---|---|---|
+/// | 7, 3 | 0.25 | 2 | 0.96 | 0.67 |
+/// | 6, 1 | 0.34 | 2 | 0.96 | 0.69 |
+/// | 4, 1 | 0.36 | 1 | 0.97 | 0.81 |
+/// | 5, 4 | 0.40 | 3 | 0.95 | 0.74 |
+/// | 7, 4 | 0.42 | 2 | 0.96 | 0.69 |
+/// | 7, 1 | 0.52 | 3 | 0.98 | 0.66 |
+/// | 5, 5 | 0.67 | 2 | 0.98 | 0.79 |
+/// | 6, 6 | 0.73 | 4 | 0.96 | 0.60 |
+/// | 1, 1 | 0.75 | 5 | 0.99 | 0.80 |
+/// | 7, 5 | 0.84 | 3 | 0.95 | 0.66 |
+///
+/// The median head is 6 frames off; the worst (L0 H1, L4 H5, L1 H7) 13–16, some of them sharp.
+/// Combinations of the best heads in this ranking: top 1 0.25 (worst 2), top 3 0.25 (worst 1),
+/// top 4 0.26 (worst 1), top 5 0.30 (worst 1).
 #[test]
 #[ignore = "measurement: prints the per-head scores behind ALIGNMENT_HEADS (release, ~10 s)"]
 fn alignment_head_sweep() {

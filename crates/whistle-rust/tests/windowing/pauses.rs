@@ -81,7 +81,7 @@ fn a_long_input_with_pauses_is_cut_in_them_and_decodes_as_its_windows_alone() {
         assert!((g.start - w.start).abs() <= FRAME_SECONDS, "{g:?} {w:?}");
         assert!((g.end - w.end).abs() <= FRAME_SECONDS, "{g:?} {w:?}");
         // One frame for the window's frame grid, which does not start where the clip does,
-        // and one for the alignment's measured precision (docs/design/timestamps.md).
+        // and one for the alignment's measured precision (`tests/timestamps/engine.rs`).
         let slack = 2.0 * FRAME_SECONDS;
         let in_a_clip = spans
             .iter()

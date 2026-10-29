@@ -15,12 +15,31 @@ stack's real inputs are recorded at its call, then every layer is replayed throu
 stack's output must match the real one (checked, relative L2; see `replay`), which pins the
 replay to the model. Each dumped layer's lanes are exactly `_LaneBody` applied to the previous
 dumped layer's lanes, so a Rust layer test should start from the previous layer's fixture.
+Without quantization the replay and the real stack agree to 2e-6; with A8 they differ by about
+2%, because A8 rounding is discontinuous and float noise from a different operation order
+flips a few activations to the neighbouring int8 step (the reason the Rust tests compare by
+relative L2, `tests/support/mod.rs`).
+
+Per clip it records the input samples (int16 / 32768), the mel features, the stem output, the
+encoder's input lanes, every encoder layer's lanes and its output, the greedy tokens, the
+decoder's embedded input, the memory (encoder output plus the gated position encoding), the
+Engram keys and values, every decoder layer's lanes, the decoder output and the logits.
+
+The silence clip's features are a rounding artifact of the reference (every valid cell
+-0.16005333 where the exact answer is 0; `tests/audio/features.rs`), so its later stage tests
+start from the fixture's features, and its transcript is the silence gate's job, not the
+greedy decode's ("Thank you.").
 
     oracle/.venv/bin/python -I oracle/dump.py [--full CLIP ...]
 
-`--full` clips (default: FULL below) also get every layer's internals. Only the committed tier
-(`committed` below) lives in test-data/fixtures/; the rest goes to the git-ignored
-test-data/fixtures-local/. Each manifest lists every array with its tier.
+`--full` clips (default: FULL below) also get every layer's internals (`layerNN/block_in`, the
+lanes' pre-mix, and every attention, projection, norm and MLP output). Only the committed tier
+(`committed` below) lives in test-data/fixtures/: every clip's stage boundaries and tokens; for
+en_samantha and de_anna also every layer's lanes and the logits; for en_samantha every internal
+of encoder layers 0 and 7 and decoder layers 0 and 3 (an Engram site), so each building block
+has a committed input and output. The rest goes to the git-ignored test-data/fixtures-local/.
+Each manifest lists every array with its tier, shape and dtype, plus the tokens, decoded text,
+language and the replay errors; index.json lists the clips and the pinned reference.
 """
 import argparse
 import dataclasses

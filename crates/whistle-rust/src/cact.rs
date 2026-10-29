@@ -1,8 +1,14 @@
 //! The `.cact` model archive reader: header geometry, codebooks, tensor directory and blob
 //! slices, every record bounds- and overflow-checked so a malformed or truncated archive is an
-//! [`Error`], never a panic. Follows upstream's `export.read_export` (layout documented in
-//! `docs/design/model.md` "Archive"). The archive borrows the caller's bytes; `quant` turns a
-//! [`Tensor`] into f32 values and `tokenizer` reads the RAW attachment.
+//! [`Error`], never a panic. Follows upstream's `export.read_export`. The archive borrows the
+//! caller's bytes; `quant` turns a [`Tensor`] into f32 values and `tokenizer` reads the RAW
+//! attachment.
+//!
+//! The layout, all little-endian: the header (48 u32 fields of geometry and `kv_bits`, then
+//! `rope_theta` as f32), the CQ codebooks, a directory of nameless tensor records, then each
+//! tensor's blob, 64-byte aligned, in the order upstream's exporter enumerates them (`bind`
+//! gives each its role from that order), ending with the raw SentencePiece tokenizer (BPE pieces
+//! with scores and types, the 7 language tags as user-defined pieces).
 
 use crate::error::Error;
 

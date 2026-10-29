@@ -151,10 +151,23 @@ mod wer;
 
 /// The beam search's final ranking measured on the contract clips: normalized WER against the
 /// true texts (oracle/clips.json) and the engine's transcripts (test-data/engine/), per beam
-/// count, under the mean per token (the default) and the plain sum. Prints the tables in
-/// docs/design/decoding.md: `cargo test --release --lib ranking -- --ignored --nocapture`.
+/// count, under the mean per token (the default) and the plain sum, over 72 true words and 73
+/// engine words: `cargo test --release --lib ranking -- --ignored --nocapture`. Measured
+/// 2026-10-24, normalized corpus WER:
+///
+/// | beams | truth (sum) | engine (sum) | truth (mean) | engine (mean) |
+/// |------:|------------:|-------------:|-------------:|--------------:|
+/// | 1     | 0.1944      | 0.0274       | 0.1944       | 0.0274        |
+/// | 2     | 0.1667      | 0.0548       | 0.1667       | 0.0274        |
+/// | 3     | 0.1667      | 0.0548       | 0.1667       | 0.0000        |
+/// | 5     | 0.1667      | 0.0548       | 0.1667       | 0.0000        |
+/// | 8     | 0.1667      | 0.0548       | 0.1667       | 0.0000        |
+///
+/// The sum turns fr_thomas's "5000 mètres" into "5 mm" and keeps pl_zosia's short "do 10 ml.";
+/// the mean keeps fr_thomas as greedy has it and reads pl_zosia's "do 10 milimetrów lewo", the
+/// engine's.
 #[test]
-#[ignore = "measurement for docs/design/decoding.md"]
+#[ignore = "measurement for the beam search's final ranking"]
 fn ranking_word_error_rates() {
     use super::search::Ranking;
     let read = |p: &str| -> serde_json::Value {

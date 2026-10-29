@@ -127,7 +127,7 @@ stays, the floor does not move and there is no restart (an empty pass would othe
 of the committed text and restart). If the stream or the utterance ends there, what is pending
 commits.
 
-**A pass that loops.** The repetition guard (`docs/design/decoding.md` "Repetition guard")
+**A pass that loops.** The repetition guard (`crates/whistle-rust/src/transcribe/repeat.rs`)
 rolls a pass's decode back past a loop and reads on, so a pass that ran into one still has
 words for the audio after it, and they take part in agreement as any pass's do. On de_anna
 garbled by replayed 128 ms blocks (`tests/streaming/garbled.rs`) the final pass, over the whole

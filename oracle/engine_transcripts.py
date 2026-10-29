@@ -2,7 +2,12 @@
 """Runs the closed-source Needle 3 engine CLI (fetched by scripts/fetch-weights.sh --engine) over
 every test clip and writes test-data/engine/<clip>.json: text, language and word timestamps,
 timing fields dropped. A black-box quality reference for the decode features we design ourselves
-(beam search, keywords, timestamps); the per-tensor oracle is dump.py."""
+(beam search, keywords, timestamps); the per-tensor oracle is dump.py.
+
+The reference's greedy transcripts match the engine's word for word on seven of the nine clips.
+Polish differs at the end ("... do 10 ml." against the engine's "... do 10 milimetrów lewo."),
+which three beams reproduce; on a second of silence the greedy decode says "Thank you." where
+the engine returns an empty transcript, as the port's silence gate does."""
 import glob
 import json
 import os

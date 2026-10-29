@@ -4,6 +4,12 @@
 // transcript exactly as it was (the port's greedy snapshot at one beam, test-data/snapshots/,
 // and the engine's text at three). The bonus sweep and the counts without biasing are an
 // ignored measurement.
+//
+// A keyword counts as found when its normalized words appear in order in the normalized text.
+// Without biasing the port finds 4 of the 13 at one beam and 3 at three or five; the engine
+// finds 3 without its keyword option and 7 with it. Missed by both: Siobhan ("Shivan"), Niamh,
+// Pforzheim ("Fort Simps") and Grzegorza, whose acoustic scores sit too far from the spelling
+// for a bonus that leaves ordinary words alone.
 
 use whistle::Options;
 
@@ -102,7 +108,7 @@ fn irrelevant_keywords_leave_one_beam_on_the_greedy_snapshot_text() {
 }
 
 /// Three beams without keywords give the engine's transcript on every contract clip (measured
-/// 2026-10-24, docs/design/decoding.md), so that is the text irrelevant keywords must leave.
+/// 2026-10-24, `whistle::DEFAULT_BEAMS`), so that is the text irrelevant keywords must leave.
 #[test]
 fn irrelevant_keywords_leave_three_beams_on_the_engine_text() {
     for clip in contract_clips() {
@@ -114,11 +120,23 @@ fn irrelevant_keywords_leave_three_beams_on_the_engine_text() {
     }
 }
 
-/// The bonus strength against keywords found and contract clips changed, and the counts
-/// without biasing, for docs/design/decoding.md:
-/// `cargo test --release --test decoding sweep -- --ignored --nocapture`.
+/// The bonus strength against keywords found (of 13 on the extra clips) and contract clips
+/// changed by the irrelevant keywords, and the counts without biasing:
+/// `cargo test --release --test decoding sweep -- --ignored --nocapture`. Measured with the
+/// platform libm (the deterministic math since moves three beams at 3.0 from 9 to 8 found):
+///
+/// | bonus | found, 1 / 3 / 5 beams | contract clips changed, 1 / 3 / 5 beams |
+/// |------:|-----------------------:|----------------------------------------:|
+/// | 1     | 5 / 6 / 6              | 0 / 0 / 0                               |
+/// | 2     | 7 / 7 / 8              | 0 / 0 / 0                               |
+/// | 3     | 9 / 9 / 9              | 0 / 0 / 0                               |
+/// | 4     | 10 / 10 / 8            | 0 / 0 / 1                               |
+/// | 5     | 12 / 11 / 10           | 1 / 1 / 1                               |
+/// | 6     | 12 / 13 / 8            | 2 / 2 / 1                               |
+///
+/// Larger bonuses at 5 beams find fewer: biased partial paths crowd the beam and are retracted.
 #[test]
-#[ignore = "measurement for docs/design/decoding.md"]
+#[ignore = "measurement of the keyword bonus strength"]
 fn keyword_bonus_sweep() {
     let contract = contract_clips();
     let extra = extra_clips();

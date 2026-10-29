@@ -1,4 +1,4 @@
-//! The repetition guard (`docs/design/decoding.md` "Repetition guard"): a decode on audio the
+//! The repetition guard: a decode on audio the
 //! model cannot read (garbled, noise, a language it was not trained on) can lock into
 //! repeating one token or phrase, confidently, until the length limit ("je trouve que" 59
 //! times; "B" then "ib" 317 times). `search` checks every hypothesis after each step with its
@@ -6,7 +6,18 @@
 //! end of the loop's first copy and the token that started the second copy is banned there, so
 //! the decode can pick up the audio after it; after [`MAX_REWINDS`] roll-backs it is cut there
 //! instead. Token-level and exact, so it costs a few comparisons per step and is the same on
-//! every target.
+//! every target. The reference's decode loop is a plain argmax to EOS or the limit, so the
+//! guard is designed here.
+//!
+//! Banning without rolling back does not work: the decode repeats the loop a token off. The
+//! first copy is kept, rather than cutting before the loop, because a decoder that gets stuck
+//! usually repeats the last thing it heard. A rolled-back hypothesis's decoder state is rebuilt
+//! by feeding the kept tokens again from the BOS-only state (`search`), one decoder step per
+//! kept token, at most [`MAX_REWINDS`] times per hypothesis. The search reports a guard that
+//! fired as `Transcript::repeated`: the text holds no loop, but the audio was likely garbled.
+//! The guard does not catch confident nonsense that never loops. The measurements on garbled
+//! audio are in `tests/decoding/repeat.rs`; `repeat/tests.rs` holds the real speech it must
+//! never cut.
 
 use crate::tokenizer::Tokenizer;
 

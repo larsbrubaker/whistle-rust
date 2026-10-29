@@ -94,5 +94,5 @@ and `min_modulation_db_sits_between_fan_noise_and_noisy_speech` pin parts of thi
 - The decode is chaotically sensitive to the lead-in the trim leaves: on a clip whose speech
   starts at its first sample the trim is the whole clip, while the same clip after silence keeps
   about 0.12 s of it (the pad plus frame rounding), and that can change the transcript
-  (pl_zosia flips with 160, 320 or 1280 leading zeros; `docs/design/timestamps.md`). Different,
+  (pl_zosia flips with 160, 320 or 1280 leading zeros; `crates/whistle-rust/tests/timestamps/options.rs`). Different,
   not worse; word times stay exact relative to the trimmed audio.

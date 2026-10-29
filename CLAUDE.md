@@ -4,7 +4,9 @@ A **pure Rust** port of [Whistle](https://huggingface.co/Cactus-Compute/whistle)
 Compute's 16.9 MB on-device speech-to-text model: 16 kHz mono audio in; text, language and word
 timings out; English, German, French, Spanish, Italian, Dutch and Polish. One library for
 macOS, Windows, Linux and the browser (wasm32). First consumer: MatterCAD Rust's voice input.
-Open work is in `PORTING_PLAN.md`; how the model and the oracle work is in `docs/design/`.
+Open work is in `PORTING_PLAN.md`. How the model, decoding and transcription fit together is
+in the `whistle` crate's header (`crates/whistle-rust/src/lib.rs`), each stage in the header of
+the file that implements it, and the oracle in the headers of its scripts (`oracle/`).
 
 ## Philosophy
 
@@ -38,9 +40,9 @@ needs (an empty transcript for silence, an error they can show) is decided for t
    instrumentation and root-cause analysis. A tolerance or expected value changes only when the
    behaviour it pins is deliberately changed, and the commit says why with the measurement.
 5. **Fixtures are the contract.** `test-data/fixtures/` is written only by the oracle scripts
-   (`oracle/dump*.py`, listed in `docs/design/oracle.md`). Existing fixtures are regenerated only
-   when `REFERENCE` changes, all scripts together, in their own commit; a new fixture lands with
-   the script that writes it.
+   (`oracle/dump*.py`, each saying in its header what it writes). Existing fixtures are
+   regenerated only when `REFERENCE` changes, all scripts together, in their own commit; a new
+   fixture lands with the script that writes it.
 
 ## Testing framework
 
@@ -74,7 +76,7 @@ The model runs in deployment numerics: weights dequantized from the archive, act
 fake-quantized to A8, the KV path at the archive's `kv_bits`. A8 rounding is discontinuous, so
 float noise flips a few activations to the neighbouring int8 step and the flips spread:
 upstream's own encoder output moves 1.5–2.8% (relative L2) between equivalent JAX execution
-modes and under 3e-7 input noise (`docs/design/oracle.md`). So:
+modes and under 3e-7 input noise (`relative_l2` in `tests/support/mod.rs`). So:
 
 - Compare by **relative L2**, `support::relative_l2`, never by max-abs.
 - **Exact stages** (archive parsing and dequantization, tokenizer, mel features, anything
@@ -127,7 +129,7 @@ oracle/                Python (needle-reference + JAX): fixtures, clip synthesis
                        transcripts; never used by the Rust build
 scripts/               fetch-reference.sh, fetch-weights.sh, gates.sh
 test-data/             clips/ (WAV), fixtures/ (committed oracle tier), engine/ (engine JSON)
-docs/design/           how the model, the archive and the oracle work
+docs/design/           performance, streaming, the voice-activity detector and windowing
 ```
 
 The library takes the archive as bytes and never does I/O of its own beyond what a caller
@@ -154,7 +156,8 @@ and cache it themselves.
 `PORTING_PLAN.md` is the planning doc: **open work only**, each item saying what a caller would
 notice and what is needed. History lives in git. Update it in the same change that makes it
 stale; delete an item when it is done, rewrite it to what is left when part of it is done.
-Design docs in `docs/design/` describe how the code and the model are now.
+How the code and the model work is written in the code's own header and doc comments, kept
+true in the same change; the design docs left in `docs/design/` describe how the code is now.
 
 ## Commands
 

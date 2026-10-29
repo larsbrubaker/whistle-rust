@@ -32,7 +32,8 @@ fn lanes(f: &Fixture, name: &str) -> Lanes {
 /// activations and the sum is grouped, so the rounding differs). Measured (2026-10-24): worst
 /// 1.08e-3 (en_samantha layer 3), de_anna layer 0 3.9e-4, de_anna layers 6 and 7 7.5e-5 and
 /// 7.3e-5, every other layer 8.3e-8 to 4.6e-7; tokens unchanged on every clip. The bound stays
-/// under the reference's own 2.6–2.8e-3 between execution modes for one block (`oracle.md`).
+/// under the reference's own 2.6–2.8e-3 between execution modes for one block
+/// (`support::relative_l2`).
 const LAYER_BOUND: f64 = 2e-3;
 
 #[test]
@@ -131,7 +132,7 @@ fn logits_reproduce_the_reference_on_the_clips_that_have_them() {
 #[test]
 fn restricted_argmax_is_the_next_token_on_every_clip() {
     let decoder = Decoder::new(weights());
-    let text = 8192usize; // the first language tag (docs/design/model.md "Configuration")
+    let text = 8192usize; // the first language tag (the geometry in `src/model/mod.rs`)
     for clip in clip_names() {
         let f = Fixture::load(&clip);
         let tokens = f.tokens();

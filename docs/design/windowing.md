@@ -61,7 +61,7 @@ to about a frame), so it is kept once; a word only one window heard whole is kep
 when its midpoint is on that window's side.
 
 Keeping by midpoint needs the words' times, so a window with a hard cut is always aligned (one
-extra decoder pass, `docs/design/timestamps.md`); with `word_timestamps` off its words are
+extra decoder pass, `crates/whistle-rust/src/transcribe/align.rs`); with `word_timestamps` off its words are
 dropped after the stitch. `text` and `tokens` are therefore the same with timings on and off,
 as for a single pass.
 

@@ -2,6 +2,11 @@
 //! following upstream's `export._cq_unpack`. A CQ group dequantizes to
 //! `(codebook[idx] * norm) @ H`, `H` the orthonormal Walsh–Hadamard matrix of the group size
 //! (Sylvester order); `H` is symmetric, so each group is one fast Walsh–Hadamard transform.
+//! A record stores a logical `[out, in]` matrix as one LSB-first bitstream of `bits`-wide
+//! indices per row (`in` padded to the group size, 128), then one fp16 L2 norm per row and
+//! group. `whistle.cact` mixes widths: 2-bit for most matrices, 4-bit for the embedding and
+//! the mHC projections, fp16 for vectors and fp32 for the Hadamard permutations and the mel
+//! matrix; every width the format defines is read.
 //! Reads the validated [`Tensor`] records `cact` produces. [`CqRows`] keeps a CQ record packed
 //! and dequantizes single rows on demand (the model's Engram tables); `CqRows::parts` hands
 //! the packed fields to the packed-weight projection kernel (`model::kernels::packed`).

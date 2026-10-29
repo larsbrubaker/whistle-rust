@@ -153,6 +153,14 @@ impl Fixture {
 
 /// ||actual - expected|| / ||expected|| over all elements (CLAUDE.md "Tolerance policy").
 /// An all-zero reference compares by the absolute norm of `actual` instead.
+///
+/// Relative L2, never max-abs, because A8 rounding is discontinuous: float noise from a
+/// different operation order flips a few activations to the neighbouring int8 step, and the
+/// flips spread through later layers. Measured on upstream alone (2026-10-24, jax 0.12.0.1):
+/// its encoder output moves 1.5–2.3% between eager and `jax.jit` and between `scan_unroll` 1
+/// and 8, and 1.9–2.8% under 3e-7 input noise; its layer-0 encoder block alone moves
+/// 2.6–2.8e-3. Decoding from the jitted encoder output still gives the fixtures' greedy tokens
+/// on every clip, which is why the token stream is the end-to-end contract.
 pub fn relative_l2(actual: &[f32], expected: &[f32]) -> f64 {
     assert_eq!(
         actual.len(),
