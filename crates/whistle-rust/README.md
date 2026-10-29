@@ -39,13 +39,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 `GateAndTrim` by default, so silence gives an empty transcript), takes a `Cancel` handle that
 stops a transcription from another thread with `Error::Cancelled`, runs a beam search (`beams`:
 3 by default, the smallest count that reproduced every engine transcript on the test clips, for
-about +195 ms on a 3.3 s clip; `beams: 1` is the greedy decode; up to 16), and favours names,
+about +55 ms on a 3.4 s clip, measured by `timing_per_beam_count` in
+[tests/decoding/timing.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/tests/decoding/timing.rs);
+`beams: 1` is the greedy decode; up to 16), and favours names,
 places and jargon you list (`keywords: vec!["PETG".into()]`, strength `keyword_bonus`; see
 [search.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/search.rs) and
 [keywords.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/keywords.rs)).
 `word_timestamps: true` fills `transcript.words` with each word's `start` and `end` in seconds
 from the start of the input and its `probability`, aligned from the decoder's cross-attention
-(within one 80 ms frame of the engine's on the test clips, for about +55 ms on a 3.4 s clip;
+(within one 80 ms frame of the engine's on the test clips, for about +34 ms on a 3.4 s clip,
+measured by `cost_of_word_timestamps` in
+[tests/timestamps/measure.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/tests/timestamps/measure.rs);
 [align.rs](https://github.com/larsbrubaker/whistle-rust/blob/main/crates/whistle-rust/src/transcribe/align.rs)).
 `Transcript` is `PartialEq` but not `Eq` (the times are f32).
 `transcript.repeated` is true when the decoder ran into a repetition loop (a token or phrase

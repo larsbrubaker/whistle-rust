@@ -164,7 +164,9 @@ files it governs point there. A measurement goes on the test, bench or script th
 There are no design docs. Markdown is limited to `README.md`, `CLAUDE.md`,
 `THIRD_PARTY_NOTICES.md` and `PORTING_PLAN.md` at the root, the published crate's
 `crates/whistle-rust/README.md` and `THIRD_PARTY_NOTICES.md`, and `.claude/` (agent
-instructions and skills); `markdown_placement` refuses any other Markdown file.
+instructions and skills); `markdown_placement` refuses any other Markdown file. An idea for
+later, written down when Lars asks for it, lives in `docs/later/<idea>.md`: it is not scheduled
+work and needs no plan entry; delete it when it is built or dropped.
 
 `PORTING_PLAN.md` is the plan: **open work only**, each item saying what a caller would notice
 and what is needed. History lives in git. Update it in the same change that makes it stale;

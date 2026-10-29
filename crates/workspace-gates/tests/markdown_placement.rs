@@ -6,6 +6,8 @@
 //     open work) at the repository root;
 //   - `crates/whistle-rust/README.md` and `crates/whistle-rust/THIRD_PARTY_NOTICES.md`, which
 //     ship in the published crate (its crates.io and docs.rs page, and its notices);
+//   - `docs/later/<idea>.md`, one level deep: an idea written down for later, not scheduled
+//     work, deleted when it is built or dropped;
 //   - anything under `.claude/` (agent instructions and skills).
 //
 // Every other `.md` or `.markdown` file (any case) fails the gate, named with what to do about
@@ -52,13 +54,23 @@ fn is_markdown(path: &str) -> bool {
     }
 }
 
+/// True for an idea written down for later: a file directly inside `docs/later/`, not in a
+/// folder below it.
+fn is_later_idea(path: &str) -> bool {
+    path.strip_prefix("docs/later/")
+        .is_some_and(|name| !name.is_empty() && !name.contains('/'))
+}
+
 /// Where `path` (relative to the root, `/`-separated) stands.
 fn placement(path: &str) -> Placement {
     if !is_markdown(path) {
         return Placement::NotMarkdown;
     }
     let under = |tree: &str| path.strip_prefix(tree).is_some_and(|rest| !rest.is_empty());
-    if ALLOWED_FILES.contains(&path) || ALLOWED_TREES.iter().any(|tree| under(tree)) {
+    if ALLOWED_FILES.contains(&path)
+        || ALLOWED_TREES.iter().any(|tree| under(tree))
+        || is_later_idea(path)
+    {
         Placement::Allowed
     } else {
         Placement::Refused
@@ -81,7 +93,8 @@ fn failure_message(refused: &[&str]) -> String {
         "Documentation lives in the code. Move what it explains into the header or doc comments \
          of the code it is about (a rule spanning several files into the owning crate's root; \
          measurements onto the test or bench that makes them), then delete it. Open work goes \
-         in PORTING_PLAN.md (CLAUDE.md, \"Documentation\").\n",
+         in PORTING_PLAN.md; an idea for later goes in docs/later/<idea>.md (CLAUDE.md, \
+         \"Documentation\").\n",
     );
     message
 }
@@ -169,6 +182,13 @@ fn markdown_placement_refuses_docs_anywhere_else() {
     ] {
         assert_eq!(placement(path), Placement::NotMarkdown, "{path}");
     }
+}
+
+#[test]
+fn markdown_placement_allows_an_idea_for_later_one_level_deep() {
+    assert_eq!(placement("docs/later/idea.md"), Placement::Allowed);
+    assert_eq!(placement("docs/later/sub/idea.md"), Placement::Refused);
+    assert_eq!(placement("docs/later.md"), Placement::Refused);
 }
 
 #[test]

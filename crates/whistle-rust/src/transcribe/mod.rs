@@ -63,7 +63,7 @@ pub const MAX_BEAMS: usize = 16;
 
 /// The default [`Options::beams`]: a 3-beam search, the smallest count that reproduces the
 /// engine's transcript on every contract clip, with the best word error rate against the true
-/// texts (12/72 words against greedy's 14/72), for about +195 ms on a 3.3 s clip. 5 beams (the
+/// texts (12/72 words against greedy's 14/72), for about +55 ms on a 3.4 s clip. 5 beams (the
 /// engine's benchmark count) give the same text on those clips for more than twice the extra
 /// cost. The measurements are in `ranking_word_error_rates` (`src/transcribe/tests.rs`) and
 /// `tests/decoding/timing.rs`.
@@ -172,7 +172,7 @@ pub struct Options {
     pub cancel: Option<Cancel>,
     /// Hypotheses the decode keeps, 1 to [`MAX_BEAMS`]. The default, [`DEFAULT_BEAMS`] (3), is
     /// the smallest count that reproduced every engine transcript on the test clips, with the
-    /// best word error rate against the true texts, for about +195 ms on a 3.3 s clip
+    /// best word error rate against the true texts, for about +55 ms on a 3.4 s clip
     /// ([`DEFAULT_BEAMS`] says why). `beams: 1` is the greedy decode the reference defines.
     /// 0 or more than [`MAX_BEAMS`] is [`Error::Input`].
     pub beams: usize,

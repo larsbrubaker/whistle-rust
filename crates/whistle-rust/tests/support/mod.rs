@@ -31,6 +31,23 @@ pub fn model_path() -> PathBuf {
     repo_root().join("models").join("whistle.cact")
 }
 
+/// Runs `f` `runs` times and returns each run's wall time in ms, in run order, and their median:
+/// what the release measurements report, because the median ignores the odd run slowed by other
+/// work on the machine where a mean or a minimum would not.
+pub fn timed_runs_ms(runs: usize, mut f: impl FnMut()) -> (Vec<f64>, f64) {
+    let times: Vec<f64> = (0..runs)
+        .map(|_| {
+            let start = std::time::Instant::now();
+            f();
+            start.elapsed().as_secs_f64() * 1e3
+        })
+        .collect();
+    let mut sorted = times.clone();
+    sorted.sort_by(f64::total_cmp);
+    let median = sorted.get(sorted.len() / 2).copied().unwrap_or(0.0);
+    (times, median)
+}
+
 pub fn read_json(path: &Path) -> Value {
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()))

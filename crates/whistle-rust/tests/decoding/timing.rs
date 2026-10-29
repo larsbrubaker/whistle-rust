@@ -1,15 +1,19 @@
-// The cost of the beam search per beam count on en_daniel (3.3 s, 16 text tokens). Run it in
-// release: `cargo test --release --test decoding -- --ignored --nocapture`. It asserts nothing
-// about speed; it only checks every count transcribes. Measured 2026-10-24, release, Apple
-// Silicon, one thread, ms per call (extra over greedy): 1 beam 207; 2 beams 305 (+98); 3 beams
-// 402 (+195); 5 beams 670 (+463); 8 beams 894 (+687); 16 beams 1347 (+1140); 5 beams with 3
-// keywords 442 (+235).
-
-use std::time::Instant;
+// The cost of the beam search per beam count on en_daniel (3.4 s, 16 text tokens). Run it in
+// release: `cargo test --release -p whistle-rust --test decoding timing_per_beam_count --
+// --ignored --nocapture`. It asserts nothing about speed; it only checks every count
+// transcribes. Each count is timed over 7 calls and reported as their median, so a call slowed
+// by other work on the machine does not move the figure.
+//
+// Measured 2026-10-29, release, Apple Silicon, the default kernel threads (up to 4), on a
+// machine shared with other builds (load average 21-35 on 10 cores); ms per call (extra over
+// greedy), the median of six runs of this test: 1 beam 164; 2 beams 228 (+58); 3 beams 229
+// (+55); 5 beams 339 (+161); 8 beams 453 (+266); 16 beams 792 (+578); 5 beams with 3 keywords
+// 309.
 
 use whistle::Options;
 
 use crate::clips::{beams, contract_clips, transcribe, whistle};
+use crate::support::timed_runs_ms;
 
 #[test]
 #[ignore = "release measurement of the cost per beam count"]
@@ -23,17 +27,19 @@ fn timing_per_beam_count() {
         * g.num_kv_heads as usize
         * (g.qk_head_dim + g.v_head_dim) as usize
         * 4;
+    let mut greedy = 0.0;
     for n in [1, 2, 3, 5, 8, 16] {
-        let runs = 3;
-        let start = Instant::now();
         let mut tokens = 0;
-        for _ in 0..runs {
+        let (times, ms) = timed_runs_ms(7, || {
             tokens = transcribe(clip, &beams(n)).tokens.len();
+        });
+        if n == 1 {
+            greedy = ms;
         }
-        let ms = start.elapsed().as_secs_f64() * 1e3 / runs as f64;
         println!(
-            "beams {n:2}: {ms:7.1} ms per call ({tokens} tokens); self-attention cache {} KiB \
-             per hypothesis at that length",
+            "beams {n:2}: median {ms:7.1} ms per call (+{:.1} over greedy; runs {times:.0?}; \
+             {tokens} tokens); self-attention cache {} KiB per hypothesis at that length",
+            ms - greedy,
             kv_per_position * (tokens + 2) / 1024
         );
     }
@@ -42,10 +48,8 @@ fn timing_per_beam_count() {
         keywords: vec!["Siobhan".into(), "PETG".into(), "MatterHackers".into()],
         ..Options::default()
     };
-    let start = Instant::now();
-    transcribe(clip, &keyed);
-    println!(
-        "beams 5 with 3 keywords: {:.1} ms",
-        start.elapsed().as_secs_f64() * 1e3
-    );
+    let (times, ms) = timed_runs_ms(7, || {
+        transcribe(clip, &keyed);
+    });
+    println!("beams 5 with 3 keywords: median {ms:.1} ms (runs {times:.0?})");
 }
